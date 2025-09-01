@@ -1,4 +1,4 @@
-﻿param([switch])
+﻿param([switch]$SkipOllama)
 Write-Host "== Watcher installer =="
 
 python -m venv .venv
@@ -7,7 +7,7 @@ python -m venv .venv
     ruff black mypy bandit semgrep pytest pytest-cov hypothesis coverage 
     requests httpx numpy scikit-learn sqlite-utils
 
-if (-not ) {
+if (-not $SkipOllama) {
   try { winget install -e --id Ollama.Ollama -h } catch {}
   Start-Process -FilePath "C:\Program Files\Ollama\ollama.exe" -ArgumentList "serve"
   Start-Sleep -Seconds 2

@@ -1,4 +1,4 @@
-﻿import subprocess, json
+﻿import subprocess
 class QualityGate:
     def run_all(self):
         results = {
@@ -6,7 +6,7 @@ class QualityGate:
             'ruff':   self._cmd(['ruff','.']),
             'mypy':   self._cmd(['mypy','.']),
             'bandit': self._cmd(['bandit','-q','-r','.']),
-            'semgrep':self._cmd(['semgrep','--quiet','--error','--config','p/ci','.'])
+             'semgrep':self._cmd(['semgrep','--quiet','--error','--config','config/semgrep.yml','.'])
         }
         ok = all(r['ok'] for r in results.values())
         return {'ok': ok, 'results': results}
