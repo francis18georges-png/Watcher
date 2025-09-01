@@ -1,5 +1,5 @@
 ﻿from pathlib import Path
-import textwrap, shutil
+import textwrap
 
 def create_python_cli(name: str, base: Path):
     proj = base / "app" / "projects" / name
@@ -34,11 +34,13 @@ def create_python_cli(name: str, base: Path):
     """), encoding="utf-8")
 
     (proj / "tests/test_cli.py").write_text(textwrap.dedent(f"""\
-        import subprocess, sys, pathlib
+        import subprocess, sys, pathlib, importlib.util
+
         def test_ping():
             root = pathlib.Path(__file__).resolve().parents[1]
-            subprocess.check_call([sys.executable,"-m","pip","install","-q",str(root)])
-            out = subprocess.check_output(["{name}","--ping"], text=True).strip()
+            if importlib.util.find_spec("{name}") is None:
+                subprocess.check_call([sys.executable, "-m", "pip", "install", "-q", str(root)])
+            out = subprocess.check_output(["{name}", "--ping"], text=True).strip()
             assert out == "pong"
     """), encoding="utf-8")
 
