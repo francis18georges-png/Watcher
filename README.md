@@ -11,3 +11,9 @@ Voir config/settings.toml.
 
 ## Sécurité
 Sandbox d'exécution confinée, tests + linters obligatoires avant adoption de code.
+
+
+## Entraînement
+- Datasets: datasets/python/*
+- python -m pytest -q dans chaque dossier
+- UI: bouton *Améliorer (A/B)* appelle l'autograde + bench

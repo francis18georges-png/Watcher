@@ -1,0 +1,6 @@
+﻿{
+  "name": "is_prime",
+  "difficulty": "easy",
+  "objective": "Implémenter is_prime(n) -> bool",
+  "entrypoint": "is_prime:is_prime"
+}

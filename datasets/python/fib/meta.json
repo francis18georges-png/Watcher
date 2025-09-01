@@ -1,0 +1,6 @@
+﻿{
+  "name": "fib",
+  "difficulty": "easy",
+  "objective": "Implémenter fib(n) -> int (F(0)=0,F(1)=1)",
+  "entrypoint": "fib:fib"
+}

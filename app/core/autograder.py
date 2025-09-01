@@ -1,0 +1,35 @@
+﻿import json, subprocess, pathlib, time
+
+DATASETS = pathlib.Path("datasets/python")
+
+def _run_pytest(task_dir: pathlib.Path, timeout=60):
+    t0=time.time()
+    p = subprocess.run(
+        ["pytest","-q"],
+        cwd=str(task_dir),
+        capture_output=True, text=True, timeout=timeout
+    )
+    ok = (p.returncode == 0)
+    return {
+        "ok": ok,
+        "sec": round(time.time()-t0,3),
+        "stdout": p.stdout[-4000:],
+        "stderr": p.stderr[-4000:]
+    }
+
+def list_tasks():
+    return [d for d in DATASETS.iterdir() if d.is_dir()]
+
+def grade_task(name: str):
+    task = DATASETS / name
+    if not task.exists():
+        return {"ok": False, "error": f"task {name} not found"}
+    rep = _run_pytest(task)
+    rep["score"] = 1.0 if rep["ok"] else 0.0
+    rep["task"] = name
+    return rep
+
+def grade_all():
+    results = [grade_task(p.name) for p in list_tasks()]
+    ok = all(r.get("ok",False) for r in results) if results else False
+    return {"ok": ok, "results": results}

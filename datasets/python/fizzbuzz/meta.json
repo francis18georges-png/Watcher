@@ -1,0 +1,6 @@
+﻿{
+  "name": "fizzbuzz",
+  "difficulty": "easy",
+  "objective": "Implémenter fizzbuzz(n) -> str",
+  "entrypoint": "fizzbuzz:fizzbuzz"
+}
