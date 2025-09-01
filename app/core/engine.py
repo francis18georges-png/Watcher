@@ -16,7 +16,8 @@ class Engine:
         self.planner = Planner()
 
     def chat(self, prompt: str) -> str:
-        self.mem.add("chat", prompt); return "ping"
+        self.mem.add("chat", prompt)
+        return "ping"
 
     def run_briefing(self) -> str:
         spec = self.planner.briefing()
@@ -40,7 +41,8 @@ class Engine:
         # entraîne sur tous les datasets puis fait un A/B stub
         rep = AG.grade_all()
         self.mem.add("train", json.dumps(rep))
-        a = self.bench.run_variant("A"); b = self.bench.run_variant("B")
+        a = self.bench.run_variant("A")
+        b = self.bench.run_variant("B")
         keep = "A" if a >= b else "B"
         self.mem.add("decision", json.dumps({"A":a,"B":b,"keep":keep}))
         return f"train_ok={rep.get('ok',False)} A={a:.3f} B={b:.3f} keep={keep}"

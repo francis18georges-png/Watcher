@@ -11,6 +11,7 @@ Voir config/settings.toml.
 
 ## Sécurité
 Sandbox d'exécution confinée, tests + linters obligatoires avant adoption de code.
+Semgrep utilise un fichier de règles local (`config/semgrep.yml`), aucun accès réseau requis.
 
 
 ## Entraînement
