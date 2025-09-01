@@ -1,0 +1,1 @@
+﻿- Interdire secrets en clair. Bandit+Semgrep obligatoires. Écriture confinée au workspace.

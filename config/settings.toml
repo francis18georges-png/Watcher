@@ -1,0 +1,39 @@
+﻿theme = "dark"
+
+[ui]
+wizard_autostart = true
+mode = "Sur"                 # Rapide | Sur | Exploration | AutoRefactor
+
+[llm]
+backend = "ollama"           # ollama | llamacpp
+model = "llama3.2:3b"
+ctx = 8192
+temperature = 0.6
+
+[dev]
+enable_repo = true
+test_timeout_sec = 60
+quality_min_coverage = 0.75
+quality_max_ruff = 0
+quality_bandit_fail = true
+semgrep_ruleset = "p/ci"
+
+[planner]
+max_diff_lines = 200
+ab_candidates = 2
+
+[memory]
+embed_backend = "ollama"
+embed_model = "nomic-embed-text"
+top_k = 8
+db_path = "memory/mem.db"
+
+[learn]
+target_score = 0.9
+max_iters = 5
+focus_languages = ["python","node","cpp","powershell"]
+
+[intelligence]
+prefer_ab_testing = true
+reward_weights = { tests = 0.5, perf = 0.2, quality = 0.2, security = 0.1 }
+stagnation_patience = 2
