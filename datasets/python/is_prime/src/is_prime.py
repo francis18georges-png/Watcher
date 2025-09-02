@@ -1,7 +1,18 @@
-﻿import math
+"""Primality test utilities."""
+
+import math
+
 
 def is_prime(n: int) -> bool:
-    """True si n est premier pour n>=2."""
+    """Return ``True`` if ``n`` is prime for ``n >= 2``.
+
+    Examples
+    --------
+    >>> is_prime(2)
+    True
+    >>> is_prime(4)
+    False
+    """
     if n < 2:
         return False
     if n % 2 == 0:
