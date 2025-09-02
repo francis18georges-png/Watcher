@@ -20,6 +20,52 @@ class Engine:
         self.qg = QualityGate()
         self.bench = Bench()
         self.planner = Planner()
+        self.start_msg = self._bootstrap()
+
+    def _bootstrap(self) -> str:
+        """Load context and run automatic routines for a ready agent."""
+        data_dir = self.base / "data"
+        data_dir.mkdir(exist_ok=True, parents=True)
+
+        # Initial conversation context
+        ctx_file = data_dir / "initial_context.txt"
+        if ctx_file.exists():
+            ctx = ctx_file.read_text(encoding="utf-8")
+        else:
+            ctx = "Watcher prêt. Utilisez l'onglet Chat pour dialoguer."
+            ctx_file.write_text(ctx, encoding="utf-8")
+        self.mem.add("context", ctx)
+
+        # Ensure a briefing is available
+        brief_file = data_dir / "brief.yaml"
+        if brief_file.exists():
+            self.mem.add("brief", brief_file.read_text(encoding="utf-8"))
+        else:
+            self.run_briefing()
+
+        # Preload a system prompt for conversations
+        prompt_file = data_dir / "conversation_prompt.txt"
+        if prompt_file.exists():
+            prompt = prompt_file.read_text(encoding="utf-8")
+        else:
+            prompt = (
+                "Tu es Watcher, un assistant de développement Python. "
+                "Réponds de manière concise et utile."
+            )
+            prompt_file.write_text(prompt, encoding="utf-8")
+        self.mem.add("system_prompt", prompt)
+
+        # Automatic maintenance
+        try:
+            self.run_quality_gate()
+        except Exception:  # pragma: no cover - best effort
+            pass
+        try:
+            self.auto_improve()
+        except Exception:  # pragma: no cover - best effort
+            pass
+
+        return ctx
 
     def chat(self, prompt: str) -> str:
         """Record a chat message and return a placeholder response."""
