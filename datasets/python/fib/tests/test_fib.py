@@ -1,6 +1,9 @@
-﻿import sys, pathlib
+import pathlib
+import sys
+
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1] / "src"))
 from fib import fib
+
 
 def test_values():
     assert fib(0) == 0
