@@ -6,6 +6,7 @@ class QualityGate:
         results = {
             "pytest": self._cmd(["pytest", "-q"]),
             "ruff": self._cmd(["ruff", "."]),
+            "black": self._cmd(["black", "--check", "."]),
             "mypy": self._cmd(["mypy", "."]),
             "bandit": self._cmd(["bandit", "-q", "-r", "."]),
             "semgrep": self._cmd(

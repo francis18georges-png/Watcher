@@ -34,6 +34,9 @@ Exécuter les vérifications locales avant de proposer du code :
 ```bash
 ruff check .
 black --check .
+mypy .
+bandit -q -r .
+semgrep --quiet --error --config config/semgrep.yml .
 pytest -q
 ```
 
