@@ -1,20 +1,50 @@
-﻿# Watcher
+# Watcher
+
 Atelier local d'IA de programmation autonome (offline par défaut).
-- Mémoire vectorielle, curriculum adaptatif, A/B + bench, quality gate sécurité.
+Mémoire vectorielle, curriculum adaptatif, A/B + bench et quality gate sécurité.
+
+## Installation
+
+1. Cloner ce dépôt.
+2. Créer un environnement Python 3.12 puis installer les outils de développement :
+
+   ```bash
+   pip install black ruff pytest
+   ```
 
 ## Utilisation
-1. .\installer.ps1
-2. .\run.ps1
 
-## Config
-Voir config/settings.toml.
+### Interface graphique
+
+Sous Windows :
+
+1. `./installer.ps1`
+2. `./run.ps1`
+
+### Ligne de commande
+
+```bash
+python -m app.ui.main
+```
+
+## Tests & Qualité
+
+Exécuter les vérifications locales avant de proposer du code :
+
+```bash
+ruff check .
+black --check .
+pytest -q
+```
+
+## Structure du dépôt
+
+- `app/` : moteur principal, mémoire, benchmarks et interface utilisateur.
+- `datasets/` : jeux d'entraînement Python (`fib`, `fizzbuzz`, `is_prime`).
+- `config/` : paramètres et règles de sécurité (`semgrep`).
 
 ## Sécurité
-Sandbox d'exécution confinée, tests + linters obligatoires avant adoption de code.
+
+Sandbox d'exécution confinée, tests et linters obligatoires avant adoption de code.
 Semgrep utilise un fichier de règles local (`config/semgrep.yml`), aucun accès réseau requis.
 
-
-## Entraînement
-- Datasets: datasets/python/*
-- python -m pytest -q dans chaque dossier
-- UI: bouton *Améliorer (A/B)* appelle l'autograde + bench
