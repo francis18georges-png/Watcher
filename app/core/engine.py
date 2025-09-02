@@ -8,6 +8,7 @@ from app.core.benchmark import Bench
 from app.core.evaluator import QualityGate
 from app.core.memory import Memory
 from app.core.planner import Planner
+from app.llm.client import Client
 from app.tools.scaffold import create_python_cli
 
 
@@ -20,6 +21,7 @@ class Engine:
         self.qg = QualityGate()
         self.bench = Bench()
         self.planner = Planner()
+        self.client = Client()
         self.start_msg = self._bootstrap()
 
     def _bootstrap(self) -> str:
@@ -68,9 +70,11 @@ class Engine:
         return ctx
 
     def chat(self, prompt: str) -> str:
-        """Record a chat message and return a placeholder response."""
+        """Generate a response to *prompt* using the LLM client."""
         self.mem.add("chat", prompt)
-        return "ping"
+        answer = self.client.generate(prompt)
+        self.mem.add("chat", answer)
+        return answer
 
     def run_briefing(self) -> str:
         """Generate a project brief and persist it to the data directory."""
