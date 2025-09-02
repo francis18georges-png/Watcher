@@ -37,6 +37,21 @@ black --check .
 pytest -q
 ```
 
+## Collecte de données ouverte
+
+Le module `DataCollector` prépare des dossiers pour plusieurs jeux de
+données libres utiles à l'apprentissage automatique :
+
+- The Stack
+- CodeSearchNet
+- Stack Overflow Data Dump
+- Common Crawl / OpenWebText
+- Kaggle Datasets
+
+Le téléchargement réel reste manuel afin de respecter les licences et les
+robots.txt. Une fois la session autorisée, l'agent peut lancer la collecte
+et l'apprentissage automatiquement.
+
 ## Structure du dépôt
 
 - `app/` : moteur principal, mémoire, benchmarks et interface utilisateur.

@@ -16,6 +16,8 @@ class WatcherApp(ttk.Frame):
         master.minsize(900, 600)
         self.pack(fill="both", expand=True)
         self._build()
+        self.out.insert("end", f"[Watcher] {self.engine.start_msg}\n")
+        self.out.see("end")
 
     def _build(self) -> None:
         nb = ttk.Notebook(self)
