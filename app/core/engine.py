@@ -2,6 +2,7 @@
 
 from pathlib import Path
 import json
+import sys
 
 from app.core import autograder as AG
 from app.core.benchmark import Bench
@@ -23,6 +24,36 @@ class Engine:
         self.planner = Planner()
         self.client = Client()
         self.start_msg = self._bootstrap()
+
+    def _ask_permission(self) -> bool:
+        """Return whether automatic maintenance is permitted.
+
+        Checks ``data/consent.json`` for a stored decision. If the file does
+        not exist, the user is prompted and the answer is persisted. In
+        non-interactive environments, permission defaults to ``False``.
+        """
+
+        consent_file = self.base / "data" / "consent.json"
+        if consent_file.exists():
+            try:
+                data = json.loads(consent_file.read_text(encoding="utf-8"))
+                return bool(data.get("allow", False))
+            except Exception:  # pragma: no cover - invalid file
+                pass
+
+        if not sys.stdin.isatty():  # pragma: no cover - CI or non-interactive
+            return False
+
+        while True:
+            ans = input(
+                "Autoriser Watcher à exécuter les routines automatiques ? [y/n]: "
+            ).strip().lower()
+            if ans in {"y", "n"}:
+                allow = ans == "y"
+                consent_file.write_text(
+                    json.dumps({"allow": allow}), encoding="utf-8"
+                )
+                return allow
 
     def _bootstrap(self) -> str:
         """Load context and run automatic routines for a ready agent."""
@@ -58,14 +89,15 @@ class Engine:
         self.mem.add("system_prompt", prompt)
 
         # Automatic maintenance
-        try:
-            self.run_quality_gate()
-        except Exception:  # pragma: no cover - best effort
-            pass
-        try:
-            self.auto_improve()
-        except Exception:  # pragma: no cover - best effort
-            pass
+        if self._ask_permission():
+            try:
+                self.run_quality_gate()
+            except Exception:  # pragma: no cover - best effort
+                pass
+            try:
+                self.auto_improve()
+            except Exception:  # pragma: no cover - best effort
+                pass
 
         return ctx
 
