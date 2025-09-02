@@ -1,12 +1,18 @@
-﻿def fizzbuzz(n: int) -> str:
+"""FizzBuzz exercise utility."""
+
+
+def fizzbuzz(n: int) -> str:
+    """Return fizz/buzz/fizzbuzz or the number itself.
+
+    Examples
+    --------
+    >>> fizzbuzz(3)
+    'fizz'
+    >>> fizzbuzz(5)
+    'buzz'
+    >>> fizzbuzz(15)
+    'fizzbuzz'
     """
-    Retourne:
-      "fizz" si multiple de 3
-      "buzz" si multiple de 5
-      "fizzbuzz" si multiple de 3 et 5
-      sinon str(n)
-    """
-    # TODO: implémenter
     if n % 3 == 0 and n % 5 == 0:
         return "fizzbuzz"
     if n % 3 == 0:
