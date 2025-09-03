@@ -10,6 +10,7 @@ from app.core.memory import Memory
 from app.core.planner import Planner
 from app.llm.client import Client
 from app.tools.scaffold import create_python_cli
+from app.config import load_settings
 
 
 class Engine:
@@ -17,11 +18,15 @@ class Engine:
 
     def __init__(self) -> None:
         self.base = Path(__file__).resolve().parents[2]
-        self.mem = Memory(self.base / "memory" / "mem.db")
+        settings = load_settings()
+        mem_cfg = settings.get("memory", {})
+        mem_path = self.base / mem_cfg.get("db_path", "memory/mem.db")
+        top_k = mem_cfg.get("top_k", 8)
+        self.mem = Memory(mem_path, top_k=top_k)
         self.qg = QualityGate()
         self.bench = Bench()
         self.planner = Planner()
-        self.client = Client()
+        self.client = Client(settings.get("llm", {}))
         self.start_msg = self._bootstrap()
 
     def _bootstrap(self) -> str:

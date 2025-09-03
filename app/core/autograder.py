@@ -2,11 +2,15 @@ import pathlib
 import subprocess
 import time
 
+from app.config import load_settings
+
 
 DATASETS = pathlib.Path("datasets/python")
 
 
-def _run_pytest(task_dir: pathlib.Path, timeout: int = 60) -> dict:
+def _run_pytest(task_dir: pathlib.Path, timeout: int | None = None) -> dict:
+    if timeout is None:
+        timeout = load_settings()["dev"].get("test_timeout_sec", 60)
     t0 = time.time()
     p = subprocess.run(
         ["pytest", "-q"],

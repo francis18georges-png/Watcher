@@ -27,6 +27,15 @@ Sous Windows :
 python -m app.ui.main
 ```
 
+## Configuration
+
+Les principaux réglages se trouvent dans `config/settings.toml` :
+
+- `[llm]` : backend (`backend`) et modèle (`model`) pour le client LLM.
+- `[dev.test_timeout_sec]` : délai maximal des tests et linters.
+- `[memory.db_path]` : chemin de la base SQLite des souvenirs de l'agent.
+- `[memory.top_k]` : nombre de résultats retournés lors d'une recherche.
+
 ## Tests & Qualité
 
 Exécuter les vérifications locales avant de proposer du code :

@@ -8,8 +8,9 @@ from app.tools.embeddings import embed_ollama
 
 
 class Memory:
-    def __init__(self, db_path: Path):
+    def __init__(self, db_path: Path, top_k: int = 8):
         self.db_path = Path(db_path)
+        self.top_k = top_k
         self.db_path.parent.mkdir(parents=True, exist_ok=True)
         self._init()
 
@@ -34,7 +35,9 @@ class Memory:
         con.commit()
         con.close()
 
-    def search(self, query: str, top_k: int = 8):
+    def search(self, query: str, top_k: int | None = None):
+        if top_k is None:
+            top_k = self.top_k
         q = embed_ollama([query])[0].astype("float32")
         con = sqlite3.connect(self.db_path)
         c = con.cursor()
