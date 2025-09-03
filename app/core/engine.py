@@ -8,6 +8,7 @@ from app.core.benchmark import Bench
 from app.core.evaluator import QualityGate
 from app.core.memory import Memory
 from app.core.planner import Planner
+from app.core.learner import Learner
 from app.llm.client import Client
 from app.tools.scaffold import create_python_cli
 
@@ -20,6 +21,7 @@ class Engine:
         self.mem = Memory(self.base / "memory" / "mem.db")
         self.qg = QualityGate()
         self.bench = Bench()
+        self.learner = Learner(self.bench, self.base / "data")
         self.planner = Planner()
         self.client = Client()
         self.start_msg = self._bootstrap()
@@ -76,9 +78,9 @@ class Engine:
         self.mem.add("chat", answer)
         return answer
 
-    def run_briefing(self) -> str:
+    def run_briefing(self, objective: str = "Projet démo") -> str:
         """Generate a project brief and persist it to the data directory."""
-        spec = self.planner.briefing()
+        spec = self.planner.briefing(objective)
         (self.base / "data").mkdir(exist_ok=True, parents=True)
         (self.base / "data" / "brief.yaml").write_text(spec, encoding="utf-8")
         self.mem.add("brief", spec)
@@ -98,11 +100,16 @@ class Engine:
         return json.dumps(res)
 
     def auto_improve(self) -> str:
-        """Train on datasets and perform a simple A/B benchmark."""
+        """Train on datasets and explore several benchmark variants."""
         rep = AG.grade_all()
         self.mem.add("train", json.dumps(rep))
-        a = self.bench.run_variant("A")
-        b = self.bench.run_variant("B")
-        keep = "A" if a >= b else "B"
-        self.mem.add("decision", json.dumps({"A": a, "B": b, "keep": keep}))
-        return f"train_ok={rep.get('ok', False)} A={a:.3f} B={b:.3f} keep={keep}"
+        comp = self.learner.optimize()
+        self.mem.add("decision", json.dumps(comp))
+        a = comp["A"]
+        b = comp["B"]
+        keep = comp["best"]["name"]
+        iters = comp["iterations"]
+        return (
+            f"train_ok={rep.get('ok', False)} A={a:.3f} B={b:.3f} "
+            f"keep={keep} iterations={iters}"
+        )
