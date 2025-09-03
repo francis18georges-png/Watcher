@@ -76,9 +76,9 @@ class Engine:
         self.mem.add("chat", answer)
         return answer
 
-    def run_briefing(self) -> str:
+    def run_briefing(self, objective: str = "Projet démo") -> str:
         """Generate a project brief and persist it to the data directory."""
-        spec = self.planner.briefing()
+        spec = self.planner.briefing(objective)
         (self.base / "data").mkdir(exist_ok=True, parents=True)
         (self.base / "data" / "brief.yaml").write_text(spec, encoding="utf-8")
         self.mem.add("brief", spec)
