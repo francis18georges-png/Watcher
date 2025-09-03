@@ -71,6 +71,24 @@ class Engine:
 
         return ctx
 
+    def _ask_permission(self, question: str, consent_file: Path) -> bool:
+        """Ask *question* to the user and persist the answer.
+
+        If ``consent_file`` already exists, its stored value (``"y"`` or
+        ``"n"``) is returned.  Otherwise the user is prompted and the response
+        is written to ``consent_file``.  The parent directory is created on the
+        fly to avoid ``FileNotFoundError`` when persisting the choice.
+        """
+
+        if consent_file.exists():
+            stored = consent_file.read_text(encoding="utf-8").strip().lower()
+            return stored.startswith("y")
+
+        answer = input(f"{question} [y/N]: ").strip().lower()
+        consent_file.parent.mkdir(parents=True, exist_ok=True)
+        consent_file.write_text("y" if answer.startswith("y") else "n", encoding="utf-8")
+        return answer.startswith("y")
+
     def chat(self, prompt: str) -> str:
         """Generate a response to *prompt* using the LLM client."""
         self.mem.add("chat", prompt)
