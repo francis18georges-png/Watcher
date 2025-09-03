@@ -1,5 +1,6 @@
 import tkinter as tk
 from tkinter import messagebox, ttk
+from threading import Thread
 
 from app.core.engine import Engine
 
@@ -89,15 +90,28 @@ class WatcherApp(ttk.Frame):
         self.out.insert("end", f"\n[Scaffold] {msg}\n")
         self.out.see("end")
 
-    def _tests(self) -> None:
-        rep = self.engine.run_quality_gate()
-        self.out.insert("end", f"\n[Tests] {rep}\n")
+    def _run_async(self, fn, tag: str) -> None:
+        pb = ttk.Progressbar(self.atelier, mode="indeterminate")
+        pb.pack(fill="x", padx=8, pady=4)
+        pb.start()
+
+        def task() -> None:
+            rep = fn()
+            self.after(0, lambda: self._task_done(pb, tag, rep))
+
+        Thread(target=task, daemon=True).start()
+
+    def _task_done(self, pb: ttk.Progressbar, tag: str, rep: str) -> None:
+        pb.stop()
+        pb.destroy()
+        self.out.insert("end", f"\n[{tag}] {rep}\n")
         self.out.see("end")
 
+    def _tests(self) -> None:
+        self._run_async(self.engine.run_quality_gate, "Tests")
+
     def _improve(self) -> None:
-        rep = self.engine.auto_improve()
-        self.out.insert("end", f"\n[Improve] {rep}\n")
-        self.out.see("end")
+        self._run_async(self.engine.auto_improve, "Improve")
 
 
 if __name__ == "__main__":
