@@ -1,8 +1,11 @@
 import subprocess
+from pathlib import Path
 
 
 class QualityGate:
     def run_all(self) -> dict:
+        repo_root = Path(__file__).resolve().parents[2]
+        semgrep_config = repo_root / "config" / "semgrep.yml"
         results = {
             "pytest": self._cmd(["pytest", "-q"]),
             "ruff": self._cmd(["ruff", "."]),
@@ -15,7 +18,7 @@ class QualityGate:
                     "--quiet",
                     "--error",
                     "--config",
-                    "config/semgrep.yml",
+                    str(semgrep_config),
                     ".",
                 ]
             ),
