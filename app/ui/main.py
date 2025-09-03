@@ -46,7 +46,8 @@ class WatcherApp(ttk.Frame):
         bottom.pack(fill="x", padx=8, pady=(0, 8))
         self.inp = tk.Text(bottom, height=4, wrap="word")
         self.inp.pack(side="left", fill="both", expand=True)
-        ttk.Button(bottom, text="Envoyer", command=self._send).pack(side="left", padx=8)
+        self.send_btn = ttk.Button(bottom, text="Envoyer", command=self._send)
+        self.send_btn.pack(side="left", padx=8)
         self.status = ttk.Label(
             self,
             text="Mode: Sur | Backend: ollama | Modèle: llama3.2:3b",
@@ -75,10 +76,17 @@ class WatcherApp(ttk.Frame):
         q = self.inp.get("1.0", "end").strip()
         if not q:
             return
-        ans = self.engine.chat(q)
-        self.out.insert("end", f"\n[You] {q}\n[Watcher] {ans}\n")
+        self.out.insert("end", f"\n[You] {q}\n")
         self.out.see("end")
         self.inp.delete("1.0", "end")
+        self.send_btn.state(["disabled"])
+
+        def done(ans: str) -> None:
+            self.out.insert("end", f"[Watcher] {ans}\n")
+            self.out.see("end")
+            self.send_btn.state(["!disabled"])
+
+        self._run_in_thread(lambda: self.engine.chat(q), done)
 
     def _brief(self) -> None:
         spec = self.engine.run_briefing()
@@ -90,16 +98,19 @@ class WatcherApp(ttk.Frame):
         self.out.insert("end", f"\n[Scaffold] {msg}\n")
         self.out.see("end")
 
+    def _run_in_thread(self, fn, done) -> None:
+        def task() -> None:
+            rep = fn()
+            self.after(0, lambda: done(rep))
+
+        Thread(target=task, daemon=True).start()
+
     def _run_async(self, fn, tag: str) -> None:
         pb = ttk.Progressbar(self.atelier, mode="indeterminate")
         pb.pack(fill="x", padx=8, pady=4)
         pb.start()
 
-        def task() -> None:
-            rep = fn()
-            self.after(0, lambda: self._task_done(pb, tag, rep))
-
-        Thread(target=task, daemon=True).start()
+        self._run_in_thread(fn, lambda rep: self._task_done(pb, tag, rep))
 
     def _task_done(self, pb: ttk.Progressbar, tag: str, rep: str) -> None:
         pb.stop()
