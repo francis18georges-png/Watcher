@@ -14,7 +14,10 @@ def embed_ollama(texts, model: str = "nomic-embed-text"):
             body=payload,
             headers={"Content-Type": "application/json"},
         )
-        data = json.loads(conn.getresponse().read())
+        resp = conn.getresponse()
+        if resp.status != 200:
+            raise RuntimeError(f"Embedding request failed: {resp.status}")
+        data = json.loads(resp.read())
         return [np.array(v, dtype=np.float32) for v in data["embeddings"]]
     except Exception as e:  # pragma: no cover - network
         raise RuntimeError(f"Embedding request failed: {e}")
