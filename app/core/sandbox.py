@@ -19,7 +19,13 @@ def run(
     Returns:
         dict: Informations d'exécution comprenant codes et dépassements.
     """
-
+    import sys
+    if sys.platform == "win32":
+        msg = (
+            "Resource limits are not implemented on Windows. "
+            "Use subprocess.CREATE_JOB_OBJECT to enforce limits."
+        )
+        raise NotImplementedError(msg)
     import resource
     import signal
     import subprocess
