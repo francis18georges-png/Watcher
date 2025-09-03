@@ -8,16 +8,26 @@ DATASETS = pathlib.Path("datasets/python")
 
 def _run_pytest(task_dir: pathlib.Path, timeout: int = 60) -> dict:
     t0 = time.time()
-    p = subprocess.run(
-        ["pytest", "-q"],
-        cwd=str(task_dir),
-        capture_output=True,
-        text=True,
-        timeout=timeout,
-    )
+    try:
+        p = subprocess.run(
+            ["pytest", "-q"],
+            cwd=str(task_dir),
+            capture_output=True,
+            text=True,
+            timeout=timeout,
+        )
+    except subprocess.TimeoutExpired:
+        return {
+            "ok": False,
+            "timeout": True,
+            "sec": timeout,
+            "stdout": "",
+            "stderr": "timeout",
+        }
     ok = p.returncode == 0
     return {
         "ok": ok,
+        "timeout": False,
         "sec": round(time.time() - t0, 3),
         "stdout": p.stdout[-4000:],
         "stderr": p.stderr[-4000:],
@@ -35,10 +45,12 @@ def grade_task(name: str) -> dict:
     rep = _run_pytest(task)
     rep["score"] = 1.0 if rep["ok"] else 0.0
     rep["task"] = name
+    rep.setdefault("timeout", False)
     return rep
 
 
 def grade_all() -> dict:
     results = [grade_task(p.name) for p in list_tasks()]
     ok = all(r.get("ok", False) for r in results) if results else False
-    return {"ok": ok, "results": results}
+    timeout = any(r.get("timeout", False) for r in results)
+    return {"ok": ok, "timeout": timeout, "results": results}
