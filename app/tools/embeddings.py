@@ -1,7 +1,7 @@
 import http.client
 import json
 
-import numpy as np
+import numpy as np  # type: ignore[import-not-found]
 
 
 def embed_ollama(texts, model: str = "nomic-embed-text"):

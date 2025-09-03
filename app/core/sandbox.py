@@ -1,5 +1,16 @@
 # Sandbox: point d'entrée pour exécutions confinées avec quotas
 
+from typing import TypedDict
+
+
+class RunResult(TypedDict):
+    code: int | None
+    out: str
+    err: str
+    timeout: bool
+    cpu_exceeded: bool
+    memory_exceeded: bool
+
 
 def run(
     cmd: list[str],
@@ -7,7 +18,7 @@ def run(
     cpu_seconds: int | None = None,
     memory_bytes: int | None = None,
     timeout: float | None = 30,
-) -> dict:
+) -> RunResult:
     """Exécute ``cmd`` avec quotas optionnels.
 
     Args:
@@ -30,7 +41,7 @@ def run(
         if memory_bytes is not None:
             resource.setrlimit(resource.RLIMIT_AS, (memory_bytes, memory_bytes))
 
-    result = {
+    result: RunResult = {
         "code": None,
         "out": "",
         "err": "",
@@ -58,8 +69,8 @@ def run(
         result.update(
             {
                 "timeout": True,
-                "out": e.stdout or "",
-                "err": e.stderr or "",
+                "out": str(e.stdout or ""),
+                "err": str(e.stderr or ""),
             }
         )
     return result
