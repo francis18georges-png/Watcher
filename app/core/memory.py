@@ -3,7 +3,7 @@ import time
 import logging
 from pathlib import Path
 
-import numpy as np
+import numpy as np  # type: ignore[import-not-found]
 
 from app.tools.embeddings import embed_ollama
 
