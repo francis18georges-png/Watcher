@@ -20,6 +20,7 @@ def run(
         dict: Informations d'exécution comprenant codes et dépassements.
     """
     import sys
+
     if sys.platform == "win32":
         msg = (
             "Resource limits are not implemented on Windows. "
@@ -36,7 +37,7 @@ def run(
         if memory_bytes is not None:
             resource.setrlimit(resource.RLIMIT_AS, (memory_bytes, memory_bytes))
 
-    result = {
+    result: dict[str, bool | int | str | None] = {
         "code": None,
         "out": "",
         "err": "",
@@ -53,7 +54,13 @@ def run(
             timeout=timeout,
             preexec_fn=_limits if cpu_seconds or memory_bytes else None,
         )
-        result.update({"code": p.returncode, "out": p.stdout, "err": p.stderr})
+        from typing import cast
+
+        out = cast(str, p.stdout) if isinstance(p.stdout, str) else ""
+        err = cast(str, p.stderr) if isinstance(p.stderr, str) else ""
+        result["code"] = p.returncode
+        result["out"] = out
+        result["err"] = err
         if p.returncode and p.returncode < 0:
             sig = -p.returncode
             if sig == signal.SIGXCPU:
@@ -61,11 +68,7 @@ def run(
             elif sig == signal.SIGKILL:
                 result["memory_exceeded"] = True
     except subprocess.TimeoutExpired as e:
-        result.update(
-            {
-                "timeout": True,
-                "out": e.stdout or "",
-                "err": e.stderr or "",
-            }
-        )
+        result["timeout"] = True
+        result["out"] = e.stdout if isinstance(e.stdout, str) else ""
+        result["err"] = e.stderr if isinstance(e.stderr, str) else ""
     return result

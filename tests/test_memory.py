@@ -1,53 +1,6 @@
-import types
-import sys
-import math
-import struct
-import pathlib
 import sqlite3
 
-# Create a minimal numpy stub to avoid dependency
-class _Vector:
-    def __init__(self, values):
-        self.values = [float(v) for v in values]
-    def astype(self, dtype):
-        return self
-    def tobytes(self):
-        return struct.pack(f"{len(self.values)}f", *self.values)
-    def __matmul__(self, other):
-        return sum(a * b for a, b in zip(self.values, other.values))
-    @property
-    def size(self):
-        return len(self.values)
-    def __iter__(self):
-        return iter(self.values)
-    def tolist(self):
-        return list(self.values)
-
-
-def _array(values, dtype=None):
-    return _Vector(values)
-
-
-def _frombuffer(buf, dtype=None):
-    n = len(buf) // 4
-    return _Vector(struct.unpack(f"{n}f", buf))
-
-
-def _norm(vec):
-    return math.sqrt(sum(v * v for v in vec))
-
-
-np_stub = types.SimpleNamespace(
-    array=_array,
-    frombuffer=_frombuffer,
-    float32="float32",
-    linalg=types.SimpleNamespace(norm=_norm),
-)
-
-sys.modules.setdefault("numpy", np_stub)
 import numpy as np  # type: ignore
-
-sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1]))
 
 from app.core.memory import Memory
 

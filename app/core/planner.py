@@ -55,4 +55,3 @@ class Planner:
         lines += fmt("livrables", deliverables)
         lines += fmt("critere_succes", success)
         return "\n".join(lines)
-

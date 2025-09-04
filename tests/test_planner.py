@@ -22,4 +22,3 @@ def test_briefing_requires_objective() -> None:
     planner = Planner()
     with pytest.raises(ValueError):
         planner.briefing("   ")
-

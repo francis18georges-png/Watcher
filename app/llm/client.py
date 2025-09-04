@@ -25,7 +25,7 @@ class Client:
 
         if self.api_key:
             try:  # pragma: no cover - network path
-                import openai
+                import openai  # type: ignore[import-not-found]
 
                 openai.api_key = self.api_key
                 resp = openai.ChatCompletion.create(
@@ -38,4 +38,3 @@ class Client:
                 pass
 
         return f"Echo: {prompt}"
-
