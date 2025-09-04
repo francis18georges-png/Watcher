@@ -1,4 +1,4 @@
-﻿class Bench:
+class Bench:
     def run_variant(self, name: str) -> float:
         # Stub bench: renvoie un score pseudo aléatoire stable par nom
         import hashlib
