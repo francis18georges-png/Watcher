@@ -1,4 +1,4 @@
-﻿[ui]
+[ui]
 theme = "dark"
 wizard_autostart = true
 mode = "Sur"                 # Rapide | Sur | Exploration | AutoRefactor
