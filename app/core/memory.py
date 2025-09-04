@@ -35,7 +35,17 @@ class Memory:
                 (kind, text, vec, time.time()),
             )
 
-    def search(self, query: str, top_k: int = 8):
+    def search(self, query: str, top_k: int = 8) -> list[tuple[float, int, str, str]]:
+        """Search memory for items similar to ``query``.
+
+        Args:
+            query: Text to search for.
+            top_k: Maximum number of results to return.
+
+        Returns:
+            A list of tuples ``(score, id, kind, text)`` sorted by descending
+            similarity score.
+        """
         try:
             q = embed_ollama([query])[0].astype("float32")
         except Exception:
