@@ -1,8 +1,9 @@
 import pathlib
-import sys
+import runpy
 
-sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1] / "src"))
-from fib import fib
+fib = runpy.run_path(
+    pathlib.Path(__file__).resolve().parents[1] / "src" / "fib.py"
+)["fib"]
 
 
 def test_values():
