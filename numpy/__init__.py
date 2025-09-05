@@ -56,3 +56,7 @@ class _Linalg:
 
 
 linalg = _Linalg()
+
+
+def zeros(shape: int, dtype: str | None = None) -> ndarray:  # noqa: ARG001
+    return ndarray([0.0] * int(shape))

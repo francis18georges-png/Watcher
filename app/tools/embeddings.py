@@ -1,8 +1,8 @@
 """Utilities for working with embeddings.
 
-If the embedding backend cannot be reached, the helper below returns an empty
-vector (``np.array([], dtype=np.float32)``) for each requested text. This
-effectively disables vector search.
+If the embedding backend cannot be reached, the helper below returns a zero
+vector (``np.zeros(1, dtype=np.float32)``) for each requested text. This
+disables vector search but allows the application to continue running.
 """
 
 import http.client
@@ -27,7 +27,7 @@ def embed_ollama(texts, model: str = "nomic-embed-text"):
         data = json.loads(resp.read())
         return [np.array(v, dtype=np.float32) for v in data["embeddings"]]
     except Exception:  # pragma: no cover - network
-        return [np.array([], dtype=np.float32) for _ in texts]
+        return [np.zeros(1, dtype=np.float32) for _ in texts]
     finally:
         try:
             conn.close()
