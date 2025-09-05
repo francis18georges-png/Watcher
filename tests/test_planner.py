@@ -2,6 +2,7 @@ import pytest
 
 from app.core.planner import Planner
 
+
 def test_briefing_includes_sections() -> None:
     plan = Planner().briefing(
         "Créer un outil",

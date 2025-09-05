@@ -2,7 +2,7 @@ import pathlib
 import runpy
 
 is_prime = runpy.run_path(
-    pathlib.Path(__file__).resolve().parents[1] / "src" / "is_prime.py"
+    str(pathlib.Path(__file__).resolve().parents[1] / "src" / "is_prime.py")
 )["is_prime"]
 
 

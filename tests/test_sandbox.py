@@ -4,6 +4,7 @@ import pytest
 
 from app.core import sandbox
 
+
 @pytest.mark.skipif(sys.platform == "win32", reason="non-Windows only")
 def test_run_unix_executes_command():
     result = sandbox.run(["python", "-c", "print('hi')"])
