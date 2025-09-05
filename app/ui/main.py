@@ -1,3 +1,6 @@
+import os
+import shutil
+import subprocess
 import tkinter as tk
 from tkinter import messagebox, ttk
 from threading import Thread
@@ -126,9 +129,36 @@ class WatcherApp(ttk.Frame):
 
 
 if __name__ == "__main__":
-    root = tk.Tk()
-    try:
-        WatcherApp(root)
-        root.mainloop()
-    except Exception as e:  # pragma: no cover - UI
-        messagebox.showerror("Watcher", str(e))
+    if not os.environ.get("DISPLAY"):
+        if shutil.which("Xvfb"):
+            print("[Watcher] DISPLAY absent, lancement de Xvfb...")
+            xvfb = subprocess.Popen(["Xvfb", ":99"])
+            os.environ["DISPLAY"] = ":99"
+            try:
+                root = tk.Tk()
+                WatcherApp(root)
+                root.mainloop()
+            finally:
+                xvfb.terminate()
+        else:
+            print("[Watcher] DISPLAY absent et Xvfb introuvable, mode CLI activé.")
+            eng = Engine()
+            print(f"[Watcher] {eng.start_msg}")
+            try:
+                while True:
+                    q = input("[You] ").strip()
+                    if q.lower() in {"exit", "quit"}:
+                        break
+                    if not q:
+                        continue
+                    ans = eng.chat(q)
+                    print(f"[Watcher] {ans}")
+            except (EOFError, KeyboardInterrupt):
+                pass
+    else:
+        root = tk.Tk()
+        try:
+            WatcherApp(root)
+            root.mainloop()
+        except Exception as e:  # pragma: no cover - UI
+            messagebox.showerror("Watcher", str(e))
