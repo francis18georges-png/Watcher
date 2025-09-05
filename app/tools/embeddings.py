@@ -12,6 +12,7 @@ import numpy as np
 
 
 def embed_ollama(texts, model: str = "nomic-embed-text"):
+    conn = None
     try:
         conn = http.client.HTTPConnection("127.0.0.1", 11434, timeout=30)
         payload = json.dumps({"model": model, "input": texts})
@@ -29,7 +30,8 @@ def embed_ollama(texts, model: str = "nomic-embed-text"):
     except Exception:  # pragma: no cover - network
         return [np.zeros(1, dtype=np.float32) for _ in texts]
     finally:
-        try:
-            conn.close()
-        except Exception:  # pragma: no cover - defensive
-            pass
+        if conn is not None:
+            try:
+                conn.close()
+            except Exception:  # pragma: no cover - defensive
+                pass
