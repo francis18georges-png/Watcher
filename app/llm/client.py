@@ -1,40 +1,51 @@
-"""LLM client with optional OpenAI integration."""
+"""LLM client that prefers a locally running Ollama server."""
 
 from __future__ import annotations
 
-import os
+import http.client
+import json
+
+
+def generate_ollama(prompt: str) -> str:
+    """Send *prompt* to a locally running Ollama server.
+
+    The request is performed against ``http://127.0.0.1:11434/api/generate``
+    using a JSON payload. The response value is returned as a stripped string.
+    """
+
+    conn = http.client.HTTPConnection("127.0.0.1", 11434, timeout=30)
+    try:  # pragma: no cover - network path
+        payload = json.dumps({"model": "llama3.2:3b", "prompt": prompt})
+        conn.request(
+            "POST",
+            "/api/generate",
+            body=payload,
+            headers={"Content-Type": "application/json"},
+        )
+        resp = conn.getresponse()
+        if resp.status != 200:
+            raise RuntimeError(f"Generate request failed: {resp.status}")
+        data = json.loads(resp.read())
+        return data.get("response", "").strip()
+    finally:
+        try:
+            conn.close()
+        except Exception:  # pragma: no cover - defensive
+            pass
 
 
 class Client:
     """Generate text using an LLM backend.
 
-    If an OpenAI API key is available the client will attempt to call the
-    `openai` package. Otherwise a deterministic echo response is returned.
+    A locally running Ollama server is preferred. If it cannot be reached a
+    deterministic echo response is returned so the rest of the application can
+    continue to function in offline mode.
     """
 
-    def __init__(self) -> None:
-        self.api_key = os.getenv("OPENAI_API_KEY")
-        self.model = os.getenv("OPENAI_MODEL", "gpt-3.5-turbo")
-
     def generate(self, prompt: str) -> str:
-        """Return a response for *prompt*.
+        """Return a response for *prompt*."""
 
-        When the OpenAI SDK or API key is missing, a simple echo is produced so
-        the rest of the application can continue to function in offline mode.
-        """
-
-        if self.api_key:
-            try:  # pragma: no cover - network path
-                import openai  # type: ignore[import-not-found]
-
-                openai.api_key = self.api_key
-                resp = openai.ChatCompletion.create(
-                    model=self.model,
-                    messages=[{"role": "user", "content": prompt}],
-                )
-                return resp["choices"][0]["message"]["content"].strip()
-            except Exception:
-                # Fall back to a deterministic response in case of errors
-                pass
-
-        return f"Echo: {prompt}"
+        try:  # pragma: no cover - network path
+            return generate_ollama(prompt)
+        except Exception:
+            return f"Echo: {prompt}"
