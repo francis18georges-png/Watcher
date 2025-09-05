@@ -5,6 +5,7 @@ mode = "Sur"                 # Rapide | Sur | Exploration | AutoRefactor
 
 [llm]
 backend = "ollama"           # ollama | llamacpp
+host = "127.0.0.1:11434"     # Hostname and port of the Ollama server
 model = "llama3.2:3b"
 ctx = 8192
 temperature = 0.6
