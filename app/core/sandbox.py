@@ -74,9 +74,8 @@ def run(
             violation = win32job.QueryInformationJobObject(
                 job, win32job.JobObjectLimitViolationInformation
             )
-            vflags = (
-                violation.get("LimitFlags", 0)
-                | violation.get("ViolationLimitFlags", 0)
+            vflags = violation.get("LimitFlags", 0) | violation.get(
+                "ViolationLimitFlags", 0
             )
             if vflags & win32job.JOB_OBJECT_LIMIT_PROCESS_TIME:
                 result["cpu_exceeded"] = True

@@ -33,6 +33,13 @@ class ndarray:
     def size(self) -> int:  # pragma: no cover - trivial
         return len(self._values)
 
+    @property
+    def shape(self) -> tuple[int, ...]:  # pragma: no cover - trivial
+        return (len(self._values),)
+
+    def __getitem__(self, idx: int) -> float:  # pragma: no cover - convenience
+        return self._values[idx]
+
     def __iter__(self):  # pragma: no cover - convenience
         return iter(self._values)
 

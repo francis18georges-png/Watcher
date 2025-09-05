@@ -2,7 +2,7 @@ import pathlib
 import runpy
 
 fizzbuzz = runpy.run_path(
-    pathlib.Path(__file__).resolve().parents[1] / "src" / "fizzbuzz.py"
+    str(pathlib.Path(__file__).resolve().parents[1] / "src" / "fizzbuzz.py")
 )["fizzbuzz"]
 
 

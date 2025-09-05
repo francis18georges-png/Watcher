@@ -1,5 +1,3 @@
-import numpy as np  # type: ignore
-
 from app.tools.embeddings import embed_ollama
 
 

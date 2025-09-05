@@ -2,7 +2,7 @@ import pathlib
 import runpy
 
 fib = runpy.run_path(
-    pathlib.Path(__file__).resolve().parents[1] / "src" / "fib.py"
+    str(pathlib.Path(__file__).resolve().parents[1] / "src" / "fib.py")
 )["fib"]
 
 
