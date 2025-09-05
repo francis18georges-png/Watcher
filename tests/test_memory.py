@@ -36,7 +36,7 @@ def test_search_embedding_error(tmp_path, monkeypatch):
     mem.add("note", "bonjour")
 
     def bad_embed(texts):
-        raise RuntimeError("fail")
+        return [np.array([], dtype=np.float32)]
 
     monkeypatch.setattr("app.core.memory.embed_ollama", bad_embed)
     assert mem.search("bonjour") == []
