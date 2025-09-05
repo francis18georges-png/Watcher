@@ -1,11 +1,8 @@
 import sys
-from pathlib import Path
 
 import pytest
 
-sys.path.append(str(Path(__file__).resolve().parents[1]))
 from app.core import sandbox
-
 
 @pytest.mark.skipif(sys.platform == "win32", reason="non-Windows only")
 def test_run_unix_executes_command():
