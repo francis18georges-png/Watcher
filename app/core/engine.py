@@ -73,9 +73,11 @@ class Engine:
 
     def chat(self, prompt: str) -> str:
         """Generate a response to *prompt* using the LLM client."""
-        self.mem.add("chat", prompt)
+        # Store the user prompt and the assistant answer using distinct
+        # memory kinds so analytics can differentiate between them.
+        self.mem.add("chat_user", prompt)
         answer = self.client.generate(prompt)
-        self.mem.add("chat", answer)
+        self.mem.add("chat_ai", answer)
         return answer
 
     def run_briefing(self, objective: str = "Projet démo") -> str:
