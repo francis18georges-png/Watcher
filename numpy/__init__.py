@@ -43,6 +43,9 @@ class ndarray:
     def __iter__(self):  # pragma: no cover - convenience
         return iter(self._values)
 
+    def __len__(self) -> int:
+        return len(self._values)
+
     def tolist(self) -> List[float]:  # pragma: no cover - convenience
         return list(self._values)
 
