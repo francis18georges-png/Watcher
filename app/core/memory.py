@@ -57,7 +57,7 @@ class Memory:
         scored = []
         for _id, kind, text, vec in rows:
             v = np.frombuffer(vec, dtype=np.float32)
-            if v.size != q.size or v.size == 0:
+            if len(v) != len(q) or len(v) == 0:
                 continue
             s = float(q @ v / ((np.linalg.norm(q) * np.linalg.norm(v)) + 1e-9))
             scored.append((s, _id, kind, text))

@@ -18,7 +18,9 @@ def test_add_and_search(tmp_path, monkeypatch):
         row = con.execute("SELECT kind,text,vec FROM items").fetchone()
     assert row[0] == "note"
     assert row[1] == "salut"
-    assert np.frombuffer(row[2], dtype=np.float32).tolist() == [1.0]
+    vec = np.frombuffer(row[2], dtype=np.float32)
+    assert vec.tolist() == [1.0]
+    assert len(vec) == 1
 
     results = mem.search("salut")
     assert len(results) == 1
