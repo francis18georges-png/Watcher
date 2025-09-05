@@ -6,7 +6,7 @@ from app.core.memory import Memory
 
 
 def test_add_and_search(tmp_path, monkeypatch):
-    def fake_embed(texts):
+    def fake_embed(texts, model="nomic-embed-text"):
         return [np.array([1.0])]
 
     monkeypatch.setattr("app.core.memory.embed_ollama", fake_embed)
@@ -29,7 +29,7 @@ def test_add_and_search(tmp_path, monkeypatch):
 
 
 def test_search_embedding_error(tmp_path, monkeypatch):
-    def good_embed(texts):
+    def good_embed(texts, model="nomic-embed-text"):
         return [np.array([1.0])]
 
     monkeypatch.setattr("app.core.memory.embed_ollama", good_embed)
@@ -37,7 +37,7 @@ def test_search_embedding_error(tmp_path, monkeypatch):
     mem = Memory(db_path)
     mem.add("note", "bonjour")
 
-    def bad_embed(texts):
+    def bad_embed(texts, model="nomic-embed-text"):
         return [np.array([], dtype=np.float32)]
 
     monkeypatch.setattr("app.core.memory.embed_ollama", bad_embed)
