@@ -22,11 +22,74 @@ def run(
     import sys
 
     if sys.platform == "win32":
-        msg = (
-            "Resource limits are not implemented on Windows. "
-            "Use subprocess.CREATE_JOB_OBJECT to enforce limits."
+        import subprocess
+        import win32job  # type: ignore[import-not-found]
+
+        result: dict[str, bool | int | str | None] = {
+            "code": None,
+            "out": "",
+            "err": "",
+            "timeout": False,
+            "cpu_exceeded": False,
+            "memory_exceeded": False,
+        }
+
+        job = win32job.CreateJobObject(None, "")
+        info = win32job.QueryInformationJobObject(
+            job, win32job.JobObjectExtendedLimitInformation
         )
-        raise NotImplementedError(msg)
+        flags = info["BasicLimitInformation"]["LimitFlags"]
+        if cpu_seconds is not None:
+            info["BasicLimitInformation"]["PerProcessUserTimeLimit"] = int(
+                cpu_seconds * 10_000_000
+            )
+            flags |= win32job.JOB_OBJECT_LIMIT_PROCESS_TIME
+        if memory_bytes is not None:
+            info["ProcessMemoryLimit"] = int(memory_bytes)
+            flags |= win32job.JOB_OBJECT_LIMIT_PROCESS_MEMORY
+        info["BasicLimitInformation"]["LimitFlags"] = flags
+        win32job.SetInformationJobObject(
+            job, win32job.JobObjectExtendedLimitInformation, info
+        )
+
+        creation_flags = subprocess.CREATE_NEW_CONSOLE
+        p = subprocess.Popen(
+            cmd,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+            creationflags=creation_flags,
+        )
+        win32job.AssignProcessToJobObject(job, p._handle)
+        try:
+            out, err = p.communicate(timeout=timeout)
+        except subprocess.TimeoutExpired:
+            p.kill()
+            out, err = p.communicate()
+            result["timeout"] = True
+        result["code"] = p.returncode
+        result["out"] = out if isinstance(out, str) else ""
+        result["err"] = err if isinstance(err, str) else ""
+        try:
+            violation = win32job.QueryInformationJobObject(
+                job, win32job.JobObjectLimitViolationInformation
+            )
+            vflags = (
+                violation.get("LimitFlags", 0)
+                | violation.get("ViolationLimitFlags", 0)
+            )
+            if vflags & win32job.JOB_OBJECT_LIMIT_PROCESS_TIME:
+                result["cpu_exceeded"] = True
+            if vflags & win32job.JOB_OBJECT_LIMIT_PROCESS_MEMORY:
+                result["memory_exceeded"] = True
+        except Exception:
+            pass
+        finally:
+            try:
+                win32job.CloseHandle(job)
+            except Exception:
+                pass
+        return result
     import resource
     import signal
     import subprocess

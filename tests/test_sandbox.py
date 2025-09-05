@@ -18,6 +18,10 @@ def test_run_unix_executes_command():
 
 
 @pytest.mark.skipif(sys.platform != "win32", reason="Windows only")
-def test_run_windows_notimplemented():
-    with pytest.raises(NotImplementedError):
-        sandbox.run(["python", "-c", "print('hi')"])
+def test_run_windows_executes_command():
+    result = sandbox.run(["python", "-c", "print('hi')"])
+    assert result["code"] == 0
+    assert result["out"].strip() == "hi"
+    assert result["timeout"] is False
+    assert result["cpu_exceeded"] is False
+    assert result["memory_exceeded"] is False
