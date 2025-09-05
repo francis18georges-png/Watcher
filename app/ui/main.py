@@ -1,6 +1,7 @@
 import os
 import shutil
 import subprocess
+import traceback
 import tkinter as tk
 from tkinter import messagebox, ttk
 from threading import Thread
@@ -101,10 +102,15 @@ class WatcherApp(ttk.Frame):
         self.out.insert("end", f"\n[Scaffold] {msg}\n")
         self.out.see("end")
 
-    def _run_in_thread(self, fn, done) -> None:
+    def _run_in_thread(self, fn, done=None) -> None:
         def task() -> None:
-            rep = fn()
-            self.after(0, lambda: done(rep))
+            try:
+                rep = fn()
+            except Exception as e:  # pragma: no cover - threading
+                traceback.print_exc()
+                rep = str(e)
+            cb = done or (lambda r: messagebox.showerror(APP_NAME, r))
+            self.after(0, lambda: cb(rep))
 
         Thread(target=task, daemon=True).start()
 
