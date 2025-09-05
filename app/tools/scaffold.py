@@ -47,14 +47,19 @@ def create_python_cli(name: str, base: Path):
     (proj / "tests/test_cli.py").write_text(
         textwrap.dedent(
             f"""\
-        import subprocess, sys, pathlib, importlib.util
+        import sys, pathlib, importlib
 
-        def test_ping():
-            root = pathlib.Path(__file__).resolve().parents[1]
-            if importlib.util.find_spec("{name}") is None:
-                subprocess.check_call([sys.executable, "-m", "pip", "install", "-q", str(root)])
-            out = subprocess.check_output(["{name}", "--ping"], text=True).strip()
-            assert out == "pong"
+        sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1]))
+
+        def test_ping(capsys):
+            cli = importlib.import_module("{name}.cli")
+            argv = sys.argv
+            sys.argv = ["{name}", "--ping"]
+            try:
+                cli.main()
+            finally:
+                sys.argv = argv
+            assert capsys.readouterr().out.strip() == "pong"
     """
         ),
         encoding="utf-8",
