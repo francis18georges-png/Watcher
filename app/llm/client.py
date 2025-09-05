@@ -61,17 +61,20 @@ class Client:
     """
 
     def __init__(self, model: str | None = None, host: str | None = None) -> None:
-        if model is None or host is None:
-            try:
-                cfg_path = Path(__file__).resolve().parents[2] / "config" / "settings.toml"
-                with cfg_path.open("rb") as fh:
-                    cfg = tomllib.load(fh).get("llm", {})
-            except Exception:
-                cfg = {}
-        else:
+        try:
+            cfg_path = Path(__file__).resolve().parents[2] / "config" / "settings.toml"
+            with cfg_path.open("rb") as fh:
+                cfg = tomllib.load(fh).get("llm", {})
+        except Exception:
             cfg = {}
-        self.model = model or cfg.get("model", "llama3.2:3b")
-        self.host = host or cfg.get("host", "127.0.0.1:11434")
+
+        if model is not None:
+            cfg["model"] = model
+        if host is not None:
+            cfg["host"] = host
+
+        self.model = cfg.get("model", "llama3.2:3b")
+        self.host = cfg.get("host", "127.0.0.1:11434")
 
     def generate(self, prompt: str) -> str:
         """Return a response for *prompt*."""
