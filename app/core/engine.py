@@ -2,6 +2,7 @@
 
 from pathlib import Path
 import json
+from threading import Thread
 
 from app.core import autograder as AG
 from app.core.benchmark import Bench
@@ -16,7 +17,7 @@ from app.tools.scaffold import create_python_cli
 class Engine:
     """High level interface coordinating memory, planning and benchmarking."""
 
-    def __init__(self) -> None:
+    def __init__(self, perform_maintenance: bool = False) -> None:
         self.base = Path(__file__).resolve().parents[2]
         self.mem = Memory(self.base / "memory" / "mem.db")
         self.qg = QualityGate()
@@ -25,9 +26,11 @@ class Engine:
         self.planner = Planner()
         self.client = Client()
         self.start_msg = self._bootstrap()
+        if perform_maintenance:
+            Thread(target=self.perform_maintenance, daemon=True).start()
 
     def _bootstrap(self) -> str:
-        """Load context and run automatic routines for a ready agent."""
+        """Load context and set up an initial ready agent."""
         data_dir = self.base / "data"
         data_dir.mkdir(exist_ok=True, parents=True)
 
@@ -59,16 +62,6 @@ class Engine:
             prompt_file.write_text(prompt, encoding="utf-8")
         self.mem.add("system_prompt", prompt)
 
-        # Automatic maintenance
-        try:
-            self.run_quality_gate()
-        except Exception:  # pragma: no cover - best effort
-            pass
-        try:
-            self.auto_improve()
-        except Exception:  # pragma: no cover - best effort
-            pass
-
         return ctx
 
     def chat(self, prompt: str) -> str:
@@ -94,6 +87,17 @@ class Engine:
         proj = create_python_cli(name, self.base)
         self.mem.add("scaffold", proj)
         return f"scaffold: {proj}"
+
+    def perform_maintenance(self) -> None:
+        """Run quality gate and auto-improvement routines."""
+        try:
+            self.run_quality_gate()
+        except Exception:  # pragma: no cover - best effort
+            pass
+        try:
+            self.auto_improve()
+        except Exception:  # pragma: no cover - best effort
+            pass
 
     def run_quality_gate(self) -> str:
         """Run static checks and tests, storing the result in memory."""
