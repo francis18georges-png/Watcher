@@ -10,4 +10,5 @@ def test_embed_ollama_connection_error(monkeypatch):
     monkeypatch.setattr("http.client.HTTPConnection", bad_conn)
     vecs = embed_ollama(["hello"])
     assert len(vecs) == 1
-    assert vecs[0].size == 0
+    assert vecs[0].shape == (1,)
+    assert vecs[0][0] == 0.0
