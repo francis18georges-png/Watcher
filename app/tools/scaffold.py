@@ -19,6 +19,9 @@ def create_python_cli(name: str, base: Path):
             args = p.parse_args()
             if args.ping:
                 print("pong")
+
+        if __name__ == "__main__":
+            main()
     """
         ),
         encoding="utf-8",
@@ -47,16 +50,15 @@ def create_python_cli(name: str, base: Path):
     (proj / "tests/test_cli.py").write_text(
         textwrap.dedent(
             f"""\
-        import sys, pathlib, importlib
+        import sys, pathlib, runpy
 
         sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1]))
 
         def test_ping(capsys):
-            cli = importlib.import_module("{name}.cli")
             argv = sys.argv
             sys.argv = ["{name}", "--ping"]
             try:
-                cli.main()
+                runpy.run_module("{name}.cli", run_name="__main__")
             finally:
                 sys.argv = argv
             assert capsys.readouterr().out.strip() == "pong"
