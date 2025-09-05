@@ -11,7 +11,24 @@ import json
 import numpy as np
 
 
-def embed_ollama(texts, model: str = "nomic-embed-text"):
+def embed_ollama(texts: list[str], model: str = "nomic-embed-text") -> list[np.ndarray]:
+    """Generate embeddings for the given texts via a local Ollama server.
+
+    Parameters
+    ----------
+    texts:
+        List of strings to embed.
+    model:
+        Name of the embedding model served by Ollama. Defaults to
+        ``"nomic-embed-text"``.
+
+    Returns
+    -------
+    list[np.ndarray]
+        A list of embedding vectors corresponding to ``texts``. Each vector is
+        a ``numpy.ndarray`` of ``float32``. If the Ollama backend cannot be
+        reached, a list of zero vectors of shape ``(1,)`` is returned instead.
+    """
     conn = None
     try:
         conn = http.client.HTTPConnection("127.0.0.1", 11434, timeout=30)
