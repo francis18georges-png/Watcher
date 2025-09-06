@@ -28,6 +28,7 @@ def run(
     if sys.platform == "win32":
         import subprocess
         import win32job  # type: ignore[import-not-found]
+        from typing import Any, cast
 
         result: dict[str, bool | int | str | None] = {
             "code": None,
@@ -64,7 +65,11 @@ def run(
             text=True,
             creationflags=creation_flags,
         )
-        win32job.AssignProcessToJobObject(job, p._handle)
+        # Access the private ``_handle`` attribute to integrate with the
+        # Windows Job API. ``subprocess.Popen`` exposes this handle only via
+        # a non-public attribute; we cast to ``Any`` and silence the type
+        # checker to acknowledge this dependency on CPython internals.
+        win32job.AssignProcessToJobObject(job, cast(Any, p)._handle)  # type: ignore[attr-defined]
         try:
             out, err = p.communicate(timeout=timeout)
         except subprocess.TimeoutExpired:
