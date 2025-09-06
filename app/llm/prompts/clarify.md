@@ -1,2 +1,2 @@
-﻿- Définir objectif, I/O, plateformes, contraintes, licence, livrables, critère succès.
+- Définir objectif, I/O, plateformes, contraintes, licence, livrables, critère succès.
 - Tant que ces points ne sont pas définis, bloquer l'implémentation.

@@ -1,6 +1,7 @@
 import os
 import shutil
 import subprocess
+import traceback
 import tkinter as tk
 from tkinter import messagebox, ttk
 from threading import Thread
@@ -51,6 +52,12 @@ class WatcherApp(ttk.Frame):
         self.inp.pack(side="left", fill="both", expand=True)
         self.send_btn = ttk.Button(bottom, text="Envoyer", command=self._send)
         self.send_btn.pack(side="left", padx=8)
+        ttk.Label(bottom, text="Note").pack(side="left")
+        self.rate_var = tk.IntVar(value=0)
+        tk.Spinbox(bottom, from_=0, to=5, textvariable=self.rate_var, width=3).pack(
+            side="left", padx=4
+        )
+        ttk.Button(bottom, text="Noter", command=self._rate).pack(side="left")
         self.status = ttk.Label(
             self,
             text="Mode: Sur | Backend: ollama | Modèle: llama3.2:3b",
@@ -101,10 +108,15 @@ class WatcherApp(ttk.Frame):
         self.out.insert("end", f"\n[Scaffold] {msg}\n")
         self.out.see("end")
 
-    def _run_in_thread(self, fn, done) -> None:
+    def _run_in_thread(self, fn, done=None) -> None:
         def task() -> None:
-            rep = fn()
-            self.after(0, lambda: done(rep))
+            try:
+                rep = fn()
+            except Exception as e:  # pragma: no cover - threading
+                traceback.print_exc()
+                rep = str(e)
+            cb = done or (lambda r: messagebox.showerror(APP_NAME, r))
+            self.after(0, lambda: cb(rep))
 
         Thread(target=task, daemon=True).start()
 
@@ -126,6 +138,12 @@ class WatcherApp(ttk.Frame):
 
     def _improve(self) -> None:
         self._run_async(self.engine.auto_improve, "Improve")
+
+    def _rate(self) -> None:
+        score = self.rate_var.get()
+        msg = self.engine.add_feedback(score)
+        self.out.insert("end", f"\n[Feedback] {msg}\n")
+        self.out.see("end")
 
 
 if __name__ == "__main__":
@@ -149,6 +167,14 @@ if __name__ == "__main__":
                     q = input("[You] ").strip()
                     if q.lower() in {"exit", "quit"}:
                         break
+                    if q.lower().startswith("rate "):
+                        try:
+                            score = float(q.split()[1])
+                        except (IndexError, ValueError):
+                            print("[Watcher] usage: rate <score>")
+                            continue
+                        print(f"[Watcher] {eng.add_feedback(score)}")
+                        continue
                     if not q:
                         continue
                     ans = eng.chat(q)

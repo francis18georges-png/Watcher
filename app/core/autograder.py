@@ -3,18 +3,23 @@ import subprocess
 import time
 
 
-DATASETS = pathlib.Path("datasets/python")
+DATASETS = pathlib.Path(__file__).resolve().parents[2] / "datasets" / "python"
 
 
 def _run_pytest(task_dir: pathlib.Path, timeout: int = 60) -> dict:
     t0 = time.time()
-    p = subprocess.run(
-        ["pytest", "-q"],
-        cwd=str(task_dir),
-        capture_output=True,
-        text=True,
-        timeout=timeout,
-    )
+    try:
+        p = subprocess.run(
+            ["pytest", "-q"],
+            cwd=str(task_dir),
+            capture_output=True,
+            text=True,
+            timeout=timeout,
+        )
+    except FileNotFoundError:
+        return {"ok": False, "error": "pytest not found"}
+    except subprocess.TimeoutExpired:
+        return {"ok": False, "error": f"pytest timed out after {timeout} seconds"}
     ok = p.returncode == 0
     return {
         "ok": ok,
@@ -33,7 +38,7 @@ def grade_task(name: str) -> dict:
     if not task.exists():
         return {"ok": False, "error": f"task {name} not found"}
     rep = _run_pytest(task)
-    rep["score"] = 1.0 if rep["ok"] else 0.0
+    rep["score"] = 1.0 if rep.get("ok") else 0.0
     rep["task"] = name
     return rep
 

@@ -5,6 +5,7 @@ mode = "Sur"                 # Rapide | Sur | Exploration | AutoRefactor
 
 [llm]
 backend = "ollama"           # ollama | llamacpp
+host = "127.0.0.1:11434"     # Hostname and port of the Ollama server
 model = "llama3.2:3b"
 ctx = 8192
 temperature = 0.6
@@ -24,6 +25,7 @@ ab_candidates = 2
 [memory]
 embed_backend = "ollama"
 embed_model = "nomic-embed-text"
+embed_host = "127.0.0.1:11434"
 top_k = 8
 db_path = "memory/mem.db"
 
@@ -36,3 +38,20 @@ focus_languages = ["python","node","cpp","powershell"]
 prefer_ab_testing = true
 reward_weights = { tests = 0.5, perf = 0.2, quality = 0.2, security = 0.1 }
 stagnation_patience = 2
+
+[data]
+path = "data"
+
+[data.steps]
+load = "app.data.pipeline.load_raw_data"
+normalize = "app.data.pipeline.normalize_data"
+clean = "app.data.pipeline.clean_data"
+transform = "app.data.pipeline.transform_data"
+
+[training]
+epochs = 10
+batch_size = 32
+seed = 42
+
+[model]
+name = "default"

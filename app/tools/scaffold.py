@@ -2,8 +2,29 @@ from pathlib import Path
 import textwrap
 
 
+def _confirm_overwrite(path: Path) -> bool:
+    """Ask the user to confirm overwriting *path*.
+
+    If stdin is not available (e.g. during tests), the function returns
+    ``False`` so that the operation is aborted by default.
+    """
+
+    try:
+        resp = input(f"{path} contient déjà des fichiers. Écraser ? [y/N] ")
+    except (
+        EOFError,
+        OSError,
+    ):  # pragma: no cover - non-interactive envs or pytest capture
+        return False
+    return resp.strip().lower() in {"y", "yes", "o", "oui"}
+
+
 def create_python_cli(name: str, base: Path):
     proj = base / "app" / "projects" / name
+    if proj.exists() and any(proj.iterdir()):
+        if not _confirm_overwrite(proj):
+            raise FileExistsError(f"Dossier {proj} non vide")
+
     (proj / name).mkdir(parents=True, exist_ok=True)
     (proj / "tests").mkdir(parents=True, exist_ok=True)
 
@@ -19,6 +40,9 @@ def create_python_cli(name: str, base: Path):
             args = p.parse_args()
             if args.ping:
                 print("pong")
+
+        if __name__ == "__main__":
+            main()
     """
         ),
         encoding="utf-8",
@@ -47,16 +71,15 @@ def create_python_cli(name: str, base: Path):
     (proj / "tests/test_cli.py").write_text(
         textwrap.dedent(
             f"""\
-        import sys, pathlib, importlib
+        import sys, pathlib, runpy
 
         sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1]))
 
         def test_ping(capsys):
-            cli = importlib.import_module("{name}.cli")
             argv = sys.argv
             sys.argv = ["{name}", "--ping"]
             try:
-                cli.main()
+                runpy.run_module("{name}.cli", run_name="__main__")
             finally:
                 sys.argv = argv
             assert capsys.readouterr().out.strip() == "pong"

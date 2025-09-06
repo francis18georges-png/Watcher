@@ -7,13 +7,56 @@ disables vector search but allows the application to continue running.
 
 import http.client
 import json
+from urllib.parse import urlparse
 
 import numpy as np
 
+from config import load_config
 
-def embed_ollama(texts, model: str = "nomic-embed-text"):
+
+def embed_ollama(
+    texts: list[str],
+    model: str | None = None,
+    host: str | None = None,
+) -> list[np.ndarray]:
+    """Generate embeddings for the given texts via an Ollama server.
+
+    Parameters
+    ----------
+    texts:
+        List of strings to embed.
+    model:
+        Name of the embedding model served by Ollama. If omitted, the value is
+        read from ``config/settings.toml``.
+    host:
+        Hostname (and optional port) of the Ollama server. If omitted, the
+        value is read from ``config/settings.toml``.
+
+    Returns
+    -------
+    list[np.ndarray]
+        A list of embedding vectors corresponding to ``texts``. Each vector is
+        a ``numpy.ndarray`` of ``float32``. If the Ollama backend cannot be
+        reached, a list of zero vectors of shape ``(1,)`` is returned instead.
+    """
+
+    cfg = load_config().get("memory", {})
+
+    if model is not None:
+        cfg["embed_model"] = model
+    if host is not None:
+        cfg["embed_host"] = host
+
+    model = cfg.get("embed_model", "nomic-embed-text")
+    host = cfg.get("embed_host", "127.0.0.1:11434")
+
+    parsed = urlparse(host if "://" in host else f"http://{host}")
+
+    conn = None
     try:
-        conn = http.client.HTTPConnection("127.0.0.1", 11434, timeout=30)
+        conn = http.client.HTTPConnection(
+            parsed.hostname or "127.0.0.1", parsed.port or 11434, timeout=30
+        )
         payload = json.dumps({"model": model, "input": texts})
         conn.request(
             "POST",
@@ -29,7 +72,8 @@ def embed_ollama(texts, model: str = "nomic-embed-text"):
     except Exception:  # pragma: no cover - network
         return [np.zeros(1, dtype=np.float32) for _ in texts]
     finally:
-        try:
-            conn.close()
-        except Exception:  # pragma: no cover - defensive
-            pass
+        if conn is not None:
+            try:
+                conn.close()
+            except Exception:  # pragma: no cover - defensive
+                pass

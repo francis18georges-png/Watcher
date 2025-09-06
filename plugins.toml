@@ -1,0 +1,2 @@
+[[plugins]]
+path = "app.tools.plugins.hello:HelloPlugin"

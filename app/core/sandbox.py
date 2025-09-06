@@ -1,5 +1,9 @@
 # Sandbox: point d'entrée pour exécutions confinées avec quotas
 
+import logging
+
+logger = logging.getLogger(__name__)
+
 
 def run(
     cmd: list[str],
@@ -81,13 +85,17 @@ def run(
                 result["cpu_exceeded"] = True
             if vflags & win32job.JOB_OBJECT_LIMIT_PROCESS_MEMORY:
                 result["memory_exceeded"] = True
+        except OSError as exc:
+            logger.debug("Could not query job object: %s", exc)
         except Exception:
-            pass
+            logger.exception("Unexpected error querying job object")
         finally:
             try:
                 win32job.CloseHandle(job)
+            except OSError as exc:
+                logger.debug("Failed to close job handle: %s", exc)
             except Exception:
-                pass
+                logger.exception("Unexpected error closing job handle")
         return result
     import resource
     import signal

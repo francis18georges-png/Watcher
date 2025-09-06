@@ -32,6 +32,12 @@ python -m app.ui.main
 Exécuter les vérifications locales avant de proposer du code :
 
 ```bash
+make check
+```
+
+Les commandes exécutées par `make check` sont :
+
+```bash
 ruff check .
 black --check .
 mypy .
@@ -39,6 +45,34 @@ bandit -q -r .
 semgrep --quiet --error --config config/semgrep.yml .
 pytest -q
 ```
+
+## Reproductibilité
+
+Un utilitaire `set_seed` permet de fixer la graine aléatoire pour Python,
+NumPy et, si disponible, PyTorch. Le fichier de configuration `config/settings.toml`
+contient un paramètre `seed` dans la section `[training]` qui peut être adapté
+pour garantir des exécutions déterministes.
+
+## Données
+
+Les jeux de données localisés dans `datasets/raw` et `datasets/processed` sont
+gérés avec [DVC](https://dvc.org/). Exemple de cycle de travail :
+
+```bash
+# enregistrer les modifications locales
+dvc add datasets/raw datasets/processed
+# sauvegarder dans le cache DVC
+dvc commit
+# récupérer les données depuis le stockage distant
+dvc pull
+```
+
+### Collecte
+
+Un module de scraping asynchrone (`app/data/scraper.py`) permet de
+collecter des pages web en parallèle tout en les mettant en cache sur
+disque. Les téléchargements déjà effectués ne sont pas relancés, ce qui
+accélère les itérations et facilite la reprise après interruption.
 
 ## Structure du dépôt
 
@@ -50,4 +84,17 @@ pytest -q
 
 Sandbox d'exécution confinée, tests et linters obligatoires avant adoption de code.
 Semgrep utilise un fichier de règles local (`config/semgrep.yml`), aucun accès réseau requis.
+
+## Confidentialité
+
+Watcher fonctionne hors ligne par défaut et n'envoie aucune donnée vers l'extérieur.
+Les journaux comme les contenus mémorisés restent sur l'environnement local et peuvent être effacés par l'utilisateur.
+
+## Éthique et traçabilité
+
+Les actions du système sont journalisées via le module standard `logging`. Les erreurs et décisions importantes sont ainsi consignées pour audit ou débogage.
+
+Les contenus générés peuvent être conservés dans une base SQLite par le composant de mémoire (`app/core/memory.py`). Cette base stocke textes et métadonnées afin d'offrir un historique local des opérations.
+
+Pour un aperçu détaillé des principes éthiques et des limites d'utilisation, consultez [ETHICS.md](ETHICS.md).
 

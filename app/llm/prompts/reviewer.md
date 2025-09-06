@@ -1,1 +1,1 @@
-﻿- Checklist: lisibilité, complexité, performances, sécurité, erreurs, logs, tests, docs.
+- Checklist: lisibilité, complexité, performances, sécurité, erreurs, logs, tests, docs.

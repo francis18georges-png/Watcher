@@ -5,7 +5,8 @@ import pytest
 from app.core import sandbox
 
 
-@pytest.mark.skipif(sys.platform == "win32", reason="non-Windows only")
+# Skip Unix test when running on any Windows platform
+@pytest.mark.skipif(sys.platform.startswith("win"), reason="non-Windows only")
 def test_run_unix_executes_command():
     result = sandbox.run(["python", "-c", "print('hi')"])
     assert result["code"] == 0
@@ -15,7 +16,8 @@ def test_run_unix_executes_command():
     assert result["memory_exceeded"] is False
 
 
-@pytest.mark.skipif(sys.platform != "win32", reason="Windows only")
+# Skip Windows test when not running on Windows
+@pytest.mark.skipif(not sys.platform.startswith("win"), reason="Windows only")
 def test_run_windows_executes_command():
     result = sandbox.run(["python", "-c", "print('hi')"])
     assert result["code"] == 0
