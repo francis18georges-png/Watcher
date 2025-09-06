@@ -1,6 +1,7 @@
 import sqlite3
 import time
 import logging
+import math
 from pathlib import Path
 
 import numpy as np
@@ -84,12 +85,21 @@ class Memory:
 
     @staticmethod
     def _cosine_similarity(vec_blob: bytes, query_blob: bytes) -> float:
-        """Compute cosine similarity between two embedded vectors stored as BLOBs."""
+        """Compute cosine similarity between two embedded vectors stored as BLOBs.
+
+        The product of vector norms ``b`` is compared to zero using
+        :func:`math.isclose` with ``rel_tol=1e-9`` and ``abs_tol=1e-12``.  When
+        ``b`` is effectively zero, the similarity is defined as ``0.0`` to avoid
+        division by a tiny denominator.
+        """
         v1 = np.frombuffer(vec_blob, dtype=np.float32)
         v2 = np.frombuffer(query_blob, dtype=np.float32)
         if len(v1) != len(v2) or len(v1) == 0:
             return 0.0
-        return float(v1 @ v2 / ((np.linalg.norm(v1) * np.linalg.norm(v2)) + 1e-9))
+        b = float(np.linalg.norm(v1) * np.linalg.norm(v2))
+        if math.isclose(b, 0.0, rel_tol=1e-9, abs_tol=1e-12):
+            return 0.0
+        return float((v1 @ v2) / b)
 
     def search(
         self, query: str, top_k: int = 8, threshold: float = 0.0
