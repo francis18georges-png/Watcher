@@ -3,6 +3,7 @@
 from pathlib import Path
 import json
 from threading import Thread
+import tomllib
 
 from app.core import autograder as AG
 from app.core.benchmark import Bench
@@ -19,7 +20,20 @@ class Engine:
 
     def __init__(self, perform_maintenance: bool = False) -> None:
         self.base = Path(__file__).resolve().parents[2]
-        self.mem = Memory(self.base / "memory" / "mem.db")
+
+        try:
+            cfg_path = self.base / "config" / "settings.toml"
+            with cfg_path.open("rb") as fh:
+                cfg = tomllib.load(fh).get("memory", {})
+        except Exception:
+            cfg = {}
+
+        db_path = cfg.get("db_path", "memory/mem.db")
+        path = Path(db_path)
+        if not path.is_absolute():
+            path = self.base / path
+
+        self.mem = Memory(path)
         self.qg = QualityGate()
         self.bench = Bench()
         self.learner = Learner(self.bench, self.base / "data")
