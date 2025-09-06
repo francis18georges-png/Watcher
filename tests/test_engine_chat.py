@@ -11,6 +11,7 @@ def test_chat_saves_distinct_kinds(tmp_path, monkeypatch):
         return [np.array([1.0])]
 
     monkeypatch.setattr("app.core.memory.embed_ollama", fake_embed)
+    monkeypatch.setattr(Memory, "search", lambda self, q, top_k=8: [])
 
     class DummyClient:
         def generate(self, prompt: str) -> str:
@@ -27,3 +28,34 @@ def test_chat_saves_distinct_kinds(tmp_path, monkeypatch):
         rows = con.execute("SELECT kind,text FROM items ORDER BY id").fetchall()
 
     assert rows == [("chat_user", "ping"), ("chat_ai", "pong")]
+
+
+def test_chat_includes_retrieved_terms(tmp_path, monkeypatch):
+    def fake_embed(texts, model="nomic-embed-text"):
+        return [np.array([1.0])]
+
+    monkeypatch.setattr("app.core.memory.embed_ollama", fake_embed)
+
+    eng = Engine.__new__(Engine)
+    eng.mem = Memory(tmp_path / "mem.db")
+
+    def fake_search(self, query: str, top_k: int = 8):
+        return [(0.9, 1, "ctx", "alpha beta")]
+
+    monkeypatch.setattr(Memory, "search", fake_search)
+
+    class DummyClient:
+        def __init__(self):
+            self.prompt = None
+
+        def generate(self, prompt: str) -> str:
+            self.prompt = prompt
+            return "pong"
+
+    eng.client = DummyClient()
+
+    answer = eng.chat("ping")
+
+    assert answer == "pong"
+    assert "alpha beta" in eng.client.prompt
+    assert "ping" in eng.client.prompt

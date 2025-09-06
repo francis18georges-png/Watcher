@@ -81,6 +81,14 @@ class Engine:
         # Store the user prompt and the assistant answer using distinct
         # memory kinds so analytics can differentiate between them.
         self.mem.add("chat_user", prompt)
+
+        # Retrieve texts most similar to the prompt from memory.
+        excerpts = [text for _score, _id, _kind, text in self.mem.search(prompt)]
+
+        # Combine the original prompt with retrieved excerpts before sending to the LLM.
+        if excerpts:
+            prompt = "\n\n".join([prompt, "\n".join(excerpts)])
+
         answer = self.client.generate(prompt)
         self.mem.add("chat_ai", answer)
         return answer
