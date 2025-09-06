@@ -57,6 +57,12 @@ def generate_ollama(prompt: str, *, host: str, model: str) -> str:
             pass
 
 
+def chunk_prompt(prompt: str, *, size: int = 1000) -> list[str]:
+    """Yield slices of *prompt* of at most *size* characters."""
+
+    return [prompt[i : i + size] for i in range(0, len(prompt), size)]
+
+
 class Client:
     """Generate text using an LLM backend.
 
@@ -102,14 +108,23 @@ class Client:
         self.fallback_phrase = fallback_phrase
 
     def generate(self, prompt: str) -> tuple[str, str]:
-        """Return a response and trace for *prompt*."""
+        """Return a response and trace for *prompt*.
+
+        The prompt is sent in fixed-size chunks so very large prompts can be
+        handled without overwhelming the backend. Successful responses from
+        each chunk are concatenated before being returned.
+        """
 
         trace: list[str] = []
         try:  # pragma: no cover - network path
-            trace.append("ollama")
-            resp = generate_ollama(prompt, host=self.host, model=self.model)
+            responses: list[str] = []
+            for idx, chunk in enumerate(chunk_prompt(prompt)):
+                trace.append(f"ollama:{idx}")
+                responses.append(
+                    generate_ollama(chunk, host=self.host, model=self.model)
+                )
             trace.append("success")
-            return resp, " -> ".join(trace)
+            return "".join(responses), " -> ".join(trace)
         except Exception as exc:
             trace.append(f"error:{exc.__class__.__name__}")
             trace.append("fallback")
