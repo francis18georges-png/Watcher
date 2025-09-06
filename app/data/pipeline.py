@@ -4,6 +4,10 @@ from __future__ import annotations
 
 from pathlib import Path
 import json
+from importlib import import_module
+from typing import Any, Protocol, runtime_checkable
+
+from app.config import load_config
 
 BASE_DIR = Path(__file__).resolve().parents[2]
 RAW_DIR = BASE_DIR / "datasets" / "raw"
@@ -59,3 +63,66 @@ def transform_data(data: dict, filename: str = "cleaned.json") -> Path:
     with dest.open("w", encoding="utf-8") as fh:
         json.dump(data, fh, ensure_ascii=False, indent=2)
     return dest
+
+
+@runtime_checkable
+class PipelineStep(Protocol):
+    """Simple interface for pipeline steps.
+
+    A pipeline step is any callable that accepts an arbitrary input and
+    returns an arbitrary output. Steps are executed sequentially where the
+    return value of one step is passed as the argument to the next.
+    """
+
+    def __call__(self, data: Any) -> Any:  # pragma: no cover - Protocol definition
+        ...
+
+
+def _resolve_step(path: str) -> PipelineStep:
+    """Import and instantiate the step defined by *path*.
+
+    Parameters
+    ----------
+    path:
+        Dotted path to a callable implementing :class:`PipelineStep`.
+
+    Returns
+    -------
+    PipelineStep
+        The instantiated pipeline step.
+    """
+
+    module_name, _, attr = path.rpartition(".")
+    module = import_module(module_name)
+    obj = getattr(module, attr)
+    step = obj() if isinstance(obj, type) else obj
+    if not isinstance(step, PipelineStep):  # pragma: no cover - defensive
+        raise TypeError(f"{path} is not a PipelineStep")
+    return step
+
+
+def run_pipeline(data: Any | None = None) -> Any:
+    """Execute configured data pipeline steps.
+
+    Steps are declared in ``config/settings.toml`` under ``[data.steps]`` as a
+    mapping where the values are dotted import paths. They are executed in the
+    order they are declared in the configuration.
+
+    Parameters
+    ----------
+    data:
+        Initial data passed to the first pipeline step. Defaults to ``None``.
+
+    Returns
+    -------
+    Any
+        The result returned by the last pipeline step.
+    """
+
+    cfg = load_config("data")
+    steps_cfg = cfg.get("steps", {})
+    result: Any = data
+    for path in steps_cfg.values():
+        step = _resolve_step(path)
+        result = step(result)
+    return result
