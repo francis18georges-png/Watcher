@@ -5,6 +5,7 @@ from __future__ import annotations
 import http.client
 import json
 import logging
+from collections.abc import Iterable
 from urllib.parse import urlparse
 
 from config import load_config
@@ -91,15 +92,28 @@ class Client:
         self.host = cfg.get("host", "127.0.0.1:11434")
         self.fallback_phrase = fallback_phrase
 
-    def generate(self, prompt: str) -> tuple[str, str]:
-        """Return a response and trace for *prompt*."""
+    def generate(self, prompt: str, *, separator: str = "") -> tuple[str, str]:
+        """Return a response and trace for *prompt*.
+
+        If the backend returns chunked responses they are joined using
+        ``separator`` (defaults to ``""``) without injecting additional
+        whitespace.
+        """
 
         trace: list[str] = []
         try:  # pragma: no cover - network path
             trace.append("ollama")
             resp = generate_ollama(prompt, host=self.host, model=self.model)
+
+            if isinstance(resp, str):
+                text = resp
+            elif isinstance(resp, Iterable):
+                text = separator.join(resp)
+            else:  # defensive: unexpected return type
+                text = str(resp)
+
             trace.append("success")
-            return resp, " -> ".join(trace)
+            return text, " -> ".join(trace)
         except Exception as exc:
             trace.append(f"error:{exc.__class__.__name__}")
             trace.append("fallback")
