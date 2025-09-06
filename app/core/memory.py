@@ -39,6 +39,29 @@ class Memory:
                 (kind, text, vec, time.time()),
             )
 
+    def summarize(self, kind: str, max_items: int) -> None:
+        with sqlite3.connect(self.db_path) as con:
+            c = con.cursor()
+            rows = c.execute(
+                "SELECT id,text FROM items WHERE kind=? ORDER BY ts ASC",
+                (kind,),
+            ).fetchall()
+            if len(rows) <= max_items:
+                return
+            excess = len(rows) - max_items + 1
+            oldest = rows[:excess]
+            texts = [t for _, t in oldest]
+            summary = " ".join(texts)
+            if len(summary) > 200:
+                summary = summary[:197] + "..."
+            ids = [str(_id) for _id, _ in oldest]
+            placeholders = ",".join("?" for _ in ids)
+            c.execute(
+                f"DELETE FROM items WHERE id IN ({placeholders})",
+                ids,
+            )
+        self.add(kind, summary)
+
     def add_feedback(
         self, kind: str, prompt: str, answer: str, rating: float
     ) -> None:
