@@ -158,12 +158,17 @@ class Engine:
             return "data preparation failed"
         return str(path)
 
-    def auto_improve(self, qg_res: str | None = None) -> str:
-        """Train on datasets and perform a simple A/B benchmark.
+    def auto_improve(
+        self,
+        qg_res: str | None = None,
+        state: list[float] | None = None,
+        reward: float | None = None,
+    ) -> str:
+        """Train on datasets, update policy and perform a simple A/B benchmark.
 
-        If *qg_res* is ``None`` the quality gate is executed to obtain a
-        fresh result.  When a recent result is already available it can be
-        passed in to avoid running the expensive checks twice.
+        If *qg_res* is ``None`` the quality gate is executed to obtain a fresh
+        result.  When a recent result is already available it can be passed in
+        to avoid running the expensive checks twice.
         """
         if qg_res is None:
             # Only execute the quality gate if a recent result wasn't
@@ -192,6 +197,10 @@ class Engine:
         self.prepare_data()
         rep = AG.grade_all()
         self.mem.add("train", json.dumps(rep))
+
+        if state is not None and reward is not None:
+            self.learner.step(state, reward)
+
         comp = self.learner.compare("A", "B")
         self.mem.add("decision", json.dumps(comp))
         a = comp["A"]
