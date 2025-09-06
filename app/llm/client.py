@@ -69,6 +69,9 @@ class Client:
             value is read from ``config/settings.toml``.
         host: Hostname (and optional port) of the Ollama server. If omitted,
             the value is read from ``config/settings.toml``.
+        ctx: Context window size used by the LLM. Defaults to ``None`` which
+            means the value is read from ``config/settings.toml``. Must be a
+            positive integer.
         fallback_phrase: Text prefix used when generation fails. Defaults to
             ``"Echo"``.
     """
@@ -78,9 +81,15 @@ class Client:
         model: str | None = None,
         host: str | None = None,
         *,
+        ctx: int | None = None,
         fallback_phrase: str = "Echo",
     ) -> None:
         cfg = load_config().get("llm", {})
+
+        if ctx is not None:
+            if ctx < 1:
+                raise ValueError("ctx must be a positive integer")
+            cfg["ctx"] = ctx
 
         if model is not None:
             cfg["model"] = model
@@ -89,6 +98,7 @@ class Client:
 
         self.model = cfg.get("model", "llama3.2:3b")
         self.host = cfg.get("host", "127.0.0.1:11434")
+        self.ctx = cfg.get("ctx")
         self.fallback_phrase = fallback_phrase
 
     def generate(self, prompt: str) -> tuple[str, str]:
