@@ -25,18 +25,18 @@ def run(
     """
     import sys
 
+    result: dict[str, bool | int | str | None] = {
+        "code": None,
+        "out": "",
+        "err": "",
+        "timeout": False,
+        "cpu_exceeded": False,
+        "memory_exceeded": False,
+    }
+
     if sys.platform == "win32":
         import subprocess
         import win32job  # type: ignore[import-not-found]
-
-        result: dict[str, bool | int | str | None] = {
-            "code": None,
-            "out": "",
-            "err": "",
-            "timeout": False,
-            "cpu_exceeded": False,
-            "memory_exceeded": False,
-        }
 
         job = win32job.CreateJobObject(None, "")
         info = win32job.QueryInformationJobObject(
@@ -106,15 +106,6 @@ def run(
             resource.setrlimit(resource.RLIMIT_CPU, (cpu_seconds, cpu_seconds))
         if memory_bytes is not None:
             resource.setrlimit(resource.RLIMIT_AS, (memory_bytes, memory_bytes))
-
-    result: dict[str, bool | int | str | None] = {
-        "code": None,
-        "out": "",
-        "err": "",
-        "timeout": False,
-        "cpu_exceeded": False,
-        "memory_exceeded": False,
-    }
 
     try:
         p = subprocess.run(
