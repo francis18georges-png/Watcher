@@ -5,10 +5,9 @@ from __future__ import annotations
 import http.client
 import json
 import logging
-from pathlib import Path
 from urllib.parse import urlparse
 
-import tomllib
+from config import load_config
 
 
 def generate_ollama(prompt: str, *, host: str, model: str) -> str:
@@ -69,12 +68,7 @@ class Client:
         *,
         fallback_phrase: str = "Echo",
     ) -> None:
-        try:
-            cfg_path = Path(__file__).resolve().parents[2] / "config" / "settings.toml"
-            with cfg_path.open("rb") as fh:
-                cfg = tomllib.load(fh).get("llm", {})
-        except Exception:
-            cfg = {}
+        cfg = load_config().get("llm", {})
 
         if model is not None:
             cfg["model"] = model

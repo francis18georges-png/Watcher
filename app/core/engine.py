@@ -4,7 +4,8 @@ from pathlib import Path
 import json
 import logging
 from threading import Thread
-import tomllib
+
+from config import load_config
 
 from app.core import autograder as AG
 from app.core.benchmark import Bench
@@ -22,12 +23,7 @@ class Engine:
     def __init__(self, perform_maintenance: bool = False) -> None:
         self.base = Path(__file__).resolve().parents[2]
 
-        try:
-            cfg_path = self.base / "config" / "settings.toml"
-            with cfg_path.open("rb") as fh:
-                cfg = tomllib.load(fh).get("memory", {})
-        except Exception:
-            cfg = {}
+        cfg = load_config().get("memory", {})
 
         db_path = cfg.get("db_path", "memory/mem.db")
         path = Path(db_path)
