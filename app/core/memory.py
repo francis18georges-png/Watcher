@@ -106,6 +106,6 @@ class Memory:
             for _id, kind, text, score in rows
             if score is not None and score > 0
         ]
-        if threshold > 0 and (not scored or scored[-1][0] < threshold):
+        if threshold > 0 and (not scored or scored[0][0] < threshold):
             raise ValueError(f"no results with score >= {threshold}")
         return scored
