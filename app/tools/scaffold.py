@@ -11,7 +11,10 @@ def _confirm_overwrite(path: Path) -> bool:
 
     try:
         resp = input(f"{path} contient déjà des fichiers. Écraser ? [y/N] ")
-    except (EOFError, OSError):  # pragma: no cover - non-interactive envs or pytest capture
+    except (
+        EOFError,
+        OSError,
+    ):  # pragma: no cover - non-interactive envs or pytest capture
         return False
     return resp.strip().lower() in {"y", "yes", "o", "oui"}
 

@@ -40,6 +40,20 @@ semgrep --quiet --error --config config/semgrep.yml .
 pytest -q
 ```
 
+## Données
+
+Les jeux de données localisés dans `datasets/raw` et `datasets/processed` sont
+gérés avec [DVC](https://dvc.org/). Exemple de cycle de travail :
+
+```bash
+# enregistrer les modifications locales
+dvc add datasets/raw datasets/processed
+# sauvegarder dans le cache DVC
+dvc commit
+# récupérer les données depuis le stockage distant
+dvc pull
+```
+
 ## Structure du dépôt
 
 - `app/` : moteur principal, mémoire, benchmarks et interface utilisateur.
