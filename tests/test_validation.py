@@ -8,10 +8,14 @@ def test_validate_prompt_valid() -> None:
 
 
 def test_validate_prompt_empty() -> None:
-    with pytest.raises(ValueError):
+    # Capture the exception so we can assert on the error message
+    with pytest.raises(ValueError) as exc_info:
         validate_prompt("")
+    assert "Prompt cannot be empty" in str(exc_info.value)
 
 
 def test_validate_prompt_type() -> None:
-    with pytest.raises(TypeError):
+    # Ensure the type error message clearly indicates the problem
+    with pytest.raises(TypeError) as exc_info:
         validate_prompt(123)
+    assert "Prompt must be a string" in str(exc_info.value)
