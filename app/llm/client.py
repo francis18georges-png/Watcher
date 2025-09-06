@@ -106,6 +106,7 @@ class Client:
         self.host = cfg.get("host", "127.0.0.1:11434")
         self.ctx = cfg.get("ctx")
         self.fallback_phrase = fallback_phrase
+        self._cache: dict[str, str] = {}
 
     def generate(self, prompt: str, *, separator: str = "") -> tuple[str, str]:
         """Return a response and trace for *prompt*.
@@ -120,6 +121,9 @@ class Client:
         each chunk are concatenated before being returned.
         """
 
+        if prompt in self._cache:
+            return self._cache[prompt], "cache"
+
         trace: list[str] = []
         try:  # pragma: no cover - network path
             responses: list[str] = []
@@ -129,9 +133,21 @@ class Client:
                     generate_ollama(chunk, host=self.host, model=self.model)
                 )
             trace.append("success")
-            return separator.join(responses), " -> ".join(trace)
+            result = separator.join(responses)
         except Exception as exc:
             trace.append(f"error:{exc.__class__.__name__}")
             trace.append("fallback")
             logging.exception("Failed to generate response: %s", exc)
-            return f"{self.fallback_phrase}: {prompt}", " -> ".join(trace)
+            result = f"{self.fallback_phrase}: {prompt}"
+        self._cache[prompt] = result
+        return result, " -> ".join(trace)
+
+    def generate_stream(self, prompt: str):
+        """Yield response tokens for ``prompt``.
+
+        The full response is cached to speed up subsequent calls.
+        """
+
+        response, _ = self.generate(prompt)
+        for token in response.split():
+            yield token

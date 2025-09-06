@@ -1,5 +1,6 @@
 import math
 import sqlite3
+import time
 
 import numpy as np  # type: ignore
 import pytest
@@ -90,3 +91,37 @@ def test_cosine_similarity_regular():
     vec = np.array([1.0], dtype=np.float32)
     blob = vec.tobytes()
     assert math.isclose(Memory._cosine_similarity(blob, blob), 1.0, rel_tol=1e-6)
+
+
+def test_feedback_update_and_revoke(tmp_path):
+    mem = Memory(tmp_path / "mem.db")
+    mem.add_feedback("kind", "p", "a", 1.0)
+    with sqlite3.connect(mem.db_path) as con:
+        fid = con.execute("SELECT id FROM feedback").fetchone()[0]
+    mem.update_feedback(fid, rating=0.5)
+    with sqlite3.connect(mem.db_path) as con:
+        rating = con.execute(
+            "SELECT rating FROM feedback WHERE id=?", (fid,)
+        ).fetchone()[0]
+        assert rating == 0.5
+        log_rows = con.execute("SELECT action FROM feedback_log").fetchall()
+        assert [r[0] for r in log_rows] == ["update"]
+    mem.revoke_feedback(fid)
+    with sqlite3.connect(mem.db_path) as con:
+        assert con.execute("SELECT COUNT(*) FROM feedback").fetchone()[0] == 0
+        log_rows = con.execute("SELECT action FROM feedback_log").fetchall()
+        assert [r[0] for r in log_rows] == ["update", "revoke"]
+
+
+def test_expire(tmp_path, monkeypatch):
+    def fake_embed(texts, model="nomic-embed-text"):
+        return [np.array([1.0])]
+
+    monkeypatch.setattr("app.core.memory.embed_ollama", fake_embed)
+    mem = Memory(tmp_path / "mem.db")
+    mem.add("note", "hello")
+    # set older timestamp
+    with sqlite3.connect(mem.db_path) as con:
+        con.execute("UPDATE items SET ts=?", (time.time() - 1000,))
+    removed = mem.expire(ttl=10)
+    assert removed == 1

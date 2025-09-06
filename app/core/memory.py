@@ -27,6 +27,10 @@ class Memory:
                 "CREATE TABLE IF NOT EXISTS feedback("  # noqa: E501
                 "id INTEGER PRIMARY KEY, kind TEXT, prompt TEXT, answer TEXT, rating REAL, ts REAL)"
             )
+            c.execute(
+                "CREATE TABLE IF NOT EXISTS feedback_log("  # noqa: E501
+                "id INTEGER PRIMARY KEY AUTOINCREMENT, feedback_id INT, action TEXT, old_rating REAL, ts REAL)"
+            )
             c.execute("CREATE INDEX IF NOT EXISTS idx_items_kind_ts ON items(kind, ts)")
 
     def add(self, kind: str, text: str) -> None:
@@ -83,6 +87,81 @@ class Memory:
                 "SELECT kind,prompt,answer,rating FROM feedback"
             ).fetchall()
         return rows
+
+    def update_feedback(self, feedback_id: int, *, rating: float) -> None:
+        """Update rating of a feedback entry, logging previous value."""
+
+        with sqlite3.connect(self.db_path) as con:
+            c = con.cursor()
+            row = c.execute(
+                "SELECT rating FROM feedback WHERE id=?", (feedback_id,)
+            ).fetchone()
+            if row is None:
+                raise KeyError(feedback_id)
+            (old_rating,) = row
+            c.execute(
+                "UPDATE feedback SET rating=?, ts=? WHERE id=?",
+                (rating, time.time(), feedback_id),
+            )
+            c.execute(
+                "INSERT INTO feedback_log(feedback_id, action, old_rating, ts) VALUES(?,?,?,?)",
+                (feedback_id, "update", old_rating, time.time()),
+            )
+
+    def revoke_feedback(self, feedback_id: int) -> None:
+        """Remove a feedback entry but keep audit log."""
+
+        with sqlite3.connect(self.db_path) as con:
+            c = con.cursor()
+            row = c.execute(
+                "SELECT rating FROM feedback WHERE id=?", (feedback_id,)
+            ).fetchone()
+            if row is None:
+                raise KeyError(feedback_id)
+            (old_rating,) = row
+            c.execute("DELETE FROM feedback WHERE id=?", (feedback_id,))
+            c.execute(
+                "INSERT INTO feedback_log(feedback_id, action, old_rating, ts) VALUES(?,?,?,?)",
+                (feedback_id, "revoke", old_rating, time.time()),
+            )
+
+    def expire(self, ttl: float) -> int:
+        """Delete memory items older than ``ttl`` seconds.
+
+        Returns the number of removed rows.
+        """
+
+        threshold = time.time() - ttl
+        with sqlite3.connect(self.db_path) as con:
+            c = con.cursor()
+            c.execute("DELETE FROM items WHERE ts < ?", (threshold,))
+            return c.rowcount
+
+    def evict_similar(self, kind: str, text: str, *, threshold: float = 0.9) -> int:
+        """Remove existing items of *kind* that are too similar to ``text``."""
+
+        to_delete: list[int] = []
+        for score, _id, _, _ in self.search(text, top_k=20):
+            if score >= threshold:
+                to_delete.append(_id)
+        if not to_delete:
+            return 0
+        with sqlite3.connect(self.db_path) as con:
+            c = con.cursor()
+            placeholders = ",".join("?" for _ in to_delete)
+            c.execute(f"DELETE FROM items WHERE id IN ({placeholders})", to_delete)
+            return c.rowcount
+
+    def compress_vectors(self) -> None:
+        """Compress stored vectors to half precision."""
+
+        with sqlite3.connect(self.db_path) as con:
+            c = con.cursor()
+            rows = c.execute("SELECT id,vec FROM items").fetchall()
+            for _id, vec_blob in rows:
+                arr = np.frombuffer(vec_blob, dtype=np.float32)
+                comp = arr.astype(np.float16).tobytes()  # type: ignore[attr-defined]
+                c.execute("UPDATE items SET vec=? WHERE id=?", (comp, _id))
 
     @staticmethod
     def _cosine_similarity(vec_blob: bytes, query_blob: bytes) -> float:
