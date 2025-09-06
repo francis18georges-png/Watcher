@@ -15,6 +15,7 @@ from app.core.evaluator import QualityGate
 from app.core.memory import Memory
 from app.core.planner import Planner
 from app.core.learner import Learner
+from app.core.critic import suggest
 from app.llm.client import Client, validate_prompt
 from app.tools.scaffold import create_python_cli
 from app.data import pipeline
@@ -101,6 +102,16 @@ class Engine:
             llm_prompt = "\n\n".join([llm_prompt, "\n".join(excerpts)])
 
         answer = self.client.generate(llm_prompt)
+
+        # Critic suggestions are applied in a lightweight manner to improve
+        # the final response without requiring an additional model call.
+        plan = suggest(user_prompt, answer)
+        if plan:
+            if "politesse" in plan.lower():
+                answer = answer.rstrip() + " Merci."
+            if "détail" in plan.lower() or "detail" in plan.lower():
+                answer = answer.rstrip() + " Voici quelques détails supplémentaires."
+
         self.mem.add("chat_ai", answer)
         self.last_prompt = user_prompt
         self.last_answer = answer
