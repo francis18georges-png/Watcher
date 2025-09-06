@@ -1,4 +1,4 @@
-import runpy
+import runpy  # ensure CLI module runs without NameError
 import sys
 from pathlib import Path
 
