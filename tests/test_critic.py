@@ -26,3 +26,11 @@ def test_threshold_triggers_failure():
     result = critic.evaluate(text)
     assert result["score"] < critic.threshold
     assert result["passed"] is False
+
+
+def test_suggest_returns_identifiers():
+    critic = Critic()
+    suggestions = critic.suggest("hi")
+    assert "detail" in suggestions
+    assert "politeness" in suggestions
+    assert isinstance(suggestions, list)

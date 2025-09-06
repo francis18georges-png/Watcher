@@ -4,6 +4,7 @@ import pytest
 from app.core.validation import validate_prompt
 from app.core.engine import Engine
 from app.core.memory import Memory
+from app.core.critic import Critic
 
 
 def test_validate_prompt_rejects_script() -> None:
@@ -25,6 +26,7 @@ def test_engine_chat_rejects_command(tmp_path, monkeypatch) -> None:
     eng = Engine.__new__(Engine)
     eng.mem = Memory(tmp_path / "mem.db")
     eng.client = DummyClient()
+    eng.critic = Critic()
 
     with pytest.raises(ValueError):
         eng.chat("rm -rf /")

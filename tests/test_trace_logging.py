@@ -1,8 +1,10 @@
 import numpy as np
+import numpy as np
 import sqlite3
 
 from app.core.memory import Memory
 from app.core.engine import Engine
+from app.core.critic import Critic
 
 
 def test_trace_stored_in_memory(tmp_path, monkeypatch):
@@ -19,15 +21,17 @@ def test_trace_stored_in_memory(tmp_path, monkeypatch):
     eng = Engine.__new__(Engine)
     eng.mem = Memory(tmp_path / "mem.db")
     eng.client = DummyClient()
+    eng.critic = Critic()
 
-    answer = eng.chat("ping")
+    prompt = "please " + "word " * 60 + "thank you"
+    answer = eng.chat(prompt)
     assert answer == "pong"
 
     with sqlite3.connect(tmp_path / "mem.db") as con:
         rows = con.execute("SELECT kind,text FROM items ORDER BY id").fetchall()
 
     assert rows == [
-        ("chat_user", "ping"),
+        ("chat_user", prompt),
         ("chat_ai", "pong"),
         ("trace", "trace-steps"),
     ]

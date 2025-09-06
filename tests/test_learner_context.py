@@ -1,5 +1,4 @@
 import numpy as np
-
 from app.core.engine import Engine
 from app.core.memory import Memory
 from app.core.learner import Learner
