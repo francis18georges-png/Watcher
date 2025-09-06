@@ -50,6 +50,7 @@ transform = "app.data.pipeline.transform_data"
 [training]
 epochs = 10
 batch_size = 32
+seed = 42
 
 [model]
 name = "default"

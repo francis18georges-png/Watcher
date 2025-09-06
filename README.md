@@ -40,6 +40,13 @@ semgrep --quiet --error --config config/semgrep.yml .
 pytest -q
 ```
 
+## Reproductibilité
+
+Un utilitaire `set_seed` permet de fixer la graine aléatoire pour Python,
+NumPy et, si disponible, PyTorch. Le fichier de configuration `config/settings.toml`
+contient un paramètre `seed` dans la section `[training]` qui peut être adapté
+pour garantir des exécutions déterministes.
+
 ## Données
 
 Les jeux de données localisés dans `datasets/raw` et `datasets/processed` sont
