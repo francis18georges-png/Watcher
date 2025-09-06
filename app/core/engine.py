@@ -1,11 +1,9 @@
 """Core orchestration engine for the Watcher project."""
 
 from pathlib import Path
-import importlib
 import json
 import logging
 from threading import Thread
-import tomllib
 
 from config import load_config
 
@@ -18,7 +16,7 @@ from app.core.learner import Learner
 from app.llm.client import Client, validate_prompt
 from app.tools.scaffold import create_python_cli
 from app.data import pipeline
-from app.tools.plugins import Plugin
+from app.tools import plugins
 
 
 class Engine:
@@ -40,7 +38,7 @@ class Engine:
         self.learner = Learner(self.bench, self.base / "data")
         self.planner = Planner()
         self.client = Client()
-        self.plugins: list[Plugin] = []
+        self.plugins: list[plugins.Plugin] = []
         self._load_plugins()
         self.start_msg = self._bootstrap()
         self.last_prompt = ""
@@ -202,36 +200,15 @@ class Engine:
     # Plugin related helpers
 
     def _load_plugins(self) -> None:
-        """Load plugins defined in ``plugins.toml``.
+        """Populate :attr:`plugins` from ``plugins.toml``."""
 
-        Each entry in the file should look like::
+        self.plugins = plugins.reload_plugins(self.base)
 
-            [[plugins]]
-            path = "package.module:ClassName"
+    def reload_plugins(self) -> str:
+        """Reload plugins without restarting the engine."""
 
-        Loading errors are logged but otherwise ignored.
-        """
-
-        cfg = self.base / "plugins.toml"
-        if not cfg.exists():
-            return
-        try:
-            data = tomllib.loads(cfg.read_text(encoding="utf-8"))
-        except Exception:  # pragma: no cover - best effort
-            logging.exception("Invalid plugins.toml")
-            return
-        for item in data.get("plugins", []):
-            path = item.get("path")
-            if not path:
-                continue
-            module_name, _, class_name = path.partition(":")
-            try:
-                module = importlib.import_module(module_name)
-                cls = getattr(module, class_name)
-                plugin: Plugin = cls()
-                self.plugins.append(plugin)
-            except Exception:  # pragma: no cover - best effort
-                logging.exception("Failed to load plugin %s", path)
+        self._load_plugins()
+        return f"{len(self.plugins)} plugins rechargés"
 
     def run_plugins(self) -> list[str]:
         """Execute all loaded plugins and return their outputs."""
