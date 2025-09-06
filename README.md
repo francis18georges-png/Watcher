@@ -51,3 +51,11 @@ pytest -q
 Sandbox d'exécution confinée, tests et linters obligatoires avant adoption de code.
 Semgrep utilise un fichier de règles local (`config/semgrep.yml`), aucun accès réseau requis.
 
+## Éthique et traçabilité
+
+Les actions du système sont journalisées via le module standard `logging`. Les erreurs et décisions importantes sont ainsi consignées pour audit ou débogage.
+
+Les contenus générés peuvent être conservés dans une base SQLite par le composant de mémoire (`app/core/memory.py`). Cette base stocke textes et métadonnées afin d'offrir un historique local des opérations.
+
+Pour un aperçu détaillé des principes éthiques et des limites d'utilisation, consultez [ETHICS.md](ETHICS.md).
+
