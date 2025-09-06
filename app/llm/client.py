@@ -91,11 +91,17 @@ class Client:
         self.host = cfg.get("host", "127.0.0.1:11434")
         self.fallback_phrase = fallback_phrase
 
-    def generate(self, prompt: str) -> str:
-        """Return a response for *prompt*."""
+    def generate(self, prompt: str) -> tuple[str, str]:
+        """Return a response and trace for *prompt*."""
 
+        trace: list[str] = []
         try:  # pragma: no cover - network path
-            return generate_ollama(prompt, host=self.host, model=self.model)
+            trace.append("ollama")
+            resp = generate_ollama(prompt, host=self.host, model=self.model)
+            trace.append("success")
+            return resp, " -> ".join(trace)
         except Exception as exc:
+            trace.append(f"error:{exc.__class__.__name__}")
+            trace.append("fallback")
             logging.exception("Failed to generate response: %s", exc)
-            return f"{self.fallback_phrase}: {prompt}"
+            return f"{self.fallback_phrase}: {prompt}", " -> ".join(trace)
