@@ -15,6 +15,7 @@ requirements.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from typing import cast
 
 
 @dataclass
@@ -65,7 +66,9 @@ class Critic:
         scores = {
             "length": min(len(words) / 100.0, 1.0),
             "politeness": (
-                1.0 if any(keyword in text_lower for keyword in polite_keywords) else 0.0
+                1.0
+                if any(keyword in text_lower for keyword in polite_keywords)
+                else 0.0
             ),
         }
 
@@ -99,7 +102,7 @@ class Critic:
         """
 
         result = self.evaluate(text)
-        scores = result["scores"]  # type: ignore[index]
+        scores = cast(dict[str, float], result["scores"])
         suggestions: list[str] = []
 
         # Encourage prompts with at least ~50 words of detail.
