@@ -27,7 +27,7 @@ def run(
 
     if sys.platform == "win32":
         import subprocess
-        import win32job  # type: ignore[import-not-found]
+        import win32job
 
         result: dict[str, bool | int | str | None] = {
             "code": None,
