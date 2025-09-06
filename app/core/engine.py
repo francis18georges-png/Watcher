@@ -16,6 +16,7 @@ from app.core.learner import Learner
 from app.llm.client import Client
 from app.core.validation import validate_prompt
 from app.core.critic import Critic
+from app.core.reasoning import ReasoningChain
 from app.tools.scaffold import create_python_cli
 from app.data import pipeline
 from app.tools import plugins
@@ -84,12 +85,24 @@ class Engine:
 
         return ctx
 
-    def chat(self, prompt: str) -> str:
-        """Generate a response to *prompt* using the LLM client."""
+    def chat(self, prompt: str, reasoning: ReasoningChain | None = None) -> str:
+        """Generate a response to *prompt* using the LLM client.
+
+        Parameters
+        ----------
+        prompt:
+            User provided input.
+        reasoning:
+            Optional :class:`ReasoningChain` instance used to record explicit
+            reasoning steps.  When supplied, the prompt and resulting answer are
+            appended to the chain and stored in memory for later inspection.
+        """
         user_prompt = validate_prompt(prompt)
         # Store the user prompt and the assistant answer using distinct
         # memory kinds so analytics can differentiate between them.
         self.mem.add("chat_user", user_prompt)
+        if reasoning is not None:
+            reasoning.add(f"prompt: {user_prompt}")
 
         # Use the critic to obtain structured suggestions for the prompt.  If
         # the prompt lacks essential qualities we reply with these suggestions
@@ -107,6 +120,9 @@ class Engine:
             self.mem.add("chat_ai", msg)
             self.last_prompt = user_prompt
             self.last_answer = msg
+            if reasoning is not None:
+                reasoning.add(f"answer: {msg}")
+                reasoning.save(self.mem)
             return msg
 
         # Retrieve texts most similar to the prompt from memory.  Extract
@@ -126,13 +142,15 @@ class Engine:
         answer, trace = self.client.generate(llm_prompt)
 
         if details:
-            answer += (
-                "\n\nVoici quelques détails supplémentaires.\n"
-                + "\n".join(details)
+            answer += "\n\nVoici quelques détails supplémentaires.\n" + "\n".join(
+                details
             )
 
         self.mem.add("chat_ai", answer)
         self.mem.add("trace", trace)
+        if reasoning is not None:
+            reasoning.add(f"answer: {answer}")
+            reasoning.save(self.mem)
         self.last_prompt = user_prompt
         self.last_answer = answer
         return answer

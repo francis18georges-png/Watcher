@@ -1,10 +1,11 @@
 import ast
 import operator as op
 import re
+from collections.abc import Callable
 from typing import Any
 
 # Supported operators mapped to functions
-_OPERATORS = {
+_OPERATORS: dict[type[ast.AST], Callable[..., Any]] = {
     ast.Add: op.add,
     ast.Sub: op.sub,
     ast.Mult: op.mul,
@@ -36,6 +37,7 @@ _TOKEN_RE = re.compile(
     """,
     re.VERBOSE,
 )
+
 
 def _validate(expr: str) -> None:
     """Validate that *expr* contains only supported tokens."""
