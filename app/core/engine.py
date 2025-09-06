@@ -100,7 +100,7 @@ class Engine:
         if suggestions:
             # Map suggestion identifiers to short human messages.
             mapping = {
-                "detail": "manque de détails",
+                "detail": "Voici quelques détails supplémentaires.",
                 "politeness": "manque de politesse",
             }
             msg = ", ".join(mapping.get(s, s) for s in suggestions)
