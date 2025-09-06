@@ -32,6 +32,12 @@ python -m app.ui.main
 Exécuter les vérifications locales avant de proposer du code :
 
 ```bash
+make check
+```
+
+Les commandes exécutées par `make check` sont :
+
+```bash
 ruff check .
 black --check .
 mypy .
