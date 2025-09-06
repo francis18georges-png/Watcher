@@ -19,7 +19,9 @@ async def _async_fetch(urls: Iterable[str], cache_dir: Path) -> Dict[str, str]:
     return await scrape_all(urls, cache_dir)
 
 
-def fetch_programming_docs(urls: Iterable[str] | None, cache_dir: Path) -> Dict[str, str]:
+def fetch_programming_docs(
+    urls: Iterable[str] | None, cache_dir: Path
+) -> Dict[str, str]:
     """Download programming documentation pages.
 
     Parameters
