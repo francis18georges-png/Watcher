@@ -1,6 +1,6 @@
-from __future__ import annotations
-
 """Utilities for validating dataset structure."""
+
+from __future__ import annotations
 
 from pathlib import Path
 

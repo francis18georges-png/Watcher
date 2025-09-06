@@ -8,7 +8,7 @@ import json
 from contextvars import ContextVar
 
 try:
-    import yaml
+    import yaml  # type: ignore[import-untyped]
 except ModuleNotFoundError:  # pragma: no cover - optional dependency
     yaml = None
 
