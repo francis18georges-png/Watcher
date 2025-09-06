@@ -1,5 +1,6 @@
 import ast
 import operator as op
+import re
 from typing import Any
 
 # Supported operators mapped to functions
@@ -15,6 +16,40 @@ _OPERATORS = {
     ast.USub: op.neg,
 }
 
+# Regex matching a numeric literal. Supports optional leading sign and
+# scientific notation (e.g. ``+1.0`` or ``1e-3``).
+_NUMBER_PATTERN = r"""
+    [+-]?                    # optional sign
+    (?:
+        (?:\d+(?:\.\d*)?) # digits with optional decimal part
+        |(?:\.\d+)          # or decimal without leading digits
+    )
+    (?:[eE][+-]?\d+)?       # optional exponent
+"""
+
+# Token pattern for validating expressions. Permits numbers and basic
+# arithmetic operators/parentheses.
+_TOKEN_RE = re.compile(
+    rf"""
+    \s*
+    (?:{_NUMBER_PATTERN}|[+\-*/()])
+    """,
+    re.VERBOSE,
+)
+
+def _validate(expr: str) -> None:
+    """Validate that *expr* contains only supported tokens."""
+    expr = expr.strip()
+    pos = 0
+    while pos < len(expr):
+        match = _TOKEN_RE.match(expr, pos)
+        if not match:
+            raise ValueError("Malformed expression")
+        pos = match.end()
+    if pos != len(expr):
+        raise ValueError("Malformed expression")
+
+
 def safe_eval(expr: str) -> Any:
     """Safely evaluate a mathematical expression.
 
@@ -22,6 +57,7 @@ def safe_eval(expr: str) -> Any:
     A :class:`ValueError` is raised for any malformed or unsupported
     expression.
     """
+    _validate(expr)
     try:
         tree = ast.parse(expr, mode="eval")
     except SyntaxError as exc:  # pragma: no cover - handled uniformly
