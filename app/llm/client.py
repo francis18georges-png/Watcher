@@ -107,8 +107,13 @@ class Client:
         self.ctx = cfg.get("ctx")
         self.fallback_phrase = fallback_phrase
 
-    def generate(self, prompt: str) -> tuple[str, str]:
+    def generate(self, prompt: str, *, separator: str = "") -> tuple[str, str]:
         """Return a response and trace for *prompt*.
+
+        Args:
+            prompt: Text prompt to send for generation.
+            separator: String inserted between responses for each chunk when
+                concatenated. Defaults to ``""``.
 
         The prompt is sent in fixed-size chunks so very large prompts can be
         handled without overwhelming the backend. Successful responses from
@@ -124,7 +129,7 @@ class Client:
                     generate_ollama(chunk, host=self.host, model=self.model)
                 )
             trace.append("success")
-            return "".join(responses), " -> ".join(trace)
+            return separator.join(responses), " -> ".join(trace)
         except Exception as exc:
             trace.append(f"error:{exc.__class__.__name__}")
             trace.append("fallback")
