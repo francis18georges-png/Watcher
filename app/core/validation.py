@@ -1,6 +1,6 @@
-from __future__ import annotations
-
 """Validation utilities for user prompts and training datasets."""
+
+from __future__ import annotations
 
 from pathlib import Path
 
