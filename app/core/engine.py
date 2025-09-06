@@ -38,6 +38,8 @@ class Engine:
         self.planner = Planner()
         self.client = Client()
         self.start_msg = self._bootstrap()
+        self.last_prompt = ""
+        self.last_answer = ""
         if perform_maintenance:
             Thread(target=self.perform_maintenance, daemon=True).start()
 
@@ -83,7 +85,16 @@ class Engine:
         self.mem.add("chat_user", prompt)
         answer = self.client.generate(prompt)
         self.mem.add("chat_ai", answer)
+        self.last_prompt = prompt
+        self.last_answer = answer
         return answer
+
+    def add_feedback(self, rating: float, kind: str = "chat") -> str:
+        """Persist user feedback on the last exchange."""
+        if not self.last_prompt or not self.last_answer:
+            return "no response to rate"
+        self.mem.add_feedback(kind, self.last_prompt, self.last_answer, rating)
+        return "feedback enregistré"
 
     def run_briefing(self, objective: str = "Projet démo") -> str:
         """Generate a project brief and persist it to the data directory."""
@@ -130,6 +141,25 @@ class Engine:
 
     def auto_improve(self) -> str:
         """Train on datasets and perform a simple A/B benchmark."""
+        fb = self.mem.all_feedback()
+        if fb:
+            raw_dir = self.base / "datasets" / "raw"
+            raw_dir.mkdir(parents=True, exist_ok=True)
+            raw_file = raw_dir / "data.json"
+            data = [
+                {
+                    "kind": k,
+                    "prompt": p,
+                    "answer": a,
+                    "rating": r,
+                }
+                for k, p, a, r in fb
+            ]
+            raw_file.write_text(
+                json.dumps({"feedback": data}, ensure_ascii=False, indent=2),
+                encoding="utf-8",
+            )
+
         self.prepare_data()
         rep = AG.grade_all()
         self.mem.add("train", json.dumps(rep))
