@@ -40,6 +40,18 @@ semgrep --quiet --error --config config/semgrep.yml .
 pytest -q
 ```
 
+## Auto-amélioration
+
+Lors de la routine `auto_improve`, Watcher calcule une récompense
+composite utilisée pour ajuster sa stratégie d'apprentissage :
+
+- 70 % provient du taux de réussite du QualityGate (linters, tests, etc.).
+- 30 % provient de la note moyenne des retours utilisateurs (échelle 0‑5
+  normalisée sur 0‑1).
+
+Cette récompense est transmise à `Learner.update_policy` pour influencer
+les décisions futures.
+
 ## Données
 
 Les jeux de données localisés dans `datasets/raw` et `datasets/processed` sont
