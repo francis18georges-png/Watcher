@@ -68,7 +68,9 @@ class Memory:
             return 0.0
         return float(v1 @ v2 / ((np.linalg.norm(v1) * np.linalg.norm(v2)) + 1e-9))
 
-    def search(self, query: str, top_k: int = 8) -> list[tuple[float, int, str, str]]:
+    def search(
+        self, query: str, top_k: int = 8, threshold: float = 0.0
+    ) -> list[tuple[float, int, str, str]]:
         """Search memory for items similar to ``query``.
 
         The SQL query is limited to ``top_k`` results using a similarity function to
@@ -77,6 +79,9 @@ class Memory:
         Args:
             query: Text to search for.
             top_k: Maximum number of results to return.
+            threshold: Minimum acceptable similarity score. When set to a value
+                greater than zero, an exception is raised if no results meet
+                this threshold.
 
         Returns:
             A list of tuples ``(score, id, kind, text)`` sorted by descending
@@ -101,4 +106,6 @@ class Memory:
             for _id, kind, text, score in rows
             if score is not None and score > 0
         ]
+        if threshold > 0 and (not scored or scored[-1][0] < threshold):
+            raise ValueError(f"no results with score >= {threshold}")
         return scored

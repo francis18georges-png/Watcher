@@ -1,6 +1,7 @@
 import sqlite3
 
 import numpy as np  # type: ignore
+import pytest
 
 from app.core.memory import Memory
 
@@ -42,3 +43,18 @@ def test_search_embedding_error(tmp_path, monkeypatch):
 
     monkeypatch.setattr("app.core.memory.embed_ollama", bad_embed)
     assert mem.search("bonjour") == []
+
+
+def test_search_respects_threshold(tmp_path, monkeypatch):
+    def fake_embed(texts, model="nomic-embed-text"):
+        if fake_embed.calls == 0:
+            fake_embed.calls += 1
+            return [np.array([1.0, 0.0])]
+        return [np.array([0.0, 1.0])]
+
+    fake_embed.calls = 0
+    monkeypatch.setattr("app.core.memory.embed_ollama", fake_embed)
+    mem = Memory(tmp_path / "mem.db")
+    mem.add("note", "salut")
+    with pytest.raises(ValueError):
+        mem.search("salut", threshold=0.5)
