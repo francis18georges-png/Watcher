@@ -3,7 +3,7 @@ import subprocess
 import time
 
 
-DATASETS = pathlib.Path("datasets/python")
+DATASETS = pathlib.Path(__file__).resolve().parents[2] / "datasets" / "python"
 
 
 def _run_pytest(task_dir: pathlib.Path, timeout: int = 60) -> dict:
