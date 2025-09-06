@@ -2,22 +2,78 @@ from __future__ import annotations
 
 from functools import lru_cache
 from pathlib import Path
+from typing import Any
+import os
 import tomllib
 
+REQUIRED_SECTIONS = {
+    "ui",
+    "llm",
+    "dev",
+    "planner",
+    "memory",
+    "learn",
+    "intelligence",
+    "data",
+    "training",
+    "model",
+}
 
-@lru_cache(maxsize=1)
-def load_config() -> dict:
-    """Load configuration from ``settings.toml``.
+
+def _read_toml(path: Path) -> dict[str, Any]:
+    try:
+        with path.open("rb") as fh:
+            return tomllib.load(fh)
+    except Exception:
+        return {}
+
+
+def _deep_update(base: dict[str, Any], other: dict[str, Any]) -> dict[str, Any]:
+    for key, value in other.items():
+        if isinstance(value, dict) and isinstance(base.get(key), dict):
+            _deep_update(base[key], value)
+        else:
+            base[key] = value
+    return base
+
+
+def _validate(cfg: dict[str, Any]) -> dict[str, Any]:
+    missing = REQUIRED_SECTIONS - cfg.keys()
+    if missing:
+        missing_list = ", ".join(sorted(missing))
+        raise ValueError(f"Missing required sections: {missing_list}")
+    for key, value in cfg.items():
+        if not isinstance(value, dict):
+            raise TypeError(f"Section '{key}' must be a table")
+    return cfg
+
+
+@lru_cache(maxsize=None)
+def load_config(profile: str | None = None) -> dict[str, Any]:
+    """Load configuration from ``settings.toml`` with optional *profile*.
+
+    Parameters
+    ----------
+    profile:
+        Name of the profile to load. When omitted the value is read from the
+        ``WATCHER_PROFILE`` environment variable. Values from
+        ``settings.<profile>.toml`` override the base configuration.
 
     Returns
     -------
     dict
-        Parsed configuration dictionary. If the file cannot be read an empty
-        dictionary is returned.
+        Parsed and validated configuration dictionary. If the base file cannot
+        be read an empty dictionary is returned.
     """
-    cfg_path = Path(__file__).resolve().parent / "settings.toml"
-    try:
-        with cfg_path.open("rb") as fh:
-            return tomllib.load(fh)
-    except Exception:
+
+    base_path = Path(__file__).resolve().parent
+    cfg = _read_toml(base_path / "settings.toml")
+    if not cfg:
         return {}
+
+    profile = profile or os.getenv("WATCHER_PROFILE")
+    if profile:
+        profile_cfg = _read_toml(base_path / f"settings.{profile}.toml")
+        cfg = _deep_update(cfg, profile_cfg)
+
+    return _validate(cfg)
