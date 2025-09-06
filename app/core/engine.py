@@ -15,6 +15,7 @@ from app.core.planner import Planner
 from app.core.learner import Learner
 from app.llm.client import Client
 from app.core.validation import validate_prompt
+from app.core.critic import Critic
 from app.tools.scaffold import create_python_cli
 from app.data import pipeline
 from app.tools import plugins
@@ -39,6 +40,7 @@ class Engine:
         self.learner = Learner(self.bench, self.base / "data")
         self.planner = Planner()
         self.client = Client()
+        self.critic = Critic()
         self.plugins: list[plugins.Plugin] = []
         self._load_plugins()
         self.start_msg = self._bootstrap()
@@ -88,6 +90,24 @@ class Engine:
         # Store the user prompt and the assistant answer using distinct
         # memory kinds so analytics can differentiate between them.
         self.mem.add("chat_user", user_prompt)
+
+        # Use the critic to obtain structured suggestions for the prompt.  If
+        # the prompt lacks essential qualities we reply with these suggestions
+        # rather than querying the LLM which keeps the tests lightweight and
+        # mirrors the behaviour of a real assistant that would ask the user to
+        # clarify their question first.
+        suggestions = self.critic.suggest(user_prompt)
+        if suggestions:
+            # Map suggestion identifiers to short human messages.
+            mapping = {
+                "detail": "manque de détails",
+                "politeness": "manque de politesse",
+            }
+            msg = ", ".join(mapping.get(s, s) for s in suggestions)
+            self.mem.add("chat_ai", msg)
+            self.last_prompt = user_prompt
+            self.last_answer = msg
+            return msg
 
         # Retrieve texts most similar to the prompt from memory.
         excerpts = [

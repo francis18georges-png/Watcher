@@ -74,3 +74,34 @@ class Critic:
             "scores": scores,
             "passed": weighted_total >= self.threshold,
         }
+
+    # New method
+    def suggest(self, text: str) -> list[str]:
+        """Return identifiers for criteria that could be improved.
+
+        This helper is intentionally lightweight and mirrors how a more
+        sophisticated LLM based critic could report actionable feedback.  The
+        return value is a list of short identifiers instead of free form text
+        so callers can react to individual suggestions without brittle string
+        matching.
+
+        The currently supported identifiers are:
+
+        * ``"detail"`` – the provided text is considered too short.
+        * ``"politeness"`` – polite keywords such as "please" or "thank you"
+          were missing.
+        """
+
+        result = self.evaluate(text)
+        scores = result["scores"]  # type: ignore[index]
+        suggestions: list[str] = []
+
+        # Encourage prompts with at least ~50 words of detail.
+        if scores.get("length", 0.0) < 0.5:
+            suggestions.append("detail")
+
+        # Require the presence of polite keywords.
+        if scores.get("politeness", 0.0) < 1.0:
+            suggestions.append("politeness")
+
+        return suggestions
