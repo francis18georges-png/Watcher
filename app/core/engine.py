@@ -154,7 +154,12 @@ class Engine:
         return str(path)
 
     def auto_improve(self) -> str:
-        """Train on datasets and perform a simple A/B benchmark."""
+        """Train on datasets, compute a reward and benchmark variants.
+
+        The reward combines QualityGate results (70%) with the average
+        user feedback rating (30%).
+        """
+
         fb = self.mem.all_feedback()
         if fb:
             raw_dir = self.base / "datasets" / "raw"
@@ -174,6 +179,33 @@ class Engine:
                 encoding="utf-8",
             )
 
+        # Compute feedback score (0-1) from stored ratings (0-5)
+        ratings = [r for _k, _p, _a, r in fb]
+        fb_score = sum(ratings) / len(ratings) / 5 if ratings else 0.0
+
+        # Run quality gate and compute pass ratio
+        qg = self.qg.run_all()
+        self.mem.add("quality", json.dumps(qg))
+        results = qg.get("results", {})
+        total = len(results)
+        passed = sum(1 for r in results.values() if r.get("ok"))
+        qg_score = passed / total if total else 0.0
+
+        # Composite reward: 70% quality gate + 30% feedback
+        reward = 0.7 * qg_score + 0.3 * fb_score
+        self.learner.update_policy(reward)
+
+        self.mem.add(
+            "reward",
+            json.dumps(
+                {
+                    "quality": qg_score,
+                    "feedback": fb_score,
+                    "reward": reward,
+                }
+            ),
+        )
+
         self.prepare_data()
         rep = AG.grade_all()
         self.mem.add("train", json.dumps(rep))
@@ -182,7 +214,10 @@ class Engine:
         a = comp["A"]
         b = comp["B"]
         keep = comp["best"]["name"]
-        return f"train_ok={rep.get('ok', False)} A={a:.3f} B={b:.3f} keep={keep}"
+        return (
+            f"train_ok={rep.get('ok', False)} A={a:.3f} B={b:.3f} "
+            f"keep={keep} reward={reward:.3f}"
+        )
 
     # ------------------------------------------------------------------
     # Plugin related helpers

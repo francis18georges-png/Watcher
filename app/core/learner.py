@@ -14,6 +14,7 @@ class Learner:
     def __init__(self, bench: Bench, data_dir: Path) -> None:
         self.bench = bench
         self.file = data_dir / "best_variant.json"
+        self.policy_file = data_dir / "policy.json"
         self.file.parent.mkdir(parents=True, exist_ok=True)
 
     def compare(self, a: str, b: str) -> dict:
@@ -26,6 +27,16 @@ class Learner:
             best = {"name": name, "score": score}
             self._save_best(best)
         return {"A": score_a, "B": score_b, "best": best}
+
+    def update_policy(self, reward: float) -> None:
+        """Update the learning policy based on a reward signal.
+
+        The current policy is a simple log of the latest reward value,
+        persisted to ``policy.json`` for potential future use.
+        """
+        self.policy_file.write_text(
+            json.dumps({"last_reward": reward}), encoding="utf-8"
+        )
 
     def _load_best(self) -> dict | None:
         if self.file.exists():
