@@ -63,3 +63,28 @@ def test_chat_includes_retrieved_terms(tmp_path, monkeypatch):
     assert answer == "pong"
     assert "alpha beta" in eng.client.prompt
     assert "ping" in eng.client.prompt
+
+
+def test_chat_appends_detail_suggestions(tmp_path, monkeypatch):
+    def fake_embed(texts, model="nomic-embed-text"):
+        return [np.array([1.0])]
+
+    monkeypatch.setattr("app.core.memory.embed_ollama", fake_embed)
+
+    eng = Engine.__new__(Engine)
+    eng.mem = Memory(tmp_path / "mem.db")
+
+    def fake_search(self, query: str, top_k: int = 8):
+        return [(0.9, 1, "detail", "alpha beta")]
+
+    monkeypatch.setattr(Memory, "search", fake_search)
+
+    class DummyClient:
+        def generate(self, prompt: str) -> tuple[str, str]:
+            return "pong", "dummy-trace"
+
+    eng.client = DummyClient()
+
+    answer = eng.chat("ping")
+
+    assert "Voici quelques détails supplémentaires." in answer

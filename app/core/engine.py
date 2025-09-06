@@ -89,10 +89,11 @@ class Engine:
         # memory kinds so analytics can differentiate between them.
         self.mem.add("chat_user", user_prompt)
 
-        # Retrieve texts most similar to the prompt from memory.
-        excerpts = [
-            text for _score, _id, _kind, text in self.mem.search(user_prompt)
-        ]
+        # Retrieve texts most similar to the prompt from memory and separate
+        # potential detail suggestions from regular context excerpts.
+        results = self.mem.search(user_prompt)
+        excerpts = [text for _score, _id, kind, text in results if kind != "detail"]
+        details = [text for _score, _id, kind, text in results if kind == "detail"]
 
         # Combine the original prompt with retrieved excerpts before sending to the LLM.
         llm_prompt = user_prompt
@@ -100,6 +101,15 @@ class Engine:
             llm_prompt = "\n\n".join([llm_prompt, "\n".join(excerpts)])
 
         answer, trace = self.client.generate(llm_prompt)
+
+        # Append any detail suggestions after the generated answer to surface
+        # additional information to the user.
+        if details:
+            detail_text = "\n".join(details)
+            answer = (
+                f"{answer}\n\nVoici quelques détails supplémentaires.\n{detail_text}"
+            )
+
         self.mem.add("chat_ai", answer)
         self.mem.add("trace", trace)
         self.last_prompt = user_prompt
