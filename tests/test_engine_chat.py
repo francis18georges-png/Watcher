@@ -14,8 +14,8 @@ def test_chat_saves_distinct_kinds(tmp_path, monkeypatch):
     monkeypatch.setattr(Memory, "search", lambda self, q, top_k=8: [])
 
     class DummyClient:
-        def generate(self, prompt: str) -> str:
-            return "pong"
+        def generate(self, prompt: str) -> tuple[str, str]:
+            return "pong", "dummy-trace"
 
     eng = Engine.__new__(Engine)
     eng.mem = Memory(tmp_path / "mem.db")
@@ -27,7 +27,11 @@ def test_chat_saves_distinct_kinds(tmp_path, monkeypatch):
     with sqlite3.connect(tmp_path / "mem.db") as con:
         rows = con.execute("SELECT kind,text FROM items ORDER BY id").fetchall()
 
-    assert rows == [("chat_user", "ping"), ("chat_ai", "pong")]
+    assert rows == [
+        ("chat_user", "ping"),
+        ("chat_ai", "pong"),
+        ("trace", "dummy-trace"),
+    ]
 
 
 def test_chat_includes_retrieved_terms(tmp_path, monkeypatch):
@@ -48,9 +52,9 @@ def test_chat_includes_retrieved_terms(tmp_path, monkeypatch):
         def __init__(self):
             self.prompt = None
 
-        def generate(self, prompt: str) -> str:
+        def generate(self, prompt: str) -> tuple[str, str]:
             self.prompt = prompt
-            return "pong"
+            return "pong", "dummy-trace"
 
     eng.client = DummyClient()
 

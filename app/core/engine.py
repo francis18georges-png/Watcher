@@ -100,8 +100,9 @@ class Engine:
         if excerpts:
             llm_prompt = "\n\n".join([llm_prompt, "\n".join(excerpts)])
 
-        answer = self.client.generate(llm_prompt)
+        answer, trace = self.client.generate(llm_prompt)
         self.mem.add("chat_ai", answer)
+        self.mem.add("trace", trace)
         self.last_prompt = user_prompt
         self.last_answer = answer
         return answer
