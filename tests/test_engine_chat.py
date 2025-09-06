@@ -22,12 +22,16 @@ def test_chat_saves_distinct_kinds(tmp_path, monkeypatch):
     eng.client = DummyClient()
 
     answer = eng.chat("ping")
-    assert answer == "pong"
+    assert answer.startswith("pong")
+    assert "Merci." in answer
 
     with sqlite3.connect(tmp_path / "mem.db") as con:
         rows = con.execute("SELECT kind,text FROM items ORDER BY id").fetchall()
 
-    assert rows == [("chat_user", "ping"), ("chat_ai", "pong")]
+    assert rows[0] == ("chat_user", "ping")
+    assert rows[1][0] == "chat_ai"
+    assert "pong" in rows[1][1]
+    assert "Merci." in rows[1][1]
 
 
 def test_chat_includes_retrieved_terms(tmp_path, monkeypatch):
@@ -56,6 +60,7 @@ def test_chat_includes_retrieved_terms(tmp_path, monkeypatch):
 
     answer = eng.chat("ping")
 
-    assert answer == "pong"
+    assert answer.startswith("pong")
+    assert "Merci." in answer
     assert "alpha beta" in eng.client.prompt
     assert "ping" in eng.client.prompt

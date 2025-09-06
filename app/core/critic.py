@@ -74,3 +74,38 @@ class Critic:
             "scores": scores,
             "passed": weighted_total >= self.threshold,
         }
+
+
+def suggest(prompt: str, answer: str) -> str:
+    """Return a simple improvement plan for ``answer``.
+
+    The heuristic mirrors the :class:`Critic` scoring rules.  Two basic
+    suggestions are provided:
+
+    * Encourage adding more detail when the length score is low.
+    * Request a polite phrase when none is detected.
+
+    Parameters
+    ----------
+    prompt:
+        The original user prompt.  Currently unused but allows future
+        expansion to contextual suggestions.
+    answer:
+        The assistant response to critique.
+
+    Returns
+    -------
+    str
+        A human readable plan combining zero or more improvement steps.
+    """
+
+    critic = Critic()
+    result = critic.evaluate(answer)
+    suggestions: list[str] = []
+
+    if result["scores"].get("length", 0.0) < 0.5:
+        suggestions.append("Ajoutez des détails.")
+    if result["scores"].get("politeness", 0.0) < 1.0:
+        suggestions.append("Ajoutez une formule de politesse.")
+
+    return " ".join(suggestions)
