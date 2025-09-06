@@ -25,6 +25,7 @@ ab_candidates = 2
 [memory]
 embed_backend = "ollama"
 embed_model = "nomic-embed-text"
+embed_host = "127.0.0.1:11434"
 top_k = 8
 db_path = "memory/mem.db"
 
