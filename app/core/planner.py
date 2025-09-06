@@ -20,7 +20,7 @@ class Planner:
         outputs: Iterable[str] | None = None,
         platform: str = "windows",
         constraints: Iterable[str] | None = None,
-        license: str = "MIT",
+        license_name: str = "MIT",
         deliverables: Iterable[str] | None = None,
         success: Iterable[str] | None = None,
     ) -> str:
@@ -30,7 +30,7 @@ class Planner:
         ----------
         objective:
             Main goal of the project. Must be non-empty.
-        inputs/outputs/platform/constraints/license/deliverables/success:
+        inputs/outputs/platform/constraints/license_name/deliverables/success:
             Optional sections used to enrich the generated brief.
         """
 
@@ -51,7 +51,7 @@ class Planner:
         lines.extend(f"  - {t}" for t in ["analyser", "implementer", "tester"])
         lines.append(f"plateforme: {platform}")
         lines += fmt("contraintes", constraints)
-        lines.append(f"licence: {license}")
+        lines.append(f"licence: {license_name}")
         lines += fmt("livrables", deliverables)
         lines += fmt("critere_succes", success)
         return "\n".join(lines)
