@@ -1,5 +1,6 @@
 import ast
 import operator as op
+import re
 from typing import Any
 
 # Supported operators mapped to functions
@@ -47,3 +48,31 @@ def safe_eval(expr: str) -> Any:
         raise ValueError("Unsupported expression")
 
     return _eval(tree)
+
+
+def analyze(text: str) -> dict[str, list[float] | float | None]:
+    """Extract numeric tokens from ``text`` and evaluate them.
+
+    The function searches for substrings containing digits and basic
+    arithmetic operators. Each token is evaluated with :func:`safe_eval` and
+    collected in order of appearance. The last successfully evaluated number
+    is returned as ``answer``. When no tokens can be evaluated ``answer`` is
+    ``None``.
+    """
+
+    tokens = re.findall(r"[\d\s\.\+\-\*/]+", text)
+    numbers: list[float] = []
+
+    for token in tokens:
+        token = token.strip()
+        if not token or not re.search(r"\d", token):
+            continue
+        try:
+            value = safe_eval(token)
+        except ValueError:
+            continue
+        if isinstance(value, (int, float)):
+            numbers.append(float(value))
+
+    return {"numbers": numbers, "answer": numbers[-1] if numbers else None}
+
