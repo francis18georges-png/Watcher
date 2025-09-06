@@ -21,6 +21,10 @@ class Memory:
                 "CREATE TABLE IF NOT EXISTS items("  # noqa: E501
                 "id INTEGER PRIMARY KEY, kind TEXT, text TEXT, vec BLOB, ts REAL)"
             )
+            c.execute(
+                "CREATE TABLE IF NOT EXISTS feedback("  # noqa: E501
+                "id INTEGER PRIMARY KEY, kind TEXT, prompt TEXT, answer TEXT, rating REAL, ts REAL)"
+            )
 
     def add(self, kind: str, text: str) -> None:
         try:
@@ -34,6 +38,26 @@ class Memory:
                 "INSERT INTO items(kind,text,vec,ts) VALUES(?,?,?,?)",
                 (kind, text, vec, time.time()),
             )
+
+    def add_feedback(
+        self, kind: str, prompt: str, answer: str, rating: float
+    ) -> None:
+        """Persist a rated question/answer pair."""
+        with sqlite3.connect(self.db_path) as con:
+            c = con.cursor()
+            c.execute(
+                "INSERT INTO feedback(kind,prompt,answer,rating,ts) VALUES(?,?,?,?,?)",
+                (kind, prompt, answer, rating, time.time()),
+            )
+
+    def all_feedback(self) -> list[tuple[str, str, str, float]]:
+        """Return all stored feedback entries."""
+        with sqlite3.connect(self.db_path) as con:
+            c = con.cursor()
+            rows = c.execute(
+                "SELECT kind,prompt,answer,rating FROM feedback"
+            ).fetchall()
+        return rows
 
     @staticmethod
     def _cosine_similarity(vec_blob: bytes, query_blob: bytes) -> float:
