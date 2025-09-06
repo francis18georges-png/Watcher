@@ -109,17 +109,28 @@ class Engine:
             self.last_answer = msg
             return msg
 
-        # Retrieve texts most similar to the prompt from memory.
-        excerpts = [
-            text for _score, _id, _kind, text in self.mem.search(user_prompt)
-        ]
+        # Retrieve texts most similar to the prompt from memory.  Extract
+        # regular excerpts and detail suggestions separately so the latter can
+        # be surfaced in the final response without polluting the prompt sent
+        # to the LLM.
+        results = self.mem.search(user_prompt)
+        excerpts = [t for _s, _i, k, t in results if k != "detail"]
+        details = [t for _s, _i, k, t in results if k == "detail"]
 
-        # Combine the original prompt with retrieved excerpts before sending to the LLM.
+        # Combine the original prompt with retrieved excerpts before sending to
+        # the LLM.
         llm_prompt = user_prompt
         if excerpts:
             llm_prompt = "\n\n".join([llm_prompt, "\n".join(excerpts)])
 
         answer, trace = self.client.generate(llm_prompt)
+
+        if details:
+            answer += (
+                "\n\nVoici quelques détails supplémentaires.\n"
+                + "\n".join(details)
+            )
+
         self.mem.add("chat_ai", answer)
         self.mem.add("trace", trace)
         self.last_prompt = user_prompt
