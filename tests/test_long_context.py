@@ -27,4 +27,3 @@ def test_chunk_prompt_preserves_trailing_space():
     prompt = "foo "
     chunks = chunk_prompt(prompt, size=2)
     assert chunks == ["fo", "o "]
-

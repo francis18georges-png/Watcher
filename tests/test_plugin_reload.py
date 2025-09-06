@@ -11,8 +11,7 @@ def test_reload_plugins():
     assert not any(isinstance(p, DummyPlugin) for p in engine.plugins)
 
     cfg.write_text(
-        original
-        + "\n[[plugins]]\npath = \"tests.dummy_plugin:DummyPlugin\"\n",
+        original + '\n[[plugins]]\npath = "tests.dummy_plugin:DummyPlugin"\n',
         encoding="utf-8",
     )
     try:
@@ -22,4 +21,3 @@ def test_reload_plugins():
         assert "dummy plugin loaded" in outputs
     finally:
         cfg.write_text(original, encoding="utf-8")
-

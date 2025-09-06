@@ -61,9 +61,12 @@ class Learner:
         if self.prev_state is not None:
             # Normalise state to stabilise updates
             mean = sum(self.prev_state) / len(self.prev_state)
-            std = math.sqrt(
-                sum((s - mean) ** 2 for s in self.prev_state) / len(self.prev_state)
-            ) or 1.0
+            std = (
+                math.sqrt(
+                    sum((s - mean) ** 2 for s in self.prev_state) / len(self.prev_state)
+                )
+                or 1.0
+            )
             norm_prev = [(s - mean) / std for s in self.prev_state]
 
             grad = [reward * s for s in norm_prev]
@@ -76,8 +79,7 @@ class Learner:
                 self.beta1 * m + (1 - self.beta1) * g for m, g in zip(self.m, grad)
             ]
             self.v = [
-                self.beta2 * v + (1 - self.beta2) * (g ** 2)
-                for v, g in zip(self.v, grad)
+                self.beta2 * v + (1 - self.beta2) * (g**2) for v, g in zip(self.v, grad)
             ]
             m_hat = [m / (1 - self.beta1**self.t) for m in self.m]
             v_hat = [v / (1 - self.beta2**self.t) for v in self.v]

@@ -22,6 +22,7 @@ def test_validate_prompt_type() -> None:
 # Dataset validation tests
 # ---------------------------------------------------------------------------
 
+
 def _make_dataset(
     tmp_path,
     *,

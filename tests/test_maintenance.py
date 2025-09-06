@@ -47,4 +47,3 @@ def test_auto_improve_runs_quality_when_missing(tmp_path, monkeypatch):
     eng = _setup_engine(tmp_path, monkeypatch, calls)
     eng.auto_improve()
     assert calls == ["run_all"]
-

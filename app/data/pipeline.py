@@ -103,6 +103,7 @@ def _resolve_step(path: str) -> PipelineStep:
         raise TypeError(f"{path} is not a PipelineStep")
     return step
 
+
 @dataclass
 class StepResult:
     """Execution details for a pipeline step."""
