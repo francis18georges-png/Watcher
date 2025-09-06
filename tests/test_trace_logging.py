@@ -1,5 +1,4 @@
 import numpy as np
-import numpy as np
 import sqlite3
 
 from app.core.memory import Memory

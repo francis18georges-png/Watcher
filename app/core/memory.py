@@ -40,6 +40,16 @@ class Memory:
                 (kind, text, vec, time.time()),
             )
 
+    def last(self, kind: str) -> tuple[int, str] | None:
+        """Return the most recently added item for ``kind``."""
+
+        with sqlite3.connect(self.db_path) as con:
+            row = con.execute(
+                "SELECT id,text FROM items WHERE kind=? ORDER BY id DESC LIMIT 1",
+                (kind,),
+            ).fetchone()
+        return row if row is not None else None
+
     def summarize(self, kind: str, max_items: int) -> None:
         with sqlite3.connect(self.db_path) as con:
             c = con.cursor()
@@ -63,9 +73,7 @@ class Memory:
             )
         self.add(kind, summary)
 
-    def add_feedback(
-        self, kind: str, prompt: str, answer: str, rating: float
-    ) -> None:
+    def add_feedback(self, kind: str, prompt: str, answer: str, rating: float) -> None:
         """Persist a rated question/answer pair."""
         with sqlite3.connect(self.db_path) as con:
             c = con.cursor()
