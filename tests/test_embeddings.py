@@ -27,7 +27,7 @@ def test_embed_ollama_host_argument(monkeypatch):
 
 
 def test_embed_ollama_host_from_config(monkeypatch):
-    def fake_load(fh):
+    def fake_config():
         return {"memory": {"embed_host": "confighost:4242"}}
 
     called = {}
@@ -37,7 +37,7 @@ def test_embed_ollama_host_from_config(monkeypatch):
         called["port"] = port
         raise OSError("fail")
 
-    monkeypatch.setattr("app.tools.embeddings.tomllib.load", fake_load)
+    monkeypatch.setattr("app.tools.embeddings.load_config", fake_config)
     monkeypatch.setattr("http.client.HTTPConnection", bad_conn)
     embed_ollama(["hi"])
     assert called == {"host": "confighost", "port": 4242}

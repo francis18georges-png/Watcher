@@ -7,11 +7,11 @@ disables vector search but allows the application to continue running.
 
 import http.client
 import json
-from pathlib import Path
 from urllib.parse import urlparse
 
 import numpy as np
-import tomllib
+
+from config import load_config
 
 
 def embed_ollama(
@@ -40,12 +40,7 @@ def embed_ollama(
         reached, a list of zero vectors of shape ``(1,)`` is returned instead.
     """
 
-    try:
-        cfg_path = Path(__file__).resolve().parents[2] / "config" / "settings.toml"
-        with cfg_path.open("rb") as fh:
-            cfg = tomllib.load(fh).get("memory", {})
-    except Exception:
-        cfg = {}
+    cfg = load_config().get("memory", {})
 
     if model is not None:
         cfg["embed_model"] = model
