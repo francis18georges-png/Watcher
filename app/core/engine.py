@@ -15,7 +15,8 @@ from app.core.evaluator import QualityGate
 from app.core.memory import Memory
 from app.core.planner import Planner
 from app.core.learner import Learner
-from app.llm.client import Client, validate_prompt
+from app.llm.client import Client
+from app.core.validation import validate_prompt
 from app.tools.scaffold import create_python_cli
 from app.data import pipeline
 from app.tools.plugins import Plugin
