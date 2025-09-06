@@ -16,3 +16,8 @@ def test_safe_eval_prevents_code_execution(tmp_path, monkeypatch):
     # Attempt to execute arbitrary code via import should raise ValueError
     with pytest.raises(ValueError):
         safe_eval("__import__('os').system('echo unsafe')")
+
+
+def test_safe_eval_rejects_alpha_characters():
+    with pytest.raises(ValueError):
+        safe_eval("2 + a")
