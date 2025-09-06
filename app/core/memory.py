@@ -35,8 +35,20 @@ class Memory:
                 (kind, text, vec, time.time()),
             )
 
+    @staticmethod
+    def _cosine_similarity(vec_blob: bytes, query_blob: bytes) -> float:
+        """Compute cosine similarity between two embedded vectors stored as BLOBs."""
+        v1 = np.frombuffer(vec_blob, dtype=np.float32)
+        v2 = np.frombuffer(query_blob, dtype=np.float32)
+        if len(v1) != len(v2) or len(v1) == 0:
+            return 0.0
+        return float(v1 @ v2 / ((np.linalg.norm(v1) * np.linalg.norm(v2)) + 1e-9))
+
     def search(self, query: str, top_k: int = 8) -> list[tuple[float, int, str, str]]:
         """Search memory for items similar to ``query``.
+
+        The SQL query is limited to ``top_k`` results using a similarity function to
+        avoid loading the entire table into memory.
 
         Args:
             query: Text to search for.
@@ -51,15 +63,18 @@ class Memory:
         except Exception:
             logging.exception("Failed to embed search query")
             return []
+        q_bytes = q.tobytes()
         with sqlite3.connect(self.db_path) as con:
+            con.create_function("cosine_sim", 2, self._cosine_similarity)
             c = con.cursor()
-            rows = c.execute("SELECT id,kind,text,vec FROM items").fetchall()
-        scored = []
-        for _id, kind, text, vec in rows:
-            v = np.frombuffer(vec, dtype=np.float32)
-            if len(v) != len(q) or len(v) == 0:
-                continue
-            s = float(q @ v / ((np.linalg.norm(q) * np.linalg.norm(v)) + 1e-9))
-            scored.append((s, _id, kind, text))
-        scored.sort(reverse=True)
-        return scored[:top_k]
+            rows = c.execute(
+                "SELECT id,kind,text,cosine_sim(vec, ?) as score FROM items "
+                "ORDER BY score DESC LIMIT ?",
+                (q_bytes, top_k),
+            ).fetchall()
+        scored = [
+            (score, _id, kind, text)
+            for _id, kind, text, score in rows
+            if score is not None and score > 0
+        ]
+        return scored
