@@ -68,3 +68,30 @@ def test_chat_includes_retrieved_terms(tmp_path, monkeypatch):
     assert answer == "pong"
     assert "alpha beta" in eng.client.prompt
     assert "please" in eng.client.prompt
+
+
+def test_chat_suggests_details_without_llm(tmp_path, monkeypatch):
+    def fake_embed(texts, model="nomic-embed-text"):
+        return [np.array([1.0])]
+
+    monkeypatch.setattr("app.core.memory.embed_ollama", fake_embed)
+
+    class DummyClient:
+        def generate(self, prompt: str) -> tuple[str, str]:
+            raise AssertionError("LLM should not be called when suggestions exist")
+
+    eng = Engine.__new__(Engine)
+    eng.mem = Memory(tmp_path / "mem.db")
+    eng.client = DummyClient()
+    eng.critic = Critic()
+
+    answer = eng.chat("ping")
+    assert "Voici quelques détails supplémentaires." in answer
+
+    with sqlite3.connect(tmp_path / "mem.db") as con:
+        rows = con.execute("SELECT kind,text FROM items ORDER BY id").fetchall()
+
+    assert rows == [
+        ("chat_user", "ping"),
+        ("chat_ai", answer),
+    ]
