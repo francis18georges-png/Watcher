@@ -58,9 +58,17 @@ class Client:
             value is read from ``config/settings.toml``.
         host: Hostname (and optional port) of the Ollama server. If omitted,
             the value is read from ``config/settings.toml``.
+        fallback_phrase: Text prefix used when generation fails. Defaults to
+            ``"Echo"``.
     """
 
-    def __init__(self, model: str | None = None, host: str | None = None) -> None:
+    def __init__(
+        self,
+        model: str | None = None,
+        host: str | None = None,
+        *,
+        fallback_phrase: str = "Echo",
+    ) -> None:
         try:
             cfg_path = Path(__file__).resolve().parents[2] / "config" / "settings.toml"
             with cfg_path.open("rb") as fh:
@@ -75,12 +83,13 @@ class Client:
 
         self.model = cfg.get("model", "llama3.2:3b")
         self.host = cfg.get("host", "127.0.0.1:11434")
+        self.fallback_phrase = fallback_phrase
 
     def generate(self, prompt: str) -> str:
         """Return a response for *prompt*."""
 
         try:  # pragma: no cover - network path
             return generate_ollama(prompt, host=self.host, model=self.model)
-        except Exception:
-            logging.exception("Failed to generate response")
-            return f"Echo: {prompt}"
+        except Exception as exc:
+            logging.exception("Failed to generate response: %s", exc)
+            return f"{self.fallback_phrase}: {prompt}"
