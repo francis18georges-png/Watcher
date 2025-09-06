@@ -36,7 +36,9 @@ def run(
 
     if sys.platform == "win32":
         import subprocess
-        import win32job
+        import win32job  # type: ignore[import-not-found]
+        import win32con  # type: ignore[import-not-found]
+        from win32api import CloseHandle, OpenProcess  # type: ignore[import-not-found]
 
         job = win32job.CreateJobObject(None, "")
         info = win32job.QueryInformationJobObject(
@@ -64,7 +66,8 @@ def run(
             text=True,
             creationflags=creation_flags,
         )
-        win32job.AssignProcessToJobObject(job, p._handle)
+        handle = OpenProcess(win32con.PROCESS_ALL_ACCESS, False, p.pid)
+        win32job.AssignProcessToJobObject(job, handle)
         try:
             out, err = p.communicate(timeout=timeout)
         except subprocess.TimeoutExpired:
@@ -90,6 +93,12 @@ def run(
         except Exception:
             logger.exception("Unexpected error querying job object")
         finally:
+            try:
+                CloseHandle(handle)
+            except OSError as exc:
+                logger.debug("Failed to close process handle: %s", exc)
+            except Exception:
+                logger.exception("Unexpected error closing process handle")
             try:
                 win32job.CloseHandle(job)
             except OSError as exc:
