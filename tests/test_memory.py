@@ -1,3 +1,4 @@
+import math
 import sqlite3
 
 import numpy as np  # type: ignore
@@ -77,3 +78,15 @@ def test_search_threshold_checks_top_score(tmp_path, monkeypatch):
     assert len(results) == 2
     assert results[0][0] >= 0.5
     assert results[1][0] < 0.5
+
+
+def test_cosine_similarity_handles_tiny_denominator():
+    tiny = np.array([1e-12], dtype=np.float32)
+    blob = tiny.astype("float32").tobytes()
+    assert Memory._cosine_similarity(blob, blob) == 0.0
+
+
+def test_cosine_similarity_regular():
+    vec = np.array([1.0], dtype=np.float32)
+    blob = vec.tobytes()
+    assert math.isclose(Memory._cosine_similarity(blob, blob), 1.0, rel_tol=1e-6)
