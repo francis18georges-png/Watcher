@@ -16,6 +16,7 @@ class Memory:
         self._init()
 
     def _init(self) -> None:
+        self._embed_cache: dict[str, np.ndarray] = {}
         with sqlite3.connect(self.db_path) as con:
             c = con.cursor()
             c.execute(
@@ -26,10 +27,14 @@ class Memory:
                 "CREATE TABLE IF NOT EXISTS feedback("  # noqa: E501
                 "id INTEGER PRIMARY KEY, kind TEXT, prompt TEXT, answer TEXT, rating REAL, ts REAL)"
             )
+            c.execute(
+                "CREATE INDEX IF NOT EXISTS idx_items_kind_ts ON items(kind, ts)"
+            )
 
     def add(self, kind: str, text: str) -> None:
         try:
-            vec = embed_ollama([text])[0].astype("float32").tobytes()
+            vec_arr = self._embed(text)
+            vec = vec_arr.astype("float32").tobytes()
         except Exception:
             logging.exception("Failed to embed text for kind '%s'", kind)
             vec = np.array([], dtype=np.float32).tobytes()
@@ -121,7 +126,7 @@ class Memory:
             similarity score.
         """
         try:
-            q = embed_ollama([query])[0].astype("float32")
+            q = self._embed(query, use_cache=False).astype("float32")
         except Exception:
             logging.exception("Failed to embed search query")
             return []
@@ -142,3 +147,15 @@ class Memory:
         if threshold > 0 and (not scored or scored[0][0] < threshold):
             raise ValueError(f"no results with score >= {threshold}")
         return scored
+
+    # Internal helpers -------------------------------------------------
+
+    def _embed(self, text: str, use_cache: bool = True) -> np.ndarray:
+        """Return embedding for ``text`` using a simple in-memory cache."""
+        if use_cache and text in self._embed_cache:
+            return self._embed_cache[text]
+        vecs = embed_ollama([text])
+        vec = vecs[0].astype("float32") if vecs else np.zeros(1, dtype=np.float32)
+        if use_cache:
+            self._embed_cache[text] = vec
+        return vec

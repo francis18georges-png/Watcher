@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+from typing import Iterable
 
 
 def validate_dataset(path: str | Path) -> Path:
@@ -46,3 +47,23 @@ def validate_dataset(path: str | Path) -> Path:
         raise FileNotFoundError(f"Missing meta.json file: {meta_file}")
 
     return dataset_path.resolve()
+
+
+def validate_feedback_schema(data: dict) -> None:
+    """Validate the minimal feedback dataset structure.
+
+    The schema requires a top-level ``feedback`` key mapping to an iterable of
+    dictionaries that each contain ``kind``, ``prompt``, ``answer`` and
+    ``rating`` fields.  A :class:`ValueError` is raised when the structure does
+    not match this schema.
+    """
+
+    if "feedback" not in data:
+        raise ValueError("missing 'feedback' section")
+    rows = data["feedback"]
+    if not isinstance(rows, Iterable):
+        raise ValueError("'feedback' must be an iterable")
+    required = {"kind", "prompt", "answer", "rating"}
+    for i, row in enumerate(rows):
+        if not isinstance(row, dict) or not required.issubset(row):
+            raise ValueError(f"invalid feedback entry at index {i}")

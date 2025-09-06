@@ -4,8 +4,11 @@ from __future__ import annotations
 
 from pathlib import Path
 import json
+import logging
+import time
+from dataclasses import dataclass
 from importlib import import_module
-from typing import Any, Protocol, runtime_checkable
+from typing import Any, Callable, Protocol, runtime_checkable
 
 from app.config import load_config
 
@@ -100,18 +103,34 @@ def _resolve_step(path: str) -> PipelineStep:
         raise TypeError(f"{path} is not a PipelineStep")
     return step
 
+@dataclass
+class StepResult:
+    """Execution details for a pipeline step."""
 
-def run_pipeline(data: Any | None = None) -> Any:
+    name: str
+    duration: float
+    success: bool
+
+
+Hook = Callable[[StepResult], None]
+
+
+def run_pipeline(data: Any | None = None, hooks: list[Hook] | None = None) -> Any:
     """Execute configured data pipeline steps.
 
     Steps are declared in ``config/settings.toml`` under ``[data.steps]`` as a
     mapping where the values are dotted import paths. They are executed in the
-    order they are declared in the configuration.
+    order they are declared in the configuration.  Each step is timed and hooks
+    are invoked with a :class:`StepResult` object.
 
     Parameters
     ----------
     data:
         Initial data passed to the first pipeline step. Defaults to ``None``.
+    hooks:
+        Optional list of callables invoked after each step. They receive a
+        :class:`StepResult` instance. Exceptions raised by hooks are logged and
+        ignored.
 
     Returns
     -------
@@ -122,7 +141,23 @@ def run_pipeline(data: Any | None = None) -> Any:
     cfg = load_config("data")
     steps_cfg = cfg.get("steps", {})
     result: Any = data
-    for path in steps_cfg.values():
+    for name, path in steps_cfg.items():
         step = _resolve_step(path)
-        result = step(result)
+        start = time.perf_counter()
+        ok = True
+        try:
+            result = step(result)
+        except Exception:  # pragma: no cover - best effort
+            ok = False
+            logging.exception("pipeline step '%s' failed", name)
+            raise
+        finally:
+            duration = time.perf_counter() - start
+            if hooks:
+                sr = StepResult(name, duration, ok)
+                for hook in hooks:
+                    try:
+                        hook(sr)
+                    except Exception:  # pragma: no cover - defensive
+                        logging.exception("pipeline hook failed")
     return result
