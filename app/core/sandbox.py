@@ -36,7 +36,7 @@ def run(
 
     if sys.platform == "win32":
         import subprocess
-        import win32job  # type: ignore[import-not-found]
+        import win32job
         import win32con  # type: ignore[import-not-found]
         from win32api import CloseHandle, OpenProcess  # type: ignore[import-not-found]
 
