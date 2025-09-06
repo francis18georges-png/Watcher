@@ -16,3 +16,8 @@ Watcher vise à offrir un atelier local d'IA respectant la confidentialité des 
 - Journalisation via le module `logging` standard de Python.
 - Stockage persistant des décisions dans une base SQLite gérée par `app/core/memory.py`.
 
+## Conservation et effacement des retours
+- Les retours et commentaires de l'utilisateur sont conservés sur l'environnement local.
+- L'utilisateur peut à tout moment exporter ou supprimer ces informations pour préserver la confidentialité.
+- Aucune transmission externe n'est réalisée lors de ces opérations.
+

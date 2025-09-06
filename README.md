@@ -65,6 +65,11 @@ dvc pull
 Sandbox d'exécution confinée, tests et linters obligatoires avant adoption de code.
 Semgrep utilise un fichier de règles local (`config/semgrep.yml`), aucun accès réseau requis.
 
+## Confidentialité
+
+Watcher fonctionne hors ligne par défaut et n'envoie aucune donnée vers l'extérieur.
+Les journaux comme les contenus mémorisés restent sur l'environnement local et peuvent être effacés par l'utilisateur.
+
 ## Éthique et traçabilité
 
 Les actions du système sont journalisées via le module standard `logging`. Les erreurs et décisions importantes sont ainsi consignées pour audit ou débogage.
