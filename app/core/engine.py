@@ -85,21 +85,24 @@ class Engine:
 
     def chat(self, prompt: str) -> str:
         """Generate a response to *prompt* using the LLM client."""
-        prompt = validate_prompt(prompt)
+        user_prompt = validate_prompt(prompt)
         # Store the user prompt and the assistant answer using distinct
         # memory kinds so analytics can differentiate between them.
-        self.mem.add("chat_user", prompt)
+        self.mem.add("chat_user", user_prompt)
 
         # Retrieve texts most similar to the prompt from memory.
-        excerpts = [text for _score, _id, _kind, text in self.mem.search(prompt)]
+        excerpts = [
+            text for _score, _id, _kind, text in self.mem.search(user_prompt)
+        ]
 
         # Combine the original prompt with retrieved excerpts before sending to the LLM.
+        llm_prompt = user_prompt
         if excerpts:
-            prompt = "\n\n".join([prompt, "\n".join(excerpts)])
+            llm_prompt = "\n\n".join([llm_prompt, "\n".join(excerpts)])
 
-        answer = self.client.generate(prompt)
+        answer = self.client.generate(llm_prompt)
         self.mem.add("chat_ai", answer)
-        self.last_prompt = prompt
+        self.last_prompt = user_prompt
         self.last_answer = answer
         return answer
 
