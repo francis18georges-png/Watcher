@@ -16,3 +16,11 @@ def test_safe_eval_prevents_code_execution(tmp_path, monkeypatch):
     # Attempt to execute arbitrary code via import should raise ValueError
     with pytest.raises(ValueError):
         safe_eval("__import__('os').system('echo unsafe')")
+
+
+def test_safe_eval_allows_signed_float():
+    assert safe_eval("+1.0") == 1.0
+
+
+def test_safe_eval_allows_scientific_notation():
+    assert safe_eval("1e-3") == 0.001
