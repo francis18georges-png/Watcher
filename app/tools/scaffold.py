@@ -2,8 +2,26 @@ from pathlib import Path
 import textwrap
 
 
+def _confirm_overwrite(path: Path) -> bool:
+    """Ask the user to confirm overwriting *path*.
+
+    If stdin is not available (e.g. during tests), the function returns
+    ``False`` so that the operation is aborted by default.
+    """
+
+    try:
+        resp = input(f"{path} contient déjà des fichiers. Écraser ? [y/N] ")
+    except (EOFError, OSError):  # pragma: no cover - non-interactive envs or pytest capture
+        return False
+    return resp.strip().lower() in {"y", "yes", "o", "oui"}
+
+
 def create_python_cli(name: str, base: Path):
     proj = base / "app" / "projects" / name
+    if proj.exists() and any(proj.iterdir()):
+        if not _confirm_overwrite(proj):
+            raise FileExistsError(f"Dossier {proj} non vide")
+
     (proj / name).mkdir(parents=True, exist_ok=True)
     (proj / "tests").mkdir(parents=True, exist_ok=True)
 
