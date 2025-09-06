@@ -2,6 +2,7 @@
 
 from pathlib import Path
 import json
+import logging
 from threading import Thread
 import tomllib
 
@@ -107,11 +108,11 @@ class Engine:
         try:
             self.run_quality_gate()
         except Exception:  # pragma: no cover - best effort
-            pass
+            logging.exception("run_quality_gate failed")
         try:
             self.auto_improve()
         except Exception:  # pragma: no cover - best effort
-            pass
+            logging.exception("auto_improve failed")
 
     def run_quality_gate(self) -> str:
         """Run static checks and tests, storing the result in memory."""
