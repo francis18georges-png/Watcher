@@ -27,9 +27,7 @@ class Memory:
                 "CREATE TABLE IF NOT EXISTS feedback("  # noqa: E501
                 "id INTEGER PRIMARY KEY, kind TEXT, prompt TEXT, answer TEXT, rating REAL, ts REAL)"
             )
-            c.execute(
-                "CREATE INDEX IF NOT EXISTS idx_items_kind_ts ON items(kind, ts)"
-            )
+            c.execute("CREATE INDEX IF NOT EXISTS idx_items_kind_ts ON items(kind, ts)")
 
     def add(self, kind: str, text: str) -> None:
         try:
@@ -68,9 +66,7 @@ class Memory:
             )
         self.add(kind, summary)
 
-    def add_feedback(
-        self, kind: str, prompt: str, answer: str, rating: float
-    ) -> None:
+    def add_feedback(self, kind: str, prompt: str, answer: str, rating: float) -> None:
         """Persist a rated question/answer pair."""
         with sqlite3.connect(self.db_path) as con:
             c = con.cursor()

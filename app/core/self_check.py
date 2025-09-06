@@ -37,6 +37,7 @@ _TOKEN_RE = re.compile(
     re.VERBOSE,
 )
 
+
 def _validate(expr: str) -> None:
     """Validate that *expr* contains only supported tokens."""
     expr = expr.strip()

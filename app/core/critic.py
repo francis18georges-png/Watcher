@@ -65,7 +65,9 @@ class Critic:
         scores = {
             "length": min(len(words) / 100.0, 1.0),
             "politeness": (
-                1.0 if any(keyword in text_lower for keyword in polite_keywords) else 0.0
+                1.0
+                if any(keyword in text_lower for keyword in polite_keywords)
+                else 0.0
             ),
         }
 

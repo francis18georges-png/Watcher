@@ -14,7 +14,8 @@ class DummyBench(Bench):
 
 def _setup_engine(tmp_path, monkeypatch):
     monkeypatch.setattr(
-        "app.core.memory.embed_ollama", lambda texts, model="nomic-embed-text": [np.array([1.0])]
+        "app.core.memory.embed_ollama",
+        lambda texts, model="nomic-embed-text": [np.array([1.0])],
     )
 
     eng = Engine.__new__(Engine)

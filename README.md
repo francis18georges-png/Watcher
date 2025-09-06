@@ -54,6 +54,13 @@ dvc commit
 dvc pull
 ```
 
+### Collecte
+
+Un module de scraping asynchrone (`app/data/scraper.py`) permet de
+collecter des pages web en parallèle tout en les mettant en cache sur
+disque. Les téléchargements déjà effectués ne sont pas relancés, ce qui
+accélère les itérations et facilite la reprise après interruption.
+
 ## Structure du dépôt
 
 - `app/` : moteur principal, mémoire, benchmarks et interface utilisateur.
