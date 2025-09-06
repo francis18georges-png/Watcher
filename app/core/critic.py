@@ -108,4 +108,5 @@ def suggest(prompt: str, answer: str) -> str:
     if result["scores"].get("politeness", 0.0) < 1.0:
         suggestions.append("Ajoutez une formule de politesse.")
 
-    return " ".join(suggestions)
+    # Present each suggestion on a new line for readability.
+    return "\n".join(suggestions)
