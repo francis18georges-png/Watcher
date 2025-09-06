@@ -31,5 +31,7 @@ class QualityGate:
                 "out": p.stdout[-4000:],
                 "err": p.stderr[-4000:],
             }
+        except FileNotFoundError as e:
+            return {"ok": False, "err": f"{args[0]} introuvable: {e}", "out": ""}
         except Exception as e:  # pragma: no cover - defensive
             return {"ok": False, "err": str(e), "out": ""}
