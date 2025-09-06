@@ -2,19 +2,25 @@ version: 1
 disable_existing_loggers: False
 
 formatters:
-  standard:
-    format: "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+  json:
+    (): app.core.logging_setup.JSONFormatter
+
+filters:
+  request_id:
+    (): app.core.logging_setup.RequestIdFilter
 
 handlers:
   console:
     class: logging.StreamHandler
     level: INFO
-    formatter: standard
+    formatter: json
+    filters: [request_id]
     stream: ext://sys.stdout
   file:
     class: logging.FileHandler
     level: INFO
-    formatter: standard
+    formatter: json
+    filters: [request_id]
     filename: watcher.log
 
 root:
