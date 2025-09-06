@@ -13,6 +13,7 @@ from app.core.evaluator import QualityGate
 from app.core.memory import Memory
 from app.core.planner import Planner
 from app.core.learner import Learner
+from app.core import critic
 from app.llm.client import Client
 from app.tools.scaffold import create_python_cli
 from app.data import pipeline
@@ -76,12 +77,34 @@ class Engine:
 
         return ctx
 
-    def chat(self, prompt: str) -> str:
-        """Generate a response to *prompt* using the LLM client."""
-        # Store the user prompt and the assistant answer using distinct
-        # memory kinds so analytics can differentiate between them.
+    def chat(self, prompt: str, *, threshold: float = 0.5) -> str:
+        """Generate a response to *prompt* using the LLM client.
+
+        After generating an answer it is passed to :func:`critic.review`.  If
+        the returned score is below ``threshold`` a single retry is attempted
+        with a hint requesting an improved answer.
+        """
+
+        # Store the user prompt using a distinct memory kind so analytics can
+        # differentiate between user and assistant messages.
         self.mem.add("chat_user", prompt)
-        answer = self.client.generate(prompt)
+
+        attempts = 0
+        answer = ""
+        score = 0.0
+
+        while attempts < 2:
+            if attempts == 0:
+                answer = self.client.generate(prompt)
+            else:
+                answer = self.client.generate(
+                    f"{prompt}\nRévise ta réponse précédente pour être plus utile."
+                )
+            score = critic.review(prompt, answer)
+            if score >= threshold:
+                break
+            attempts += 1
+
         self.mem.add("chat_ai", answer)
         return answer
 
