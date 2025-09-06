@@ -65,10 +65,11 @@ def run(
             text=True,
             creationflags=creation_flags,
         )
-        # ``AssignProcessToJobObject`` attend un handle de processus. Python
-        # n'expose ce handle que via l'attribut privé ``_handle`` de
-        # ``subprocess.Popen``.
-        # Le ``cast`` évite les erreurs mypy liées à cet attribut privé.
+        # ``AssignProcessToJobObject`` attend un handle de processus.
+        # Python n'expose pas publiquement ce handle : l'attribut privé
+        # ``_handle`` de ``subprocess.Popen`` est la seule façon de l'obtenir.
+        # L'utiliser évite un appel séparé à ``OpenProcess``/``CloseHandle``, et
+        # le ``cast`` informe mypy de l'usage de cet attribut privé.
         win32job.AssignProcessToJobObject(
             job, cast(Any, p)._handle
         )  # type: ignore[attr-defined]
