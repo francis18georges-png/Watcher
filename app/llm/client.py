@@ -10,6 +10,18 @@ from urllib.parse import urlparse
 from config import load_config
 
 
+def validate_prompt(prompt: str) -> str:
+    """Return a sanitized version of *prompt*.
+
+    Leading and trailing whitespace is stripped and an empty prompt raises a
+    ``ValueError``.
+    """
+    prompt = prompt.strip()
+    if not prompt:
+        raise ValueError("prompt must not be empty")
+    return prompt
+
+
 def generate_ollama(prompt: str, *, host: str, model: str) -> str:
     """Send *prompt* to an Ollama server.
 

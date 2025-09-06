@@ -13,7 +13,7 @@ from app.core.evaluator import QualityGate
 from app.core.memory import Memory
 from app.core.planner import Planner
 from app.core.learner import Learner
-from app.llm.client import Client
+from app.llm.client import Client, validate_prompt
 from app.tools.scaffold import create_python_cli
 from app.data import pipeline
 
@@ -78,6 +78,7 @@ class Engine:
 
     def chat(self, prompt: str) -> str:
         """Generate a response to *prompt* using the LLM client."""
+        prompt = validate_prompt(prompt)
         # Store the user prompt and the assistant answer using distinct
         # memory kinds so analytics can differentiate between them.
         self.mem.add("chat_user", prompt)
