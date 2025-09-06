@@ -129,13 +129,26 @@ class Engine:
         return str(path)
 
     def auto_improve(self) -> str:
-        """Train on datasets and perform a simple A/B benchmark."""
+        """Train on datasets, benchmark and update the learning policy."""
         self.prepare_data()
         rep = AG.grade_all()
         self.mem.add("train", json.dumps(rep))
         comp = self.learner.compare("A", "B")
         self.mem.add("decision", json.dumps(comp))
+
+        # Reward based on quality gate: 1 if all checks pass, else 0
+        qres = self.qg.run_all()
+        reward = 1.0 if qres.get("ok") else 0.0
+        self.mem.add("quality", json.dumps(qres))
+
+        # Update learner policy with the observed reward
+        self.learner.update_policy(reward, {"variant": comp["best"]["name"]})
+        self.mem.add("reward", json.dumps({"reward": reward}))
+
         a = comp["A"]
         b = comp["B"]
         keep = comp["best"]["name"]
-        return f"train_ok={rep.get('ok', False)} A={a:.3f} B={b:.3f} keep={keep}"
+        return (
+            f"train_ok={rep.get('ok', False)} A={a:.3f} B={b:.3f} "
+            f"keep={keep} reward={reward:.2f}"
+        )

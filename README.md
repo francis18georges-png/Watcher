@@ -60,6 +60,15 @@ dvc pull
 - `datasets/` : jeux d'entraînement Python (`fib`, `fizzbuzz`, `is_prime`).
 - `config/` : paramètres et règles de sécurité (`semgrep`).
 
+## Auto-amélioration
+
+Le module `Learner` met à jour une politique très simple qui décide quel
+"prompt" utiliser lors des expériences. Après chaque cycle de formation,
+`auto_improve` exécute un A/B test, calcule une récompense à partir du
+`QualityGate` ou d'un éventuel retour utilisateur puis appelle
+`update_policy(reward, context)` pour privilégier les variantes les plus
+performantes.
+
 ## Sécurité
 
 Sandbox d'exécution confinée, tests et linters obligatoires avant adoption de code.
