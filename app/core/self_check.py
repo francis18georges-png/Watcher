@@ -1,5 +1,6 @@
 import ast
 import operator as op
+import re
 from typing import Any
 
 # Supported operators mapped to functions
@@ -15,6 +16,9 @@ _OPERATORS = {
     ast.USub: op.neg,
 }
 
+# Precompiled regex to detect any alphabetical characters or underscores
+EXPR_RE = re.compile(r"[A-Za-z_]")
+
 def safe_eval(expr: str) -> Any:
     """Safely evaluate a mathematical expression.
 
@@ -22,6 +26,9 @@ def safe_eval(expr: str) -> Any:
     A :class:`ValueError` is raised for any malformed or unsupported
     expression.
     """
+    if EXPR_RE.search(expr):
+        raise ValueError("Unsupported characters in expression")
+
     try:
         tree = ast.parse(expr, mode="eval")
     except SyntaxError as exc:  # pragma: no cover - handled uniformly
