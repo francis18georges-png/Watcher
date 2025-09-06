@@ -79,6 +79,7 @@ class Client:
         host: str | None = None,
         *,
         fallback_phrase: str = "Echo",
+        ctx: int | None = None,
     ) -> None:
         cfg = load_config().get("llm", {})
 
@@ -86,16 +87,36 @@ class Client:
             cfg["model"] = model
         if host is not None:
             cfg["host"] = host
+        if ctx is not None:
+            cfg["ctx"] = ctx
 
         self.model = cfg.get("model", "llama3.2:3b")
         self.host = cfg.get("host", "127.0.0.1:11434")
+        self.ctx = cfg.get("ctx", 8192)
         self.fallback_phrase = fallback_phrase
 
     def generate(self, prompt: str) -> str:
-        """Return a response for *prompt*."""
+        """Return a response for *prompt*.
 
-        try:  # pragma: no cover - network path
-            return generate_ollama(prompt, host=self.host, model=self.model)
-        except Exception as exc:
-            logging.exception("Failed to generate response: %s", exc)
-            return f"{self.fallback_phrase}: {prompt}"
+        If the prompt exceeds the maximum context size, it is split into
+        multiple chunks. Each chunk is sent to the backend individually and the
+        partial responses are concatenated before being returned.
+        """
+
+        prompt = validate_prompt(prompt)
+
+        def _generate(chunk: str) -> str:
+            try:  # pragma: no cover - network path
+                return generate_ollama(chunk, host=self.host, model=self.model)
+            except Exception as exc:
+                logging.exception("Failed to generate response: %s", exc)
+                return f"{self.fallback_phrase}: {chunk}"
+
+        if len(prompt) <= self.ctx:
+            return _generate(prompt)
+
+        responses: list[str] = []
+        for start in range(0, len(prompt), self.ctx):
+            chunk = prompt[start : start + self.ctx]
+            responses.append(_generate(chunk))
+        return " ".join(responses)
