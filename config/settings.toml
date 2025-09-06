@@ -44,6 +44,7 @@ path = "data"
 
 [data.steps]
 load = "app.data.pipeline.load_raw_data"
+normalize = "app.data.pipeline.normalize_data"
 clean = "app.data.pipeline.clean_data"
 transform = "app.data.pipeline.transform_data"
 
