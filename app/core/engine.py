@@ -14,6 +14,7 @@ from app.core.planner import Planner
 from app.core.learner import Learner
 from app.llm.client import Client
 from app.tools.scaffold import create_python_cli
+from app.core.validation import validate_prompt
 
 
 class Engine:
@@ -81,6 +82,7 @@ class Engine:
 
     def chat(self, prompt: str) -> str:
         """Generate a response to *prompt* using the LLM client."""
+        validate_prompt(prompt)
         # Store the user prompt and the assistant answer using distinct
         # memory kinds so analytics can differentiate between them.
         self.mem.add("chat_user", prompt)

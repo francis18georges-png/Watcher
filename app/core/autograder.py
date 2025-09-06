@@ -2,6 +2,7 @@ import pathlib
 import subprocess
 import time
 
+from app.core.validation import validate_dataset
 
 DATASETS = pathlib.Path(__file__).resolve().parents[2] / "datasets" / "python"
 
@@ -30,13 +31,24 @@ def _run_pytest(task_dir: pathlib.Path, timeout: int = 60) -> dict:
 
 
 def list_tasks() -> list[pathlib.Path]:
-    return [d for d in DATASETS.iterdir() if d.is_dir()]
+    tasks: list[pathlib.Path] = []
+    for d in DATASETS.iterdir():
+        if not d.is_dir():
+            continue
+        try:
+            validate_dataset(d)
+        except ValueError:
+            continue
+        tasks.append(d)
+    return tasks
 
 
 def grade_task(name: str) -> dict:
     task = DATASETS / name
-    if not task.exists():
-        return {"ok": False, "error": f"task {name} not found"}
+    try:
+        validate_dataset(task)
+    except ValueError as exc:
+        return {"ok": False, "error": str(exc)}
     rep = _run_pytest(task)
     rep["score"] = 1.0 if rep.get("ok") else 0.0
     rep["task"] = name
