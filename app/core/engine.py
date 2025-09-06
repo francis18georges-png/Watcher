@@ -3,6 +3,7 @@
 from pathlib import Path
 import json
 import logging
+import time
 from threading import Thread
 
 from config import load_config
@@ -19,6 +20,7 @@ from app.core.critic import Critic
 from app.core.reasoning import ReasoningChain
 from app.tools.scaffold import create_python_cli
 from app.data import pipeline
+from app.data.validation import validate_feedback_schema
 from app.tools import plugins
 
 
@@ -198,9 +200,14 @@ class Engine:
     def prepare_data(self) -> str:
         """Execute the data preparation pipeline."""
         try:
+            start = time.perf_counter()
             raw = pipeline.load_raw_data()
+            validate_feedback_schema(raw)
             cleaned = pipeline.clean_data(raw)
             path = pipeline.transform_data(cleaned)
+            logging.info(
+                "data prepared in %.3fs -> %s", time.perf_counter() - start, path
+            )
         except Exception:  # pragma: no cover - best effort
             logging.exception("data preparation failed")
             return "data preparation failed"

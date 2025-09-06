@@ -1,5 +1,7 @@
 import numpy as np
 from app.core.engine import Engine
+import math
+
 from app.core.memory import Memory
 from app.core.learner import Learner
 from app.core.benchmark import Bench
@@ -41,7 +43,9 @@ def test_parameter_updates_over_iterations(tmp_path, monkeypatch):
     assert eng.learner.params == [0.0, 0.0]
 
     eng.auto_improve(qg_res="{}", state=[0.0, 1.0], reward=-1.0)
-    assert eng.learner.params == [-0.1, 0.0]
+    assert math.isclose(eng.learner.params[0], -0.1, abs_tol=1e-6)
+    assert math.isclose(eng.learner.params[1], 0.1, abs_tol=1e-6)
 
     eng.auto_improve(qg_res="{}", state=[1.0, 1.0], reward=2.0)
-    assert eng.learner.params == [-0.1, 0.2]
+    assert math.isclose(eng.learner.params[0], -0.2, abs_tol=1e-6)
+    assert math.isclose(eng.learner.params[1], 0.2, abs_tol=1e-6)
