@@ -14,6 +14,7 @@ from app.core.planner import Planner
 from app.core.learner import Learner
 from app.llm.client import Client
 from app.tools.scaffold import create_python_cli
+from app.data import pipeline
 
 
 class Engine:
@@ -120,8 +121,20 @@ class Engine:
         self.mem.add("quality", json.dumps(res))
         return json.dumps(res)
 
+    def prepare_data(self) -> str:
+        """Execute the data preparation pipeline."""
+        try:
+            raw = pipeline.load_raw_data()
+            cleaned = pipeline.clean_data(raw)
+            path = pipeline.transform_data(cleaned)
+        except Exception:  # pragma: no cover - best effort
+            logging.exception("data preparation failed")
+            return "data preparation failed"
+        return str(path)
+
     def auto_improve(self) -> str:
         """Train on datasets and perform a simple A/B benchmark."""
+        self.prepare_data()
         rep = AG.grade_all()
         self.mem.add("train", json.dumps(rep))
         comp = self.learner.compare("A", "B")
