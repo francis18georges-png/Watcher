@@ -36,11 +36,14 @@ def run(
 
     if sys.platform == "win32":
         import subprocess
-        import win32job
+        import win32job  # type: ignore[import-not-found]
         import win32con  # type: ignore[import-not-found]
         from win32api import CloseHandle, OpenProcess  # type: ignore[import-not-found]
+        from typing import Callable, cast
 
-        job = win32job.CreateJobObject(None, "")
+        CloseHandle = cast(Callable[[int], None], CloseHandle)
+
+        job = win32job.CreateJobObject(None, "")  # type: ignore[attr-defined]
         info = win32job.QueryInformationJobObject(
             job, win32job.JobObjectExtendedLimitInformation
         )
@@ -79,7 +82,7 @@ def run(
         result["err"] = err if isinstance(err, str) else ""
         try:
             violation = win32job.QueryInformationJobObject(
-                job, win32job.JobObjectLimitViolationInformation
+                job, win32job.JobObjectLimitViolationInformation  # type: ignore[attr-defined]
             )
             vflags = violation.get("LimitFlags", 0) | violation.get(
                 "ViolationLimitFlags", 0
@@ -100,7 +103,7 @@ def run(
             except Exception:
                 logger.exception("Unexpected error closing process handle")
             try:
-                win32job.CloseHandle(job)
+                win32job.CloseHandle(job)  # type: ignore[attr-defined]
             except OSError as exc:
                 logger.debug("Failed to close job handle: %s", exc)
             except Exception:
