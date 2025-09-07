@@ -34,3 +34,9 @@ def test_suggest_returns_identifiers():
     assert "detail" in suggestions
     assert "politeness" in suggestions
     assert isinstance(suggestions, list)
+
+
+def test_custom_keywords_override_default():
+    critic = Critic(polite_keywords=("hola",))
+    result = critic.evaluate("hola amigo")
+    assert result["scores"]["politeness"] == 1.0
