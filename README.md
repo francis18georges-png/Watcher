@@ -6,7 +6,14 @@ Mémoire vectorielle, curriculum adaptatif, A/B + bench et quality gate sécurit
 ## Installation
 
 1. Cloner ce dépôt.
-2. Créer un environnement Python 3.12 puis installer les dépendances :
+2. Créer un environnement virtuel Python 3.12 :
+
+   ```bash
+   python -m venv .venv
+   source .venv/bin/activate  # PowerShell : .\\.venv\\Scripts\\Activate.ps1
+   ```
+
+3. Installer les dépendances :
 
    ```bash
    pip install -r requirements.txt
