@@ -6,11 +6,27 @@ Mémoire vectorielle, curriculum adaptatif, A/B + bench et quality gate sécurit
 ## Installation
 
 1. Cloner ce dépôt.
-2. Créer un environnement Python 3.12 puis installer les outils de développement :
+2. Créer et activer un environnement Python 3.12 :
 
    ```bash
-   pip install black ruff pytest
+   python -m venv .venv
+   source .venv/bin/activate  # Linux/macOS
+   .venv\Scripts\activate   # Windows
    ```
+
+3. Installer les dépendances :
+
+   ```bash
+   pip install -r requirements.txt
+   ```
+
+4. Installer les outils de développement :
+
+   ```bash
+   pip install black ruff pytest mypy bandit semgrep
+   ```
+
+   Sur Windows, le script `installer.ps1` installe automatiquement toutes ces dépendances.
 
 ## Utilisation
 
@@ -41,10 +57,14 @@ Les commandes exécutées par `make check` sont :
 ruff check .
 black --check .
 mypy .
-bandit -q -r .
+bandit -q -r . -c bandit.yml
 semgrep --quiet --error --config config/semgrep.yml .
 pytest -q
 ```
+
+La configuration `bandit.yml` exclut notamment les répertoires `.git`, `datasets`,
+`.venv`, `build`, `dist` et `*.egg-info` afin d'éviter l'analyse de contenus
+non pertinents.
 
 ## Reproductibilité
 

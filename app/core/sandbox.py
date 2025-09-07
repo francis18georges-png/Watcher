@@ -25,18 +25,20 @@ def run(
     """
     import sys
 
+    result: dict[str, bool | int | str | None] = {
+        "code": None,
+        "out": "",
+        "err": "",
+        "timeout": False,
+        "cpu_exceeded": False,
+        "memory_exceeded": False,
+    }
+
     if sys.platform == "win32":
         import subprocess
-        import win32job  # type: ignore[import-not-found]
-
-        result: dict[str, bool | int | str | None] = {
-            "code": None,
-            "out": "",
-            "err": "",
-            "timeout": False,
-            "cpu_exceeded": False,
-            "memory_exceeded": False,
-        }
+        import win32job
+        import win32con  # type: ignore[import-not-found]
+        from win32api import CloseHandle, OpenProcess  # type: ignore[import-not-found]
 
         job = win32job.CreateJobObject(None, "")
         info = win32job.QueryInformationJobObject(
@@ -64,7 +66,8 @@ def run(
             text=True,
             creationflags=creation_flags,
         )
-        win32job.AssignProcessToJobObject(job, p._handle)
+        handle = OpenProcess(win32con.PROCESS_ALL_ACCESS, False, p.pid)
+        win32job.AssignProcessToJobObject(job, handle)
         try:
             out, err = p.communicate(timeout=timeout)
         except subprocess.TimeoutExpired:
@@ -91,6 +94,12 @@ def run(
             logger.exception("Unexpected error querying job object")
         finally:
             try:
+                CloseHandle(handle)
+            except OSError as exc:
+                logger.debug("Failed to close process handle: %s", exc)
+            except Exception:
+                logger.exception("Unexpected error closing process handle")
+            try:
                 win32job.CloseHandle(job)
             except OSError as exc:
                 logger.debug("Failed to close job handle: %s", exc)
@@ -106,15 +115,6 @@ def run(
             resource.setrlimit(resource.RLIMIT_CPU, (cpu_seconds, cpu_seconds))
         if memory_bytes is not None:
             resource.setrlimit(resource.RLIMIT_AS, (memory_bytes, memory_bytes))
-
-    result: dict[str, bool | int | str | None] = {
-        "code": None,
-        "out": "",
-        "err": "",
-        "timeout": False,
-        "cpu_exceeded": False,
-        "memory_exceeded": False,
-    }
 
     try:
         p = subprocess.run(
