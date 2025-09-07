@@ -41,10 +41,14 @@ Les commandes exécutées par `make check` sont :
 ruff check .
 black --check .
 mypy .
-bandit -q -r .
+bandit -q -r . -c bandit.yml
 semgrep --quiet --error --config config/semgrep.yml .
 pytest -q
 ```
+
+La configuration `bandit.yml` exclut notamment les répertoires `.git`, `datasets`,
+`.venv`, `build`, `dist` et `*.egg-info` afin d'éviter l'analyse de contenus
+non pertinents.
 
 ## Reproductibilité
 

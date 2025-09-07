@@ -12,7 +12,7 @@ type:
 > mypy .
 
 security:
-> bandit -q -r .
+> bandit -q -r . -c bandit.yml
 > semgrep --quiet --error --config config/semgrep.yml .
 
 test:
