@@ -3,9 +3,7 @@ Write-Host "== Watcher installer =="
 
 python -m venv .venv
 .\.venv\Scripts\pip install --upgrade pip wheel
-.\.venv\Scripts\pip install rich pydantic tomli-w psutil pillow pyperclip "urllib3<3" 
-    ruff black mypy bandit semgrep pytest pytest-cov hypothesis coverage 
-    requests httpx numpy scikit-learn sqlite-utils
+.\.venv\Scripts\pip install -r requirements.txt
 
 if (-not $SkipOllama) {
   try { winget install -e --id Ollama.Ollama -h } catch {}
