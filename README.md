@@ -9,8 +9,10 @@ Mémoire vectorielle, curriculum adaptatif, A/B + bench et quality gate sécurit
 2. Créer un environnement Python 3.12 puis installer les outils de développement :
 
    ```bash
-   pip install black ruff pytest
+   pip install black ruff pytest mypy bandit semgrep
    ```
+
+   Sur Windows, le script `installer.ps1` installe automatiquement toutes ces dépendances.
 
 ## Utilisation
 
