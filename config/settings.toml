@@ -55,3 +55,14 @@ seed = 42
 
 [model]
 name = "default"
+
+[critic]
+polite_keywords = [
+    "please",
+    "thank you",
+    "merci",
+    "s'il vous plaît",
+    "s'il vous plait",
+    "bonjour",
+    "salut",
+]

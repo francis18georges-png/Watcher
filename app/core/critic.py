@@ -16,6 +16,25 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
+from app.config import load_config
+
+
+def _default_polite_keywords() -> tuple[str, ...]:
+    """Return default polite keywords, allowing configuration overrides."""
+    cfg = load_config("critic")
+    keywords = cfg.get("polite_keywords") if isinstance(cfg, dict) else None
+    if keywords:
+        return tuple(keywords)
+    return (
+        "please",
+        "thank you",
+        "merci",
+        "s'il vous plaît",
+        "s'il vous plait",
+        "bonjour",
+        "salut",
+    )
+
 
 @dataclass
 class Critic:
@@ -35,6 +54,7 @@ class Critic:
         default_factory=lambda: {"length": 0.5, "politeness": 0.5}
     )
     threshold: float = 0.75
+    polite_keywords: tuple[str, ...] = field(default_factory=_default_polite_keywords)
 
     def evaluate(self, text: str) -> dict[str, float | dict[str, float] | bool]:
         """Return a granular evaluation of ``text``.
@@ -55,18 +75,11 @@ class Critic:
 
         words = text.split()
         text_lower = text.lower()
-        polite_keywords = (
-            "please",
-            "thank you",
-            "merci",
-            "s'il vous plaît",
-            "s'il vous plait",
-        )
         scores = {
             "length": min(len(words) / 100.0, 1.0),
             "politeness": (
                 1.0
-                if any(keyword in text_lower for keyword in polite_keywords)
+                if any(keyword in text_lower for keyword in self.polite_keywords)
                 else 0.0
             ),
         }
