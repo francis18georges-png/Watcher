@@ -6,10 +6,10 @@ Mémoire vectorielle, curriculum adaptatif, A/B + bench et quality gate sécurit
 ## Installation
 
 1. Cloner ce dépôt.
-2. Créer un environnement Python 3.12 puis installer les outils de développement :
+2. Créer un environnement Python 3.12 puis installer les dépendances :
 
    ```bash
-   pip install black ruff pytest
+   pip install -r requirements.txt
    ```
 
 ## Utilisation
