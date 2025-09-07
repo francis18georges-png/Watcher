@@ -36,10 +36,11 @@ def run(
 
     if sys.platform == "win32":
         import subprocess
-        import win32job  # type: ignore[import-not-found,import-untyped]
-        import win32con  # type: ignore[import-not-found,import-untyped]
-        from win32api import CloseHandle, OpenProcess  # type: ignore[import-not-found,import-untyped,attr-defined]
         from typing import Any, Callable, cast
+
+        import win32con
+        import win32job
+        from win32api import CloseHandle, OpenProcess
 
         CloseHandle = cast(Callable[[int], None], CloseHandle)
 
@@ -97,7 +98,7 @@ def run(
             logger.exception("Unexpected error querying job object")
         finally:
             try:
-                CloseHandle(handle)
+                CloseHandle(handle)  # type: ignore[attr-defined]
             except OSError as exc:
                 logger.debug("Failed to close process handle: %s", exc)
             except Exception:
