@@ -36,14 +36,14 @@ def run(
 
     if sys.platform == "win32":
         import subprocess
-        import win32job  # type: ignore[import-not-found]
-        import win32con  # type: ignore[import-not-found]
-        from win32api import CloseHandle, OpenProcess  # type: ignore[import-not-found]
-        from typing import Callable, cast
+        import win32job  # type: ignore[import-not-found,import-untyped]
+        import win32con  # type: ignore[import-not-found,import-untyped]
+        from win32api import CloseHandle, OpenProcess  # type: ignore[import-not-found,import-untyped,attr-defined]
+        from typing import Any, Callable, cast
 
         CloseHandle = cast(Callable[[int], None], CloseHandle)
 
-        job = win32job.CreateJobObject(None, "")  # type: ignore[attr-defined]
+        job = cast(Any, win32job.CreateJobObject(None, ""))  # type: ignore[attr-defined]
         info = win32job.QueryInformationJobObject(
             job, win32job.JobObjectExtendedLimitInformation
         )
