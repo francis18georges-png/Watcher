@@ -25,7 +25,7 @@ def _setup_engine(tmp_path, monkeypatch):
 
     class DummyQG:
         def run_all(self):
-            return {"ok": True, "results": {}}
+            return {"pytest": {"ok": True, "out": "", "err": ""}}
 
     eng.qg = DummyQG()
 

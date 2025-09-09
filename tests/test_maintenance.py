@@ -21,7 +21,7 @@ def _setup_engine(tmp_path, monkeypatch, calls):
     class DummyQG:
         def run_all(self):
             calls.append("run_all")
-            return {"ok": True, "results": {}}
+            return {"pytest": {"ok": True, "out": "", "err": ""}}
 
     class DummyLearner:
         def compare(self, a, b):
