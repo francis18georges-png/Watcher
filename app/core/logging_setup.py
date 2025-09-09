@@ -5,6 +5,8 @@ import logging
 import logging.config
 import datetime
 import json
+import os
+import importlib.resources as resources
 from contextvars import ContextVar
 
 try:
@@ -44,9 +46,8 @@ def set_request_id(request_id: str) -> None:
     request_id_ctx.set(request_id)
 
 
-def configure() -> None:
-    """Configure logging from the YAML configuration file if possible."""
-    config_path = Path(__file__).resolve().parents[2] / "config" / "logging.yml"
+def _configure_from_path(config_path: Path) -> None:
+    """Load logging configuration from ``config_path`` if possible."""
     if yaml and config_path.exists():
         with config_path.open("r", encoding="utf-8") as f:
             config = yaml.safe_load(f)
@@ -77,4 +78,19 @@ def configure() -> None:
         }
         logging.config.dictConfig(config)
     else:  # pragma: no cover - config file missing
+        logging.basicConfig(level=logging.INFO)
+
+
+def configure() -> None:
+    """Configure logging from the YAML configuration file if possible."""
+    env_path = os.environ.get("LOGGING_CONFIG_PATH")
+    if env_path:
+        _configure_from_path(Path(env_path))
+        return
+
+    resource = resources.files("config") / "logging.yml"
+    try:
+        with resources.as_file(resource) as config_path:
+            _configure_from_path(config_path)
+    except FileNotFoundError:  # pragma: no cover - config resource missing
         logging.basicConfig(level=logging.INFO)
