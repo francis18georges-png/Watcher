@@ -3,7 +3,7 @@
 from pathlib import Path
 import logging
 import logging.config
-from datetime import datetime
+import datetime
 import json
 from contextvars import ContextVar
 
@@ -29,7 +29,7 @@ class JSONFormatter(logging.Formatter):
 
     def format(self, record: logging.LogRecord) -> str:  # pragma: no cover - formatting
         log_record = {
-            "timestamp": datetime.utcfromtimestamp(record.created).isoformat() + "Z",
+            "timestamp": datetime.datetime.fromtimestamp(record.created, tz=datetime.UTC).isoformat(),
             "level": record.levelname,
             "name": record.name,
             "message": record.getMessage(),
