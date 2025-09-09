@@ -20,6 +20,13 @@ Mémoire vectorielle, curriculum adaptatif, A/B + bench et quality gate sécurit
    pip install -r requirements.txt
    ```
 
+   Pour activer les quotas d'exécution sur Windows, installez
+   également la dépendance optionnelle `pywin32` :
+
+   ```bash
+   pip install pywin32  # facultatif
+   ```
+
 4. Installer les outils de développement :
 
    ```bash
