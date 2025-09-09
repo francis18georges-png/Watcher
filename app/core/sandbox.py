@@ -44,9 +44,9 @@ def run(
 
         CloseHandle = cast(Callable[[int], None], CloseHandle)
 
-        job = cast(Any, win32job.CreateJobObject(None, ""))  # type: ignore[attr-defined]
+        job = cast(Any, win32job.CreateJobObject(None, ""))  # type: ignore[attr-defined, func-returns-value]
         info = win32job.QueryInformationJobObject(
-            job, win32job.JobObjectExtendedLimitInformation
+            job, win32job.JobObjectExtendedLimitInformation  # type: ignore[attr-defined]
         )
         flags = info["BasicLimitInformation"]["LimitFlags"]
         if cpu_seconds is not None:
@@ -59,7 +59,9 @@ def run(
             flags |= win32job.JOB_OBJECT_LIMIT_PROCESS_MEMORY
         info["BasicLimitInformation"]["LimitFlags"] = flags
         win32job.SetInformationJobObject(
-            job, win32job.JobObjectExtendedLimitInformation, info
+            job,
+            win32job.JobObjectExtendedLimitInformation,  # type: ignore[attr-defined]
+            info,
         )
 
         creation_flags = subprocess.CREATE_NEW_CONSOLE
@@ -104,7 +106,7 @@ def run(
             except Exception:
                 logger.exception("Unexpected error closing process handle")
             try:
-                win32job.CloseHandle(job)  # type: ignore[attr-defined]
+                CloseHandle(job)
             except OSError as exc:
                 logger.debug("Failed to close job handle: %s", exc)
             except Exception:
