@@ -36,13 +36,17 @@ def run(
 
     if sys.platform == "win32":
         import subprocess
-        import win32job
-        import win32con  # type: ignore[import-not-found]
-        from win32api import CloseHandle, OpenProcess  # type: ignore[import-not-found]
+        from typing import Any, Callable, cast
 
-        job = win32job.CreateJobObject(None, "")
+        import win32con
+        import win32job
+        from win32api import CloseHandle, OpenProcess
+
+        CloseHandle = cast(Callable[[int], None], CloseHandle)
+
+        job = cast(Any, win32job.CreateJobObject(None, ""))  # type: ignore[attr-defined, func-returns-value]
         info = win32job.QueryInformationJobObject(
-            job, win32job.JobObjectExtendedLimitInformation
+            job, win32job.JobObjectExtendedLimitInformation  # type: ignore[attr-defined]
         )
         flags = info["BasicLimitInformation"]["LimitFlags"]
         if cpu_seconds is not None:
@@ -55,7 +59,9 @@ def run(
             flags |= win32job.JOB_OBJECT_LIMIT_PROCESS_MEMORY
         info["BasicLimitInformation"]["LimitFlags"] = flags
         win32job.SetInformationJobObject(
-            job, win32job.JobObjectExtendedLimitInformation, info
+            job,
+            win32job.JobObjectExtendedLimitInformation,  # type: ignore[attr-defined]
+            info,
         )
 
         creation_flags = subprocess.CREATE_NEW_CONSOLE
@@ -79,7 +85,7 @@ def run(
         result["err"] = err if isinstance(err, str) else ""
         try:
             violation = win32job.QueryInformationJobObject(
-                job, win32job.JobObjectLimitViolationInformation
+                job, win32job.JobObjectLimitViolationInformation  # type: ignore[attr-defined]
             )
             vflags = violation.get("LimitFlags", 0) | violation.get(
                 "ViolationLimitFlags", 0
@@ -94,13 +100,13 @@ def run(
             logger.exception("Unexpected error querying job object")
         finally:
             try:
-                CloseHandle(handle)
+                CloseHandle(handle)  # type: ignore[attr-defined]
             except OSError as exc:
                 logger.debug("Failed to close process handle: %s", exc)
             except Exception:
                 logger.exception("Unexpected error closing process handle")
             try:
-                win32job.CloseHandle(job)
+                CloseHandle(job)
             except OSError as exc:
                 logger.debug("Failed to close job handle: %s", exc)
             except Exception:
