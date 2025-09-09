@@ -61,13 +61,13 @@ def run(
                 )
                 out = p.stdout if isinstance(p.stdout, str) else ""
                 err = p.stderr if isinstance(p.stderr, str) else ""
-                result["code"] = p.returncode
-                result["out"] = out
-                result["err"] = err
+                result.code = p.returncode
+                result.out = out
+                result.err = err
             except subprocess.TimeoutExpired as e:
-                result["timeout"] = True
-                result["out"] = e.stdout if isinstance(e.stdout, str) else ""
-                result["err"] = e.stderr if isinstance(e.stderr, str) else ""
+                result.timeout = True
+                result.out = e.stdout if isinstance(e.stdout, str) else ""
+                result.err = e.stderr if isinstance(e.stderr, str) else ""
             return result
 
         CloseHandle = cast(Callable[[int], None], CloseHandle)
