@@ -38,9 +38,31 @@ def run(
         import subprocess
         from typing import Any, Callable, cast
 
-        import win32con
-        import win32job
-        from win32api import CloseHandle, OpenProcess
+        try:
+            import win32con
+            import win32job
+            from win32api import CloseHandle, OpenProcess
+        except ImportError:
+            logger.warning(
+                "pywin32 introuvable; exécution sans quotas CPU/mémoire sur Windows"
+            )
+            try:
+                p = subprocess.run(
+                    cmd,
+                    capture_output=True,
+                    text=True,
+                    timeout=timeout,
+                )
+                out = p.stdout if isinstance(p.stdout, str) else ""
+                err = p.stderr if isinstance(p.stderr, str) else ""
+                result["code"] = p.returncode
+                result["out"] = out
+                result["err"] = err
+            except subprocess.TimeoutExpired as e:
+                result["timeout"] = True
+                result["out"] = e.stdout if isinstance(e.stdout, str) else ""
+                result["err"] = e.stderr if isinstance(e.stderr, str) else ""
+            return result
 
         CloseHandle = cast(Callable[[int], None], CloseHandle)
 
