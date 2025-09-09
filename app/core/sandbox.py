@@ -52,8 +52,10 @@ def run(
             logger.warning(
                 "pywin32 introuvable; exécution sans quotas CPU/mémoire sur Windows"
             )
+            from subprocess import CompletedProcess
+
             try:
-                p = subprocess.run(
+                p: CompletedProcess[str] = subprocess.run(
                     cmd,
                     capture_output=True,
                     text=True,
@@ -150,29 +152,33 @@ def run(
         if memory_bytes is not None:
             resource.setrlimit(resource.RLIMIT_AS, (memory_bytes, memory_bytes))
 
-    try:
-        p = subprocess.run(
-            cmd,
-            capture_output=True,
-            text=True,
-            timeout=timeout,
-            preexec_fn=_limits if cpu_seconds or memory_bytes else None,
-        )
-        from typing import cast
+    from subprocess import Popen
+    from typing import cast
 
-        out = cast(str, p.stdout) if isinstance(p.stdout, str) else ""
-        err = cast(str, p.stderr) if isinstance(p.stderr, str) else ""
-        result.code = p.returncode
-        result.out = out
-        result.err = err
-        if p.returncode and p.returncode < 0:
-            sig = -p.returncode
-            if sig == signal.SIGXCPU:
-                result.cpu_exceeded = True
-            elif sig == signal.SIGKILL:
-                result.memory_exceeded = True
-    except subprocess.TimeoutExpired as e:
+    p: Popen[str] = subprocess.Popen(
+        cmd,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+        preexec_fn=_limits if cpu_seconds or memory_bytes else None,
+    )
+
+    try:
+        out, err = p.communicate(timeout=timeout)
+    except subprocess.TimeoutExpired:
+        p.kill()
+        out, err = p.communicate()
         result.timeout = True
-        result.out = e.stdout if isinstance(e.stdout, str) else ""
-        result.err = e.stderr if isinstance(e.stderr, str) else ""
+
+    out_str = cast(str, out) if isinstance(out, str) else ""
+    err_str = cast(str, err) if isinstance(err, str) else ""
+    result.code = p.returncode
+    result.out = out_str
+    result.err = err_str
+    if p.returncode and p.returncode < 0:
+        sig = -p.returncode
+        if sig == signal.SIGXCPU:
+            result.cpu_exceeded = True
+        elif sig == signal.SIGKILL:
+            result.memory_exceeded = True
     return result
