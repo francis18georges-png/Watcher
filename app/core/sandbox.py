@@ -1,8 +1,21 @@
 # Sandbox: point d'entrée pour exécutions confinées avec quotas
 
 import logging
+from dataclasses import dataclass
 
 logger = logging.getLogger(__name__)
+
+
+@dataclass
+class SandboxResult:
+    """Résultat d'une exécution sandboxée."""
+
+    code: int | None = None
+    out: str = ""
+    err: str = ""
+    timeout: bool = False
+    cpu_exceeded: bool = False
+    memory_exceeded: bool = False
 
 
 def run(
@@ -11,7 +24,7 @@ def run(
     cpu_seconds: int | None = None,
     memory_bytes: int | None = None,
     timeout: float | None = 30,
-) -> dict:
+) -> SandboxResult:
     """Exécute ``cmd`` avec quotas optionnels.
 
     Args:
@@ -21,18 +34,11 @@ def run(
         timeout: Temps d'expiration mur (timeout) pour ``subprocess.run``.
 
     Returns:
-        dict: Informations d'exécution comprenant codes et dépassements.
+        SandboxResult: Informations d'exécution comprenant codes et dépassements.
     """
     import sys
 
-    result: dict[str, bool | int | str | None] = {
-        "code": None,
-        "out": "",
-        "err": "",
-        "timeout": False,
-        "cpu_exceeded": False,
-        "memory_exceeded": False,
-    }
+    result = SandboxResult()
 
     if sys.platform == "win32":
         import subprocess
@@ -79,10 +85,10 @@ def run(
         except subprocess.TimeoutExpired:
             p.kill()
             out, err = p.communicate()
-            result["timeout"] = True
-        result["code"] = p.returncode
-        result["out"] = out if isinstance(out, str) else ""
-        result["err"] = err if isinstance(err, str) else ""
+            result.timeout = True
+        result.code = p.returncode
+        result.out = out if isinstance(out, str) else ""
+        result.err = err if isinstance(err, str) else ""
         try:
             violation = win32job.QueryInformationJobObject(
                 job, win32job.JobObjectLimitViolationInformation  # type: ignore[attr-defined]
@@ -91,9 +97,9 @@ def run(
                 "ViolationLimitFlags", 0
             )
             if vflags & win32job.JOB_OBJECT_LIMIT_PROCESS_TIME:
-                result["cpu_exceeded"] = True
+                result.cpu_exceeded = True
             if vflags & win32job.JOB_OBJECT_LIMIT_PROCESS_MEMORY:
-                result["memory_exceeded"] = True
+                result.memory_exceeded = True
         except OSError as exc:
             logger.debug("Could not query job object: %s", exc)
         except Exception:
@@ -134,17 +140,17 @@ def run(
 
         out = cast(str, p.stdout) if isinstance(p.stdout, str) else ""
         err = cast(str, p.stderr) if isinstance(p.stderr, str) else ""
-        result["code"] = p.returncode
-        result["out"] = out
-        result["err"] = err
+        result.code = p.returncode
+        result.out = out
+        result.err = err
         if p.returncode and p.returncode < 0:
             sig = -p.returncode
             if sig == signal.SIGXCPU:
-                result["cpu_exceeded"] = True
+                result.cpu_exceeded = True
             elif sig == signal.SIGKILL:
-                result["memory_exceeded"] = True
+                result.memory_exceeded = True
     except subprocess.TimeoutExpired as e:
-        result["timeout"] = True
-        result["out"] = e.stdout if isinstance(e.stdout, str) else ""
-        result["err"] = e.stderr if isinstance(e.stderr, str) else ""
+        result.timeout = True
+        result.out = e.stdout if isinstance(e.stdout, str) else ""
+        result.err = e.stderr if isinstance(e.stderr, str) else ""
     return result
