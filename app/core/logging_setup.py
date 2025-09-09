@@ -29,7 +29,9 @@ class JSONFormatter(logging.Formatter):
 
     def format(self, record: logging.LogRecord) -> str:  # pragma: no cover - formatting
         log_record = {
-            "timestamp": datetime.datetime.fromtimestamp(record.created, tz=datetime.UTC).isoformat(),
+            "timestamp": datetime.datetime.fromtimestamp(
+                record.created, tz=datetime.UTC
+            ).isoformat(),
             "level": record.levelname,
             "name": record.name,
             "message": record.getMessage(),
