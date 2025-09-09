@@ -2,7 +2,11 @@ import os
 import pathlib
 import subprocess
 import time
+from contextlib import ExitStack
 from importlib import resources
+
+_STACK = ExitStack()
+_DATASETS: pathlib.Path | None = None
 
 
 def _datasets_path() -> pathlib.Path:
@@ -18,10 +22,21 @@ def _datasets_path() -> pathlib.Path:
     if env_path:
         return pathlib.Path(env_path)
 
-    try:
-        return pathlib.Path(resources.files("datasets") / "python")
-    except ModuleNotFoundError:
-        return pathlib.Path(__file__).resolve().parents[2] / "datasets" / "python"
+    global _DATASETS
+    if _DATASETS is None:
+        try:
+            root = _STACK.enter_context(resources.as_file(resources.files("datasets")))
+            candidate = root / "python"
+            if candidate.exists():
+                _DATASETS = candidate
+            else:
+                raise FileNotFoundError
+        except (ModuleNotFoundError, FileNotFoundError):
+            _DATASETS = (
+                pathlib.Path(__file__).resolve().parents[2] / "datasets" / "python"
+            )
+
+    return _DATASETS
 
 
 DATASETS = _datasets_path()
