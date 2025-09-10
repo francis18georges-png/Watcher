@@ -1,5 +1,5 @@
 exclude:
-  - .git
+  - .git          # ignore Git metadata
   - datasets
   - .venv
   - build
