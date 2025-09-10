@@ -62,4 +62,3 @@ def test_datasets_path_importlib(monkeypatch, tmp_path):
     path = autograder._datasets_path()
     assert called.get("as_file")
     assert path == tmp_path / "python"
-
