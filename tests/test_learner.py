@@ -24,3 +24,9 @@ def test_compare_persists_best(tmp_path: Path) -> None:
     bench.scores["A"] = 0.8
     res2 = learner.compare("A", "B")
     assert res2["best"]["name"] == "B"
+
+
+def test_step_handles_empty_state(tmp_path: Path) -> None:
+    bench = DummyBench({})
+    learner = Learner(bench, tmp_path)
+    assert learner.step([], reward=1.0) == []
