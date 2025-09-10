@@ -27,7 +27,8 @@ def _datasets_path() -> pathlib.Path:
     global _DATASETS
     if _DATASETS is None:
         try:
-            root = _STACK.enter_context(resources.as_file(resources.files("datasets")))
+            ctx = resources.as_file(resources.files("datasets"))
+            root = _STACK.enter_context(ctx)
             candidate = root / "python"
             if candidate.exists():
                 _DATASETS = candidate
