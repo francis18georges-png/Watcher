@@ -51,6 +51,8 @@ class Learner:
         prev_state``.  The *current* ``state`` is stored for the next
         invocation.
         """
+        if not state:
+            return self.params
 
         if not self.params:
             # Lazy initialisation matching state dimensionality
@@ -91,7 +93,11 @@ class Learner:
 
         # Store normalised current state for next call
         mean = sum(state) / len(state) if state else 0.0
-        std = math.sqrt(sum((s - mean) ** 2 for s in state) / len(state)) or 1.0
+        std = (
+            math.sqrt(sum((s - mean) ** 2 for s in state) / len(state))
+            if state
+            else 0.0
+        ) or 1.0
         self.prev_state = [(s - mean) / std for s in state]
         return self.params
 
