@@ -62,3 +62,19 @@ def test_datasets_path_importlib(monkeypatch, tmp_path):
     path = autograder._datasets_path()
     assert called.get("as_file")
     assert path == tmp_path / "python"
+
+
+def test_datasets_path_resolution(monkeypatch, tmp_path):
+    """Ensure _datasets_path uses env var when set and defaults otherwise."""
+    custom = tmp_path / "custom"
+    monkeypatch.setenv("WATCHER_DATASETS", str(custom))
+    monkeypatch.setattr(autograder, "_DATASETS", None)
+    monkeypatch.setattr(autograder, "_STACK", ExitStack())
+    assert autograder._datasets_path() == custom
+
+    monkeypatch.delenv("WATCHER_DATASETS", raising=False)
+    monkeypatch.setattr(autograder, "_DATASETS", None)
+    monkeypatch.setattr(autograder, "_STACK", ExitStack())
+    path = autograder._datasets_path()
+    assert path.name == "python"
+    assert path.parent.name == "datasets"
