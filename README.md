@@ -125,6 +125,16 @@ Semgrep utilise un fichier de règles local (`config/semgrep.yml`), aucun accès
 Watcher fonctionne hors ligne par défaut et n'envoie aucune donnée vers l'extérieur.
 Les journaux comme les contenus mémorisés restent sur l'environnement local et peuvent être effacés par l'utilisateur.
 
+## Configuration des logs
+
+Watcher peut charger une configuration de journalisation personnalisée depuis un fichier YAML. Définissez la variable d'environnement `LOGGING_CONFIG_PATH` pour indiquer le chemin du fichier :
+
+```bash
+export LOGGING_CONFIG_PATH=/chemin/vers/logging.yml
+```
+
+Si cette variable est absente ou que le fichier fourni est introuvable, le fichier `config/logging.yml` inclus dans le projet est utilisé. En dernier recours, Watcher applique la configuration basique de Python (`logging.basicConfig`) avec le niveau `INFO`.
+
 ## Éthique et traçabilité
 
 Les actions du système sont journalisées via le module standard `logging`. Les erreurs et décisions importantes sont ainsi consignées pour audit ou débogage.
