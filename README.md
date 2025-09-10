@@ -37,6 +37,13 @@ Mémoire vectorielle, curriculum adaptatif, A/B + bench et quality gate sécurit
 
 Les fichiers d'environnement (`*.env`), les journaux (`*.log`) et les environnements virtuels (`.venv/`) sont ignorés par Git afin d'éviter la mise en version de données sensibles ou temporaires.
 
+## Compatibilité NumPy
+
+Watcher tente d'utiliser la bibliothèque `numpy` lorsqu'elle est disponible.
+Si son import échoue, un module de repli léger `numpy_stub` est utilisé à la
+place. Les modules Python importent donc `np` via `from app.utils import np`
+pour bénéficier automatiquement de ce mécanisme.
+
 ## Utilisation
 
 ### Interface graphique

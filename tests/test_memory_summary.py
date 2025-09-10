@@ -1,5 +1,5 @@
 import sqlite3
-import numpy as np  # type: ignore
+from app.utils import np
 
 from app.core.memory import Memory
 
