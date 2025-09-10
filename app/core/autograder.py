@@ -2,10 +2,12 @@ import os
 import pathlib
 import subprocess
 import time
+import atexit
 from contextlib import ExitStack
 from importlib import resources
 
 _STACK = ExitStack()
+atexit.register(_STACK.close)
 _DATASETS: pathlib.Path | None = None
 
 
