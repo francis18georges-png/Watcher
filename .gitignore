@@ -1,6 +1,22 @@
+# Byte-compiled / cache
 __pycache__/
 *.pyc
+.pytest_cache/
+.mypy_cache/
+
+# Virtual environments
+.venv/
+
+# Environment variables
+*.env
+
+# Logs
+*.log
+
+# DVC
 .dvc/tmp/
 .dvc/cache/
+
+# Data
 data/
 memory/

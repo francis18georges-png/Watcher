@@ -1,9 +1,16 @@
 import subprocess
+from typing import TypedDict
+
+
+class CommandResult(TypedDict):
+    ok: bool
+    out: str
+    err: str
 
 
 class QualityGate:
-    def run_all(self) -> dict:
-        results = {
+    def run_all(self) -> dict[str, CommandResult]:
+        results: dict[str, CommandResult] = {
             "pytest": self._cmd(["pytest", "-q"]),
             "ruff": self._cmd(["ruff", "."]),
             "black": self._cmd(["black", "--check", "."]),
@@ -20,10 +27,9 @@ class QualityGate:
                 ]
             ),
         }
-        ok = all(r["ok"] for r in results.values())
-        return {"ok": ok, "results": results}
+        return results
 
-    def _cmd(self, args: list[str]) -> dict:
+    def _cmd(self, args: list[str]) -> CommandResult:
         try:
             p = subprocess.run(args, capture_output=True, text=True, timeout=60)
             return {
