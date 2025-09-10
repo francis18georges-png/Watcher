@@ -158,7 +158,28 @@ class Engine:
         return answer
 
     def add_feedback(self, rating: float, kind: str = "chat") -> str:
-        """Persist user feedback on the last exchange."""
+        """Persist user feedback on the last exchange.
+
+        Parameters
+        ----------
+        rating:
+            Score assigned by the user between ``0.0`` and ``1.0``.
+        kind:
+            Feedback category, defaults to ``"chat"``.
+
+        Returns
+        -------
+        str
+            Confirmation message or ``"no response to rate"`` when nothing was
+            rated.
+
+        Raises
+        ------
+        ValueError
+            If ``rating`` is outside the ``0.0``–``1.0`` interval.
+        """
+        if not 0.0 <= rating <= 1.0:
+            raise ValueError("rating must be between 0.0 and 1.0")
         if not self.last_prompt or not self.last_answer:
             return "no response to rate"
         self.mem.add_feedback(kind, self.last_prompt, self.last_answer, rating)
