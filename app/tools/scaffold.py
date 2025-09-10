@@ -19,11 +19,17 @@ def _confirm_overwrite(path: Path) -> bool:
     return resp.strip().lower() in {"y", "yes", "o", "oui"}
 
 
-def create_python_cli(name: str, base: Path):
+def create_python_cli(name: str, base: Path, force: bool = False) -> str:
+    """Create a minimal Python CLI project.
+
+    Existing files are overwritten when ``force`` is ``True``.
+    """
+
     proj = base / "app" / "projects" / name
     if proj.exists() and any(proj.iterdir()):
-        if not _confirm_overwrite(proj):
-            raise FileExistsError(f"Dossier {proj} non vide")
+        if not force:
+            if not _confirm_overwrite(proj):
+                raise FileExistsError(f"Dossier {proj} non vide")
 
     (proj / name).mkdir(parents=True, exist_ok=True)
     (proj / "tests").mkdir(parents=True, exist_ok=True)

@@ -52,6 +52,12 @@ Sous Windows :
 python -m app.ui.main
 ```
 
+### Générer une CLI Python
+
+Un utilitaire `create_python_cli` (dans `app.tools.scaffold`) permet de
+générer un squelette de projet sous `app/projects/<nom>`. Passer
+`force=True` écrase les fichiers existants sans demande de confirmation.
+
 ## Tests & Qualité
 
 Exécuter les vérifications locales avant de proposer du code :
