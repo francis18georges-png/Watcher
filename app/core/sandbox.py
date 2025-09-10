@@ -42,6 +42,7 @@ def run(
 
     if sys.platform == "win32":
         import subprocess
+        from subprocess import Popen
         from typing import Any, Callable, cast
 
         try:
@@ -95,7 +96,7 @@ def run(
         )
 
         creation_flags = subprocess.CREATE_NEW_CONSOLE
-        p = subprocess.Popen(
+        p: Popen[str] = Popen(
             cmd,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
@@ -155,7 +156,7 @@ def run(
     from subprocess import Popen
     from typing import cast
 
-    p: Popen[str] = subprocess.Popen(
+    p: Popen[str] = Popen(
         cmd,
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
