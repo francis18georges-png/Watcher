@@ -26,4 +26,3 @@ autograder._STACK.enter_context(DummyCtx({str(marker)!r}))
     )
     subprocess.run([sys.executable, str(script)], check=True)
     assert marker.read_text() == "closed"
-
