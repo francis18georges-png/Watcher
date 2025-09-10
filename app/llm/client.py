@@ -59,7 +59,8 @@ def generate_ollama(prompt: str, *, host: str, model: str) -> str:
 
 def chunk_prompt(prompt: str, *, size: int = 1000) -> list[str]:
     """Yield slices of *prompt* of at most *size* characters."""
-
+    if size <= 0:
+        raise ValueError("size must be a positive integer")
     return [prompt[i : i + size] for i in range(0, len(prompt), size)]
 
 
