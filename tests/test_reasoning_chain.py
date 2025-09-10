@@ -1,5 +1,5 @@
 import sqlite3
-import numpy as np
+from app.utils import np
 
 from app.core.memory import Memory
 from app.core.engine import Engine

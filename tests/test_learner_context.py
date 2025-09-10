@@ -1,4 +1,4 @@
-import numpy as np
+from app.utils import np
 from app.core.engine import Engine
 import math
 

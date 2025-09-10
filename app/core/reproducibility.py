@@ -6,10 +6,7 @@ import logging
 import os
 import random
 
-try:  # NumPy is optional
-    import numpy as np
-except Exception:  # pragma: no cover - optional dependency
-    np = None  # type: ignore[assignment]
+from app.utils import np
 
 
 def set_seed(seed: int) -> None:
@@ -28,7 +25,7 @@ def set_seed(seed: int) -> None:
 
     os.environ["PYTHONHASHSEED"] = str(seed)
     random.seed(seed)
-    if np is not None and hasattr(np, "random") and hasattr(np.random, "seed"):
+    if hasattr(np, "random") and hasattr(np.random, "seed"):
         np.random.seed(seed)  # type: ignore[attr-defined]
     try:  # pragma: no cover - PyTorch may not be installed
         import torch  # type: ignore[import-not-found]

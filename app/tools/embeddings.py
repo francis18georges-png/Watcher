@@ -9,7 +9,7 @@ import http.client
 import json
 from urllib.parse import urlparse
 
-import numpy as np
+from app.utils import np
 
 from config import load_config
 

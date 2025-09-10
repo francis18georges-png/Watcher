@@ -4,7 +4,7 @@ import logging
 import math
 from pathlib import Path
 
-import numpy as np
+from app.utils import np
 
 from app.tools.embeddings import embed_ollama
 

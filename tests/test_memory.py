@@ -1,7 +1,7 @@
 import math
 import sqlite3
 
-import numpy as np  # type: ignore
+from app.utils import np
 import pytest
 
 from app.core.memory import Memory

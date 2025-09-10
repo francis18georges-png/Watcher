@@ -3,14 +3,9 @@ from __future__ import annotations
 import random
 
 from app.core.reproducibility import set_seed
+from app.utils import np
 
-try:  # NumPy may be a lightweight stub without RNG support
-    import numpy as np
-
-    HAS_NUMPY_RNG = hasattr(np, "random") and hasattr(np.random, "rand")
-except Exception:  # pragma: no cover - optional dependency
-    np = None  # type: ignore[assignment]
-    HAS_NUMPY_RNG = False
+HAS_NUMPY_RNG = hasattr(np, "random") and hasattr(np.random, "rand")
 
 
 def test_set_seed_reproducible():

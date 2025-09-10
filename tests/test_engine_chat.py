@@ -1,4 +1,4 @@
-import numpy as np
+from app.utils import np
 import sqlite3
 
 from app.core.memory import Memory

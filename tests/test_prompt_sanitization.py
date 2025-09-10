@@ -1,4 +1,4 @@
-import numpy as np
+from app.utils import np
 import pytest
 
 from app.core.validation import validate_prompt
