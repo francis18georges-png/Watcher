@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 import os
 import random
 
@@ -36,5 +37,7 @@ def set_seed(seed: int) -> None:
         torch.cuda.manual_seed_all(seed)
         torch.backends.cudnn.deterministic = True
         torch.backends.cudnn.benchmark = False
-    except Exception:  # pragma: no cover - optional dependency
+    except ImportError:  # pragma: no cover - optional dependency
         pass
+    except Exception as exc:  # pragma: no cover - optional dependency
+        logging.warning("Failed to seed PyTorch deterministically: %s", exc)
