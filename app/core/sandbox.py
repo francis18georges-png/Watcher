@@ -18,6 +18,34 @@ class SandboxResult:
     memory_exceeded: bool = False
 
 
+def _run_without_pywin32(
+    cmd: list[str], timeout: float | None
+) -> SandboxResult:
+    """Fallback execution for Windows when pywin32 is unavailable."""
+    import subprocess
+    from subprocess import CompletedProcess
+
+    result = SandboxResult()
+    try:
+        cp: CompletedProcess[str] = subprocess.run(
+            cmd,
+            capture_output=True,
+            text=True,
+            timeout=timeout,
+        )
+        out = cp.stdout if isinstance(cp.stdout, str) else ""
+        err = cp.stderr if isinstance(cp.stderr, str) else ""
+        result.code = cp.returncode
+        result.out = out
+        result.err = err
+    except subprocess.TimeoutExpired as e:
+        result.timeout = True
+        result.out = e.stdout if isinstance(e.stdout, str) else ""
+        result.err = e.stderr if isinstance(e.stderr, str) else ""
+
+    return result
+
+
 def run(
     cmd: list[str],
     *,
@@ -53,25 +81,7 @@ def run(
             logger.warning(
                 "pywin32 introuvable; exécution sans quotas CPU/mémoire sur Windows"
             )
-            from subprocess import CompletedProcess
-
-            try:
-                p: CompletedProcess[str] = subprocess.run(
-                    cmd,
-                    capture_output=True,
-                    text=True,
-                    timeout=timeout,
-                )
-                out = p.stdout if isinstance(p.stdout, str) else ""
-                err = p.stderr if isinstance(p.stderr, str) else ""
-                result.code = p.returncode
-                result.out = out
-                result.err = err
-            except subprocess.TimeoutExpired as e:
-                result.timeout = True
-                result.out = e.stdout if isinstance(e.stdout, str) else ""
-                result.err = e.stderr if isinstance(e.stderr, str) else ""
-            return result
+            return _run_without_pywin32(cmd, timeout)
 
         CloseHandle = cast(Callable[[int], None], CloseHandle)
 
