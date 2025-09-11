@@ -23,27 +23,31 @@ def _run_without_pywin32(
 ) -> SandboxResult:
     """Fallback execution for Windows when pywin32 is unavailable."""
     import subprocess
-    from subprocess import CompletedProcess
+    from subprocess import Popen
 
-    result = SandboxResult()
+    p: Popen[str] = Popen(
+        cmd,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+    )
+
     try:
-        cp: CompletedProcess[str] = subprocess.run(
-            cmd,
-            capture_output=True,
-            text=True,
-            timeout=timeout,
-        )
-        out = cp.stdout if isinstance(cp.stdout, str) else ""
-        err = cp.stderr if isinstance(cp.stderr, str) else ""
-        result.code = cp.returncode
-        result.out = out
-        result.err = err
-    except subprocess.TimeoutExpired as e:
-        result.timeout = True
-        result.out = e.stdout if isinstance(e.stdout, str) else ""
-        result.err = e.stderr if isinstance(e.stderr, str) else ""
+        out, err = p.communicate(timeout=timeout)
+        timeout_flag = False
+    except subprocess.TimeoutExpired:
+        p.kill()
+        out, err = p.communicate()
+        timeout_flag = True
 
-    return result
+    out_str = out if isinstance(out, str) else ""
+    err_str = err if isinstance(err, str) else ""
+    return SandboxResult(
+        code=p.returncode,
+        out=out_str,
+        err=err_str,
+        timeout=timeout_flag,
+    )
 
 
 def run(
