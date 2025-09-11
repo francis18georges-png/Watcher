@@ -3,6 +3,7 @@ from __future__ import annotations
 from functools import lru_cache
 from pathlib import Path
 from typing import Any
+import logging
 import os
 import tomllib
 
@@ -20,12 +21,19 @@ REQUIRED_SECTIONS = {
 }
 
 
+logger = logging.getLogger(__name__)
+
+
 def _read_toml(path: Path) -> dict[str, Any]:
     try:
         with path.open("rb") as fh:
             return tomllib.load(fh)
-    except Exception:
+    except FileNotFoundError:
+        logger.error("Configuration file not found: %s", path)
         return {}
+    except tomllib.TOMLDecodeError as exc:
+        logger.error("Invalid TOML in %s: %s", path, exc)
+        raise
 
 
 def _deep_update(base: dict[str, Any], other: dict[str, Any]) -> dict[str, Any]:

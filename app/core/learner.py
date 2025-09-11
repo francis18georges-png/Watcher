@@ -5,10 +5,14 @@ from __future__ import annotations
 from pathlib import Path
 import json
 import math
+import logging
 
 from typing import Any
 
 from app.core.benchmark import Bench
+
+
+logger = logging.getLogger(__name__)
 
 
 class Learner:
@@ -41,8 +45,8 @@ class Learner:
                 # Ensure optimiser state matches parameter dimensionality
                 self.m = [0.0 for _ in self.params]
                 self.v = [0.0 for _ in self.params]
-            except Exception:  # pragma: no cover - defensive
-                pass
+            except Exception as exc:  # pragma: no cover - defensive
+                logger.warning("Failed to load policy params: %s", exc)
 
     def step(self, state: list[float], reward: float) -> list[float]:
         """Update policy parameters based on ``reward`` and previous state.
@@ -51,6 +55,8 @@ class Learner:
         prev_state``.  The *current* ``state`` is stored for the next
         invocation.
         """
+        if not state:
+            return self.params
 
         if not self.params:
             # Lazy initialisation matching state dimensionality
@@ -91,7 +97,11 @@ class Learner:
 
         # Store normalised current state for next call
         mean = sum(state) / len(state) if state else 0.0
-        std = math.sqrt(sum((s - mean) ** 2 for s in state) / len(state)) or 1.0
+        std = (
+            math.sqrt(sum((s - mean) ** 2 for s in state) / len(state))
+            if state
+            else 0.0
+        ) or 1.0
         self.prev_state = [(s - mean) / std for s in state]
         return self.params
 
@@ -121,5 +131,5 @@ class Learner:
         try:
             data: dict[str, Any] = {"params": self.params}
             self.params_path.write_text(json.dumps(data), encoding="utf-8")
-        except Exception:  # pragma: no cover - defensive
-            pass
+        except Exception as exc:  # pragma: no cover - defensive
+            logger.warning("Failed to save policy params: %s", exc)
