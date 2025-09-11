@@ -63,6 +63,7 @@ def test_run_windows_with_pywin32(monkeypatch, caplog):
     monkeypatch.setattr(sys, "platform", "win32")
 
     import subprocess
+
     monkeypatch.setattr(subprocess, "CREATE_NEW_CONSOLE", 0, raising=False)
 
     win32con = types.ModuleType("win32con")
@@ -73,7 +74,9 @@ def test_run_windows_with_pywin32(monkeypatch, caplog):
     def _close_handle(handle: int) -> None:  # pragma: no cover - stub
         return None
 
-    def _open_process(flags: int, inherit: bool, pid: int) -> int:  # pragma: no cover - stub
+    def _open_process(
+        flags: int, inherit: bool, pid: int
+    ) -> int:  # pragma: no cover - stub
         return 1
 
     win32api.CloseHandle = _close_handle
