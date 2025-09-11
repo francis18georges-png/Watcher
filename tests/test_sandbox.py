@@ -31,6 +31,7 @@ def test_run_windows_executes_command():
 def test_run_windows_without_pywin32(monkeypatch, caplog):
     """Simule Windows sans pywin32 et vérifie l'avertissement."""
     import builtins
+    import subprocess
 
     monkeypatch.setattr(sys, "platform", "win32")
 
@@ -43,9 +44,32 @@ def test_run_windows_without_pywin32(monkeypatch, caplog):
 
     monkeypatch.setattr(builtins, "__import__", _mock_import)
 
+    called = {"popen": False}
+
+    def _fake_run(*args, **kwargs):
+        raise AssertionError("subprocess.run should not be used")
+
+    class _FakeProc:
+        pid = 123
+        returncode = 0
+
+        def communicate(self, timeout=None):
+            return ("hi\n", "")
+
+        def kill(self):  # pragma: no cover - stub
+            pass
+
+    def _fake_popen(*args, **kwargs):
+        called["popen"] = True
+        return _FakeProc()
+
+    monkeypatch.setattr(subprocess, "run", _fake_run)
+    monkeypatch.setattr(subprocess, "Popen", _fake_popen)
+
     with caplog.at_level(logging.WARNING):
         result = sandbox.run(["python", "-c", "print('hi')"])
 
+    assert called["popen"] is True
     assert isinstance(result, sandbox.SandboxResult)
     assert result.code == 0
     assert result.out.strip() == "hi"
