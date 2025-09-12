@@ -9,6 +9,7 @@ __pycache__/
 
 # Environment variables
 *.env
+!example.env
 
 # Logs
 *.log
