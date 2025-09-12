@@ -36,4 +36,3 @@ class PerformanceMetrics:
 metrics = PerformanceMetrics()
 
 __all__ = ["PerformanceMetrics", "metrics"]
-
