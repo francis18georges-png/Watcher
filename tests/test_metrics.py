@@ -9,4 +9,3 @@ def test_metrics_logging() -> None:
     assert pm.response_times == [0.5]
     assert pm.evaluation_scores == [0.8]
     assert pm.error_logs == ["oops"]
-

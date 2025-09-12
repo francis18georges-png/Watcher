@@ -18,9 +18,7 @@ class SandboxResult:
     memory_exceeded: bool = False
 
 
-def _run_without_pywin32(
-    cmd: list[str], timeout: float | None
-) -> SandboxResult:
+def _run_without_pywin32(cmd: list[str], timeout: float | None) -> SandboxResult:
     """Fallback execution for Windows when pywin32 is unavailable."""
     import subprocess
     from subprocess import Popen

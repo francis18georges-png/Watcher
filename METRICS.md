@@ -1,18 +1,18 @@
 # Métriques clés
 
 ## Performance
-- **Temps de réponse** : mesurer le délai moyen pour générer une réponse complète.
-  - *Mesure* : journaliser l'heure d'entrée et de sortie pour chaque requête.
+- **Temps de réponse moyen** : viser < 500 ms par requête.
+  - *Mesure* : journaliser l'heure d'entrée et de sortie pour chaque requête puis calculer la moyenne.
 
 ## Qualité
-- **Couverture des tests** : suivre le pourcentage de code exécuté pendant les tests unitaires.
+- **Couverture des tests** : maintenir ≥ 85 % de code exécuté pendant les tests unitaires.
   - *Mesure* : `pytest --cov=app --cov-report=term-missing`.
 
 ## Stabilité
-- **Erreurs de typage** : surveiller les diagnostics fournis par `mypy`.
+- **Erreurs de typage** : viser zéro diagnostic fourni par `mypy`.
   - *Mesure* : `mypy .`.
 
 ## Maintenabilité
-- **Respect du style** : suivre les avertissements de `ruff`.
-  - *Mesure* : `ruff .`.
+- **Respect du style** : viser zéro avertissement de `ruff` et `black`.
+  - *Mesure* : `ruff .` puis `black --check .`.
 
