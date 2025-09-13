@@ -71,13 +71,14 @@ def load_config(profile: str | None = None) -> dict[str, Any]:
     -------
     dict
         Parsed and validated configuration dictionary. If the base file cannot
-        be read an empty dictionary is returned.
+        be read a ``FileNotFoundError`` is raised.
     """
 
     base_path = Path(__file__).resolve().parent
-    cfg = _read_toml(base_path / "settings.toml")
+    cfg_path = base_path / "settings.toml"
+    cfg = _read_toml(cfg_path)
     if not cfg:
-        return {}
+        raise FileNotFoundError(f"Configuration file not found: {cfg_path}")
 
     profile = profile or os.getenv("WATCHER_PROFILE")
     if profile:
