@@ -1,3 +1,5 @@
+import logging
+
 from app.tools.embeddings import embed_ollama
 
 
@@ -11,6 +13,16 @@ def test_embed_ollama_connection_error(monkeypatch):
     assert len(vecs[0]) == 1
     assert vecs[0].shape == (1,)
     assert vecs[0][0] == 0.0
+
+
+def test_embed_ollama_logs_warning(monkeypatch, caplog):
+    def bad_conn(*args, **kwargs):
+        raise OSError("fail")
+
+    monkeypatch.setattr("http.client.HTTPConnection", bad_conn)
+    with caplog.at_level(logging.WARNING):
+        embed_ollama(["hello"], host="1.2.3.4:5678")
+    assert "fail" in caplog.text
 
 
 def test_embed_ollama_host_argument(monkeypatch):
