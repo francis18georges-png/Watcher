@@ -1,4 +1,5 @@
 from pathlib import Path
+import re
 import textwrap
 
 
@@ -19,11 +20,18 @@ def _confirm_overwrite(path: Path) -> bool:
     return resp.strip().lower() in {"y", "yes", "o", "oui"}
 
 
+_NAME_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
+
+
 def create_python_cli(name: str, base: Path, force: bool = False) -> str:
     """Create a minimal Python CLI project.
 
-    Existing files are overwritten when ``force`` is ``True``.
+    ``name`` must match ``^[A-Za-z_][A-Za-z0-9_]*$``. Existing files are
+    overwritten when ``force`` is ``True``.
     """
+
+    if not _NAME_RE.fullmatch(name):
+        raise ValueError(f"Invalid project name: {name!r}")
 
     proj = base / "app" / "projects" / name
     if proj.exists() and any(proj.iterdir()):
