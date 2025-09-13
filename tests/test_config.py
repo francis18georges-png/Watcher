@@ -1,11 +1,17 @@
-from app.config import load_config
+import pytest
+
+from config import load_config
+import config as cfg_module
 
 
-def test_load_existing_section():
-    cfg = load_config("llm")
-    assert cfg["model"] == "llama3.2:3b"
-    assert cfg["backend"] == "ollama"
+def test_load_existing_config():
+    cfg = load_config()
+    assert cfg["llm"]["model"] == "llama3.2:3b"
+    assert cfg["llm"]["backend"] == "ollama"
 
 
-def test_load_missing_section():
-    assert load_config("does_not_exist") == {}
+def test_missing_base_file(monkeypatch):
+    monkeypatch.setattr(cfg_module, "_read_toml", lambda path: {})
+    load_config.cache_clear()
+    with pytest.raises(FileNotFoundError):
+        load_config()
