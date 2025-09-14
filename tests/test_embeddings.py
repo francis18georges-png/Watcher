@@ -1,6 +1,7 @@
 import logging
 
 from app.tools.embeddings import embed_ollama
+from config import load_config
 
 
 def test_embed_ollama_connection_error(monkeypatch):
@@ -85,3 +86,21 @@ def test_embed_ollama_warning_logged(monkeypatch):
     embed_ollama(["hello"], host="1.2.3.4:5678")
 
     assert stub.messages == ["Embedding backend unreachable: fail"]
+
+
+def test_embed_ollama_does_not_mutate_config(monkeypatch):
+    """Successive calls with overrides leave the cached config unchanged."""
+
+    load_config.cache_clear()
+    original_memory = load_config()["memory"].copy()
+
+    def bad_conn(*args, **kwargs):
+        raise OSError("fail")
+
+    monkeypatch.setattr("http.client.HTTPConnection", bad_conn)
+
+    embed_ollama(["hi"], model="foo", host="example.com:1234")
+    assert load_config()["memory"] == original_memory
+
+    embed_ollama(["hi"], model="bar", host="another.com:5678")
+    assert load_config()["memory"] == original_memory

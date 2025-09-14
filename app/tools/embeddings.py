@@ -41,7 +41,8 @@ def embed_ollama(
         reached, a list of zero vectors of shape ``(1,)`` is returned instead.
     """
 
-    cfg = load_config().get("memory", {})
+    # Copy the memory configuration to avoid mutating the cached config
+    cfg = load_config().get("memory", {}).copy()
 
     if model is not None:
         cfg["embed_model"] = model
