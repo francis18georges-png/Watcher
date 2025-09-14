@@ -6,7 +6,7 @@ from contextlib import contextmanager
 from dataclasses import dataclass, field
 import logging
 import time
-from typing import List
+from typing import Iterator, List
 
 
 @dataclass
@@ -22,6 +22,9 @@ class PerformanceMetrics:
     engine_response_times: List[float] = field(default_factory=list)
     db_response_times: List[float] = field(default_factory=list)
     plugin_response_times: List[float] = field(default_factory=list)
+    engine_time_total: float = 0.0
+    db_time_total: float = 0.0
+    plugin_time_total: float = 0.0
 
     def log_response_time(self, duration: float) -> None:
         """Record a new response time measurement."""
@@ -40,7 +43,7 @@ class PerformanceMetrics:
         logging.getLogger(__name__).error(message)
 
     @contextmanager
-    def track_engine(self) -> None:
+    def track_engine(self) -> Iterator[None]:
         """Measure and log the duration of an engine call."""
 
         start = time.perf_counter()
@@ -50,10 +53,11 @@ class PerformanceMetrics:
             duration = time.perf_counter() - start
             self.engine_calls += 1
             self.engine_response_times.append(duration)
+            self.engine_time_total += duration
             self.log_response_time(duration)
 
     @contextmanager
-    def track_db(self) -> None:
+    def track_db(self) -> Iterator[None]:
         """Measure and log the duration of a database call."""
 
         start = time.perf_counter()
@@ -63,10 +67,11 @@ class PerformanceMetrics:
             duration = time.perf_counter() - start
             self.db_calls += 1
             self.db_response_times.append(duration)
+            self.db_time_total += duration
             self.log_response_time(duration)
 
     @contextmanager
-    def track_plugin(self) -> None:
+    def track_plugin(self) -> Iterator[None]:
         """Measure and log the duration of a plugin execution."""
 
         start = time.perf_counter()
@@ -76,6 +81,7 @@ class PerformanceMetrics:
             duration = time.perf_counter() - start
             self.plugin_calls += 1
             self.plugin_response_times.append(duration)
+            self.plugin_time_total += duration
             self.log_response_time(duration)
 
 
