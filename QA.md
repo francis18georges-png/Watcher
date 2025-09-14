@@ -9,8 +9,20 @@
 
 ## Static Analysis
 
+Install the development dependencies:
+
+```
+pip install -r requirements-dev.txt
+```
+
 Run Bandit to scan the codebase while ignoring Git metadata:
 
 ```
 bandit -q -r . -c bandit.yml
+```
+
+Run Semgrep using the local ruleset:
+
+```
+semgrep --quiet --error --config config/semgrep.yml .
 ```

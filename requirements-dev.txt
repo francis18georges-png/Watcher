@@ -1,0 +1,7 @@
+black
+ruff
+pytest
+mypy
+bandit
+semgrep
+dvc
