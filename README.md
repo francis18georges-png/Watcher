@@ -68,12 +68,24 @@ générer un squelette de projet sous `app/projects/<nom>`. Passer
 ## Plugins
 
 Watcher peut être étendu par des plugins implémentant l'interface
-`Plugin` définie dans `app/tools/plugins`. Deux mécanismes de
-découverte sont supportés :
+`Plugin` définie dans `app/tools/plugins`. Chaque plugin expose un
+attribut `name` ainsi qu'une méthode `run()` retournant un message à
+l'utilisateur.
+
+Deux mécanismes de découverte sont supportés :
 
 - déclaration explicite dans le fichier `plugins.toml` ;
 - [entry points](https://packaging.python.org/en/latest/specifications/entry-points/)
-  Python via le groupe `watcher.plugins`.
+  Python via le groupe `watcher.plugins` recherchés par
+  `discover_entry_point_plugins()`.
+
+Pour enregistrer un plugin via les entry points dans un projet
+emballé, ajoutez par exemple dans votre `pyproject.toml` :
+
+```toml
+[project.entry-points."watcher.plugins"]
+hello = "monpaquet.monmodule:MonPlugin"
+```
 
 Un exemple minimal est fourni dans `app/tools/plugins/hello.py`.
 
