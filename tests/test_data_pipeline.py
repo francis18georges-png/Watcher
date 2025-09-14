@@ -1,5 +1,7 @@
 import json
+import time
 import pytest
+from app.core.memory import Memory
 from app.data.pipeline import load_raw_data, normalize_data
 
 
@@ -32,3 +34,21 @@ def test_load_raw_data_invalid_json(tmp_path, caplog):
     with pytest.raises(json.JSONDecodeError):
         load_raw_data(bad)
     assert "invalid JSON" in caplog.text
+
+
+def test_feedback_batch_loading_benchmark(tmp_path):
+    """Compare naive feedback loading with batched iteration."""
+
+    mem = Memory(tmp_path / "mem.db")
+    for i in range(1000):
+        mem.add_feedback("k", f"p{i}", f"a{i}", float(i))
+
+    start = time.perf_counter()
+    mem.all_feedback()
+    baseline = time.perf_counter() - start
+
+    start = time.perf_counter()
+    list(mem.iter_feedback(batch_size=200))
+    batched = time.perf_counter() - start
+
+    assert batched <= baseline

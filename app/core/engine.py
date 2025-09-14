@@ -4,6 +4,7 @@ from pathlib import Path
 import json
 import logging
 import time
+from itertools import chain
 from threading import Thread
 
 from config import load_config
@@ -263,8 +264,12 @@ class Engine:
             # supplied.  ``run_quality_gate`` already persists the result
             # in memory so there is no need to keep the return value here.
             self.run_quality_gate()
-        fb = self.mem.all_feedback()
-        if fb:
+        fb_iter = self.mem.iter_feedback()
+        try:
+            first = next(fb_iter)
+        except StopIteration:
+            first = None
+        if first is not None:
             raw_dir = self.base / "datasets" / "raw"
             raw_dir.mkdir(parents=True, exist_ok=True)
             raw_file = raw_dir / "data.json"
@@ -275,7 +280,7 @@ class Engine:
                     "answer": a,
                     "rating": r,
                 }
-                for k, p, a, r in fb
+                for k, p, a, r in chain([first], fb_iter)
             ]
             raw_file.write_text(
                 json.dumps({"feedback": data}, ensure_ascii=False, indent=2),
