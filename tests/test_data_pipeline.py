@@ -16,25 +16,31 @@ def test_normalize_data_dedup_and_outliers():
 
 def test_load_raw_data_missing_file(tmp_path, caplog):
     missing = tmp_path / "data.json"
-    with pytest.raises(FileNotFoundError):
-        load_raw_data(missing)
+    with caplog.at_level("ERROR", logger="app.data.pipeline"):
+        with pytest.raises(FileNotFoundError):
+            load_raw_data(missing)
     assert "does not exist" in caplog.text
+    assert all(record.name == "app.data.pipeline" for record in caplog.records)
 
 
 def test_load_raw_data_invalid_format(tmp_path, caplog):
     bad = tmp_path / "data.txt"
     bad.write_text("{}", encoding="utf-8")
-    with pytest.raises(ValueError):
-        load_raw_data(bad)
+    with caplog.at_level("ERROR", logger="app.data.pipeline"):
+        with pytest.raises(ValueError):
+            load_raw_data(bad)
     assert "unsupported format" in caplog.text
+    assert all(record.name == "app.data.pipeline" for record in caplog.records)
 
 
 def test_load_raw_data_invalid_json(tmp_path, caplog):
     bad = tmp_path / "data.json"
     bad.write_text("{bad}", encoding="utf-8")
-    with pytest.raises(json.JSONDecodeError):
-        load_raw_data(bad)
+    with caplog.at_level("ERROR", logger="app.data.pipeline"):
+        with pytest.raises(json.JSONDecodeError):
+            load_raw_data(bad)
     assert "invalid JSON" in caplog.text
+    assert all(record.name == "app.data.pipeline" for record in caplog.records)
 
 
 def test_raw_batch_loading_benchmark(tmp_path):

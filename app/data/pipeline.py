@@ -13,6 +13,8 @@ from typing import Any, Callable, Iterable, Protocol, runtime_checkable
 
 from app.config import load_config
 
+logger = logging.getLogger(__name__)
+
 BASE_DIR = Path(__file__).resolve().parents[2]
 RAW_DIR = BASE_DIR / "datasets" / "raw"
 PROCESSED_DIR = BASE_DIR / "datasets" / "processed"
@@ -28,7 +30,7 @@ def load_raw_data(path: Path | str | None = None) -> dict | list[dict]:
 
     p = Path(path) if path else RAW_DIR / "data.json"
     if not p.exists():
-        logging.error("raw data file '%s' does not exist", p)
+        logger.error("raw data file '%s' does not exist", p)
         raise FileNotFoundError(p)
     if p.is_dir():
         data: list[dict] = []
@@ -37,17 +39,17 @@ def load_raw_data(path: Path | str | None = None) -> dict | list[dict]:
                 with file.open("r", encoding="utf-8") as fh:
                     data.append(json.load(fh))
             except json.JSONDecodeError:
-                logging.exception("raw data file '%s' contains invalid JSON", file)
+                logger.exception("raw data file '%s' contains invalid JSON", file)
                 raise
         return data
     if p.suffix.lower() != ".json":
-        logging.error("raw data file '%s' has unsupported format", p)
+        logger.error("raw data file '%s' has unsupported format", p)
         raise ValueError(f"unsupported file format: {p}")
     try:
         with p.open("r", encoding="utf-8") as fh:
             return json.load(fh)
     except json.JSONDecodeError as exc:
-        logging.exception("raw data file '%s' contains invalid JSON", p)
+        logger.exception("raw data file '%s' contains invalid JSON", p)
         raise exc
 
 
@@ -238,7 +240,7 @@ def run_pipeline(data: Any | None = None, hooks: list[Hook] | None = None) -> An
             result = step(result)
         except Exception:  # pragma: no cover - best effort
             ok = False
-            logging.exception("pipeline step '%s' failed", name)
+            logger.exception("pipeline step '%s' failed", name)
             raise
         finally:
             duration = time.perf_counter() - start
@@ -248,5 +250,5 @@ def run_pipeline(data: Any | None = None, hooks: list[Hook] | None = None) -> An
                     try:
                         hook(sr)
                     except Exception:  # pragma: no cover - defensive
-                        logging.exception("pipeline hook failed")
+                        logger.exception("pipeline hook failed")
     return result
