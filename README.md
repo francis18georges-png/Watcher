@@ -67,6 +67,8 @@ générer un squelette de projet sous `app/projects/<nom>`. Passer
 
 ## Tests & Qualité
 
+Watcher applique une politique de qualité stricte : au moins **90 %** de couverture de tests et les linters `ruff` et `black` sont obligatoires avant toute contribution.
+
 Exécuter les vérifications locales avant de proposer du code :
 
 ```bash

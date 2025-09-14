@@ -1,5 +1,6 @@
-from app.utils import np
+from pathlib import Path
 
+from app.utils import np
 from app.core.engine import Engine
 from app.core.memory import Memory
 
@@ -47,3 +48,11 @@ def test_auto_improve_runs_quality_when_missing(tmp_path, monkeypatch):
     eng = _setup_engine(tmp_path, monkeypatch, calls)
     eng.auto_improve()
     assert calls == ["run_all"]
+
+
+def test_quality_config_present():
+    pyproject = Path("pyproject.toml")
+    assert pyproject.is_file()
+    content = pyproject.read_text()
+    assert "[tool.black]" in content
+    assert "[tool.ruff]" in content
