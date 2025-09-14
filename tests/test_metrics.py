@@ -51,3 +51,30 @@ def test_metrics_endpoint() -> None:
     server.server_close()
     assert data["engine_calls"] == 1
     assert "engine_time_total" in data
+
+
+def test_max_entries_limit() -> None:
+    pm = PerformanceMetrics(max_entries=2)
+    for i in range(4):
+        pm.log_response_time(float(i))
+        pm.log_evaluation_score(float(i))
+        pm.log_error(str(i))
+    assert pm.response_times == [2.0, 3.0]
+    assert pm.evaluation_scores == [2.0, 3.0]
+    assert pm.error_logs == ["2", "3"]
+
+    pm2 = PerformanceMetrics(max_entries=2)
+    for _ in range(4):
+        with pm2.track_engine():
+            pass
+        with pm2.track_db():
+            pass
+        with pm2.track_plugin():
+            pass
+    assert len(pm2.engine_response_times) == 2
+    assert len(pm2.db_response_times) == 2
+    assert len(pm2.plugin_response_times) == 2
+    assert len(pm2.response_times) == 2
+    assert pm2.engine_calls == 4
+    assert pm2.db_calls == 4
+    assert pm2.plugin_calls == 4
