@@ -15,6 +15,7 @@ try:
     import numpy as np  # type: ignore
 except Exception:  # pragma: no cover - fallback
     import numpy_stub as np  # type: ignore
+
     logger.warning("numpy is not installed, using numpy_stub instead")
 
 __all__ = ["np"]

@@ -47,11 +47,7 @@ def discover_entry_point_plugins(group: str = "watcher.plugins") -> list[Plugin]
         try:
             eps: Iterable[EntryPoint] = entry_points(group=group)
         except TypeError:  # pragma: no cover - fallback for older Python
-            eps = [
-                ep
-                for ep in entry_points()
-                if getattr(ep, "group", None) == group
-            ]
+            eps = [ep for ep in entry_points() if getattr(ep, "group", None) == group]
     except Exception:  # pragma: no cover - best effort
         logging.exception("Failed to query entry points")
         return plugins
@@ -63,9 +59,7 @@ def discover_entry_point_plugins(group: str = "watcher.plugins") -> list[Plugin]
             if _valid_plugin(plugin):
                 plugins.append(plugin)
             else:
-                logging.warning(
-                    "Invalid plugin %s", getattr(ep, "name", "<unknown>")
-                )
+                logging.warning("Invalid plugin %s", getattr(ep, "name", "<unknown>"))
         except Exception:  # pragma: no cover - best effort
             logging.exception(
                 "Failed to load entry point %s", getattr(ep, "name", "<unknown>")

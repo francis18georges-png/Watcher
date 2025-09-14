@@ -84,7 +84,9 @@ def test_max_entries_limit() -> None:
     assert pm2.plugin_calls == 4
 
 
-def test_numpy_fallback_warning(monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture) -> None:
+def test_numpy_fallback_warning(
+    monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+) -> None:
     """Ensure a warning is logged when NumPy is unavailable."""
 
     # Remove any cached modules so import occurs afresh
