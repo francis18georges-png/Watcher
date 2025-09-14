@@ -1,3 +1,5 @@
+"""Utilities to configure structured JSON logging for the application."""
+
 from pathlib import Path
 import logging
 import logging.config

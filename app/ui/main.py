@@ -1,12 +1,16 @@
+import logging
 import os
 import shutil
 import subprocess
-import traceback
 import tkinter as tk
 from tkinter import messagebox, ttk
 from threading import Thread
 
+from app.core import logging_setup
 from app.core.engine import Engine
+
+
+logger = logging.getLogger(__name__)
 
 
 APP_NAME = "Watcher"
@@ -113,7 +117,7 @@ class WatcherApp(ttk.Frame):
             try:
                 rep = fn()
             except Exception as e:  # pragma: no cover - threading
-                traceback.print_exc()
+                logger.exception("Unhandled exception in worker thread")
                 rep = str(e)
             cb = done or (lambda r: messagebox.showerror(APP_NAME, r))
             self.after(0, lambda: cb(rep))
@@ -147,9 +151,11 @@ class WatcherApp(ttk.Frame):
 
 
 if __name__ == "__main__":
+    logging_setup.configure()
+
     if not os.environ.get("DISPLAY"):
         if shutil.which("Xvfb"):
-            print("[Watcher] DISPLAY absent, lancement de Xvfb...")
+            logger.warning("DISPLAY absent, lancement de Xvfb...")
             xvfb = subprocess.Popen(["Xvfb", ":99"])
             os.environ["DISPLAY"] = ":99"
             try:
@@ -159,9 +165,9 @@ if __name__ == "__main__":
             finally:
                 xvfb.terminate()
         else:
-            print("[Watcher] DISPLAY absent et Xvfb introuvable, mode CLI activé.")
+            logger.warning("DISPLAY absent et Xvfb introuvable, mode CLI activé.")
             eng = Engine()
-            print(f"[Watcher] {eng.start_msg}")
+            logger.info("%s", eng.start_msg)
             try:
                 while True:
                     q = input("[You] ").strip()
@@ -171,14 +177,14 @@ if __name__ == "__main__":
                         try:
                             score = float(q.split()[1])
                         except (IndexError, ValueError):
-                            print("[Watcher] usage: rate <score>")
+                            logger.warning("usage: rate <score>")
                             continue
-                        print(f"[Watcher] {eng.add_feedback(score)}")
+                        logger.info("%s", eng.add_feedback(score))
                         continue
                     if not q:
                         continue
                     ans = eng.chat(q)
-                    print(f"[Watcher] {ans}")
+                    logger.info("%s", ans)
             except (EOFError, KeyboardInterrupt):
                 pass
     else:
