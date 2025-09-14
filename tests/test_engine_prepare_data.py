@@ -16,13 +16,9 @@ def test_prepare_data_handles_list(monkeypatch, tmp_path):
     )
 
     cleaned: list[dict] = []
-    monkeypatch.setattr(
-        pipeline, "clean_data", lambda d: cleaned.append(d) or d
-    )
+    monkeypatch.setattr(pipeline, "clean_data", lambda d: cleaned.append(d) or d)
 
-    monkeypatch.setattr(
-        pipeline, "transform_data", lambda d: tmp_path / "out.json"
-    )
+    monkeypatch.setattr(pipeline, "transform_data", lambda d: tmp_path / "out.json")
 
     engine = Engine()
     result = engine.prepare_data()
@@ -30,4 +26,3 @@ def test_prepare_data_handles_list(monkeypatch, tmp_path):
     assert validated == raw
     assert cleaned == raw
     assert result.endswith("out.json")
-
