@@ -162,4 +162,3 @@ def test_chat_evicts_least_recent(tmp_path, monkeypatch):
     assert eng.client.calls.count(p2) == 1
     assert eng.client.calls.count(p3) == 1
     assert p3 not in eng._cache
-
