@@ -3,6 +3,8 @@
 ## Performance
 - **Temps de réponse moyen** : viser < 500 ms par requête.
   - *Mesure* : journaliser l'heure d'entrée et de sortie pour chaque requête puis calculer la moyenne.
+- **Temps du moteur, de la base de données et des plugins** : suivre la durée d'exécution de ces composants critiques et compter le nombre d'appels.
+  - *Mesure* : utiliser les context managers `track_engine`, `track_db` et `track_plugin` dans `app/utils/metrics.py` pour enregistrer la durée et incrémenter les compteurs.
 
 ## Qualité
 - **Couverture des tests** : maintenir ≥ 85 % de code exécuté pendant les tests unitaires.
