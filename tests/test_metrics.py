@@ -1,6 +1,11 @@
+import json
 import time
+import urllib.request
+
+import pytest
 
 from app.utils.metrics import PerformanceMetrics
+from app.ui.main import start_metrics_server
 
 
 def test_metrics_logging() -> None:
@@ -29,3 +34,20 @@ def test_component_counters_increment() -> None:
     assert len(pm.engine_response_times) == 1
     assert len(pm.db_response_times) == 1
     assert len(pm.plugin_response_times) == 1
+    assert pm.engine_time_total == pytest.approx(sum(pm.engine_response_times))
+    assert pm.db_time_total == pytest.approx(sum(pm.db_response_times))
+    assert pm.plugin_time_total == pytest.approx(sum(pm.plugin_response_times))
+
+
+def test_metrics_endpoint() -> None:
+    pm = PerformanceMetrics()
+    server = start_metrics_server(port=0, metrics_obj=pm)
+    port = server.server_address[1]
+    with pm.track_engine():
+        time.sleep(0.01)
+    resp = urllib.request.urlopen(f"http://127.0.0.1:{port}/metrics")
+    data = json.loads(resp.read())
+    server.shutdown()
+    server.server_close()
+    assert data["engine_calls"] == 1
+    assert "engine_time_total" in data

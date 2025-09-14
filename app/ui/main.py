@@ -1,19 +1,58 @@
+import json
 import logging
 import os
 import shutil
 import subprocess
 import tkinter as tk
+from http.server import BaseHTTPRequestHandler, HTTPServer
 from tkinter import messagebox, ttk
 from threading import Thread
 
 from app.core import logging_setup
 from app.core.engine import Engine
+from app.utils.metrics import PerformanceMetrics, metrics
 
 
 logger = logging.getLogger(__name__)
 
 
 APP_NAME = "Watcher"
+
+
+class MetricsHandler(BaseHTTPRequestHandler):
+    metrics: PerformanceMetrics = metrics
+
+    def do_GET(self) -> None:  # pragma: no cover - simple server
+        if self.path != "/metrics":
+            self.send_response(404)
+            self.end_headers()
+            return
+
+        payload = {
+            "engine_calls": self.metrics.engine_calls,
+            "db_calls": self.metrics.db_calls,
+            "plugin_calls": self.metrics.plugin_calls,
+            "engine_time_total": self.metrics.engine_time_total,
+            "db_time_total": self.metrics.db_time_total,
+            "plugin_time_total": self.metrics.plugin_time_total,
+        }
+        body = json.dumps(payload).encode()
+        self.send_response(200)
+        self.send_header("Content-Type", "application/json")
+        self.send_header("Content-Length", str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
+
+
+def start_metrics_server(
+    port: int = 8000, metrics_obj: PerformanceMetrics | None = None
+) -> HTTPServer:
+    """Start a background HTTP server exposing metrics."""
+
+    MetricsHandler.metrics = metrics_obj or metrics
+    server = HTTPServer(("0.0.0.0", port), MetricsHandler)
+    Thread(target=server.serve_forever, daemon=True).start()
+    return server
 
 
 class WatcherApp(ttk.Frame):
@@ -152,6 +191,7 @@ class WatcherApp(ttk.Frame):
 
 if __name__ == "__main__":
     logging_setup.configure()
+    start_metrics_server()
 
     if not os.environ.get("DISPLAY"):
         if shutil.which("Xvfb"):
