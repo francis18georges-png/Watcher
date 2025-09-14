@@ -355,8 +355,22 @@ class Engine:
         return f"{len(self.plugins)} plugins rechargés"
 
     def run_plugins(self) -> list[str]:
-        """Execute all loaded plugins and return their outputs."""
-        return [p.run() for p in self.plugins]
+        """Execute all loaded plugins and return their outputs.
+
+        Each plugin is executed in isolation so a failure in one does not
+        prevent others from running.  Errors are logged and the failing plugin
+        is skipped.
+        """
+
+        outputs: list[str] = []
+        for p in self.plugins:
+            try:
+                outputs.append(p.run())
+            except Exception:  # pragma: no cover - best effort logging
+                logger.exception(
+                    "Plugin %s failed", getattr(p, "name", p.__class__.__name__)
+                )
+        return outputs
 
 
 logger = get_logger(__name__)
