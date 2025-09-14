@@ -124,3 +124,42 @@ def test_chat_uses_cache_for_identical_prompts(tmp_path, monkeypatch):
 
     assert first == second == "pong"
     assert eng.client.calls == 1
+
+
+def test_chat_evicts_least_recent(tmp_path, monkeypatch):
+    def fake_embed(texts, model="nomic-embed-text"):
+        return [np.array([1.0])]
+
+    monkeypatch.setattr("app.core.memory.embed_ollama", fake_embed)
+    monkeypatch.setattr(Memory, "search", lambda self, q, top_k=8: [])
+
+    class DummyClient:
+        def __init__(self):
+            self.calls = []
+
+        def generate(self, prompt: str) -> tuple[str, str]:
+            self.calls.append(prompt)
+            return "pong", "dummy-trace"
+
+    eng = Engine.__new__(Engine)
+    eng.mem = Memory(tmp_path / "mem.db")
+    eng.client = DummyClient()
+    eng.critic = Critic()
+    eng._cache_size = 2
+
+    def make_prompt(tag: str) -> str:
+        return "please " + "word " * 60 + f"{tag} thank you"
+
+    p1, p2, p3 = make_prompt("one"), make_prompt("two"), make_prompt("three")
+
+    eng.chat(p1)
+    eng.chat(p2)
+    eng.chat(p3)
+    eng.chat(p2)
+    eng.chat(p1)
+
+    assert eng.client.calls.count(p1) == 2
+    assert eng.client.calls.count(p2) == 1
+    assert eng.client.calls.count(p3) == 1
+    assert p3 not in eng._cache
+
