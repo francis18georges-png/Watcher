@@ -2,9 +2,15 @@ import json
 import time
 import pytest
 from app.core.memory import Memory
-from app.data.pipeline import RAW_DIR, load_raw_data, normalize_data, transform_data as save_data
-RAW_DIR.mkdir(parents=True, exist_ok=True)
+from app.data.pipeline import (
+    RAW_DIR,
+    load_raw_data,
+    normalize_data,
+    transform_data as save_data,
+)
 from app.core.pipeline import transform_data
+
+RAW_DIR.mkdir(parents=True, exist_ok=True)
 
 
 def test_normalize_data_dedup_and_outliers():
