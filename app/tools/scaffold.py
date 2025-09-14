@@ -23,6 +23,30 @@ def _confirm_overwrite(path: Path) -> bool:
 _NAME_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
 
 
+def validate_name(name: str) -> str:
+    """Validate project names.
+
+    Parameters
+    ----------
+    name:
+        Proposed project name.
+
+    Returns
+    -------
+    str
+        The validated name.
+
+    Raises
+    ------
+    ValueError
+        If ``name`` does not match ``_NAME_RE``.
+    """
+
+    if not _NAME_RE.fullmatch(name):
+        raise ValueError(f"Invalid project name: {name!r}")
+    return name
+
+
 def create_python_cli(name: str, base: Path, force: bool = False) -> str:
     """Create a minimal Python CLI project.
 
@@ -30,8 +54,7 @@ def create_python_cli(name: str, base: Path, force: bool = False) -> str:
     overwritten when ``force`` is ``True``.
     """
 
-    if not _NAME_RE.fullmatch(name):
-        raise ValueError(f"Invalid project name: {name!r}")
+    validate_name(name)
 
     proj = base / "app" / "projects" / name
     if proj.exists() and any(proj.iterdir()):
