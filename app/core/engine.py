@@ -2,7 +2,6 @@
 
 from pathlib import Path
 import json
-import logging
 import time
 from itertools import chain
 from threading import Thread
@@ -24,6 +23,7 @@ from app.data import pipeline
 from app.data.validation import validate_feedback_schema
 from app.tools import plugins
 from app.utils.metrics import metrics
+from app.core.logging_setup import get_logger
 
 
 class Engine:
@@ -219,11 +219,11 @@ class Engine:
         try:
             qg_res = self.run_quality_gate()
         except Exception:  # pragma: no cover - best effort
-            logging.exception("run_quality_gate failed")
+            logger.exception("run_quality_gate failed")
         try:
             self.auto_improve(qg_res)
         except Exception:  # pragma: no cover - best effort
-            logging.exception("auto_improve failed")
+            logger.exception("auto_improve failed")
 
     def run_quality_gate(self) -> str:
         """Run static checks and tests, storing the result in memory."""
@@ -239,11 +239,11 @@ class Engine:
             validate_feedback_schema(raw)
             cleaned = pipeline.clean_data(raw)
             path = pipeline.transform_data(cleaned)
-            logging.info(
+            logger.info(
                 "data prepared in %.3fs -> %s", time.perf_counter() - start, path
             )
         except Exception:  # pragma: no cover - best effort
-            logging.exception("data preparation failed")
+            logger.exception("data preparation failed")
             return "data preparation failed"
         return str(path)
 
@@ -318,3 +318,4 @@ class Engine:
     def run_plugins(self) -> list[str]:
         """Execute all loaded plugins and return their outputs."""
         return [p.run() for p in self.plugins]
+logger = get_logger(__name__)

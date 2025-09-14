@@ -1,6 +1,5 @@
 import sqlite3
 import time
-import logging
 import math
 from pathlib import Path
 from typing import Iterator
@@ -8,6 +7,10 @@ from typing import Iterator
 from app.utils import np
 
 from app.tools.embeddings import embed_ollama
+from app.core.logging_setup import get_logger
+
+
+logger = get_logger(__name__)
 
 
 class Memory:
@@ -35,7 +38,7 @@ class Memory:
             vec_arr = self._embed(text)
             vec = vec_arr.astype("float32").tobytes()
         except Exception:
-            logging.exception("Failed to embed text for kind '%s'", kind)
+            logger.exception("Failed to embed text for kind '%s'", kind)
             vec = np.array([], dtype=np.float32).tobytes()
         with sqlite3.connect(self.db_path) as con:
             c = con.cursor()
@@ -150,7 +153,7 @@ class Memory:
         try:
             q = self._embed(query, use_cache=False).astype("float32")
         except Exception:
-            logging.exception("Failed to embed search query")
+            logger.exception("Failed to embed search query")
             return []
         q_bytes = q.tobytes()
         with sqlite3.connect(self.db_path) as con:

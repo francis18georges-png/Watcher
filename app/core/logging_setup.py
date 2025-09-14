@@ -15,6 +15,22 @@ except ModuleNotFoundError:  # pragma: no cover - optional dependency
     yaml = None
 
 
+LOGGER_NAME = "watcher"
+"""Base logger name used throughout the project."""
+
+
+logger = logging.getLogger(LOGGER_NAME)
+"""Central application logger.
+
+Modules obtain child loggers with :func:`get_logger` ensuring that all logs
+propagate through a single named hierarchy rooted at ``watcher``. The logger is
+initially configured with ``NOTSET`` level so that the global configuration
+controls the effective verbosity.
+"""
+
+logger.setLevel(logging.NOTSET)
+
+
 request_id_ctx: ContextVar[str] = ContextVar("request_id", default="")
 
 
@@ -46,6 +62,20 @@ class JSONFormatter(logging.Formatter):
 def set_request_id(request_id: str) -> None:
     """Set the request identifier for subsequent log records."""
     request_id_ctx.set(request_id)
+
+
+def get_logger(name: str | None = None) -> logging.Logger:
+    """Return the application logger or one of its children.
+
+    Parameters
+    ----------
+    name:
+        Optional child logger name. When provided the logger returned is
+        ``watcher.<name>`` which still propagates through the central ``watcher``
+        logger.
+    """
+
+    return logger if name is None else logger.getChild(name)
 
 
 def _configure_from_path(config_path: Path) -> None:
@@ -96,3 +126,6 @@ def configure() -> None:
             _configure_from_path(config_path)
     except FileNotFoundError:  # pragma: no cover - config resource missing
         logging.basicConfig(level=logging.INFO)
+    # Ensure application logger does not filter messages on its own and relies
+    # on the configured handlers of the root logger instead.
+    logger.setLevel(logging.NOTSET)
