@@ -19,6 +19,14 @@ jobs:
       - name: Sync data
         run: dvc pull
         continue-on-error: true
-      - name: Run checks
-        run: make check
+      - name: Run lint
+        run: make lint
+      - name: Run type check
+        run: make type
+      - name: Run security checks
+        run: |
+          bandit -q -r . -c bandit.yml
+          semgrep --quiet --error --config config/semgrep.yml .
+      - name: Run tests
+        run: make test
 

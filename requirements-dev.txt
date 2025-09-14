@@ -1,7 +1,7 @@
-black
-ruff
-pytest
-mypy
 bandit
-semgrep
+black
 dvc
+mypy
+pytest
+ruff
+semgrep
