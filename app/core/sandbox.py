@@ -108,22 +108,22 @@ def run(
         )
 
         creation_flags = subprocess.CREATE_NEW_CONSOLE
-        p: Popen[str] = Popen(
+        win_proc: Popen[str] = Popen(
             cmd,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
             text=True,
             creationflags=creation_flags,
         )
-        handle = OpenProcess(win32con.PROCESS_ALL_ACCESS, False, p.pid)
+        handle = OpenProcess(win32con.PROCESS_ALL_ACCESS, False, win_proc.pid)
         win32job.AssignProcessToJobObject(job, handle)
         try:
-            out, err = p.communicate(timeout=timeout)
+            out, err = win_proc.communicate(timeout=timeout)
         except subprocess.TimeoutExpired:
-            p.kill()
-            out, err = p.communicate()
+            win_proc.kill()
+            out, err = win_proc.communicate()
             result.timeout = True
-        result.code = p.returncode
+        result.code = win_proc.returncode
         result.out = out if isinstance(out, str) else ""
         result.err = err if isinstance(err, str) else ""
         try:
