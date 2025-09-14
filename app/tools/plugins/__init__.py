@@ -12,17 +12,29 @@ import tomllib
 
 
 class Plugin(Protocol):
-    """Simple plugin interface used by all Watcher extensions."""
+    """Interface commune à toutes les extensions Watcher.
 
+    Chaque plugin doit fournir un identifiant court exposé via l'attribut
+    :attr:`name` et implémenter la méthode :meth:`run` qui retourne un message
+    lisible indiquant le résultat de son exécution.
+    """
+
+    #: Nom unique du plugin utilisé pour l'affichage et les logs.
     name: str
 
     def run(self) -> str:  # pragma: no cover - interface definition
-        """Execute the plugin and return a human readable message."""
+        """Exécuter le plugin et retourner un message utilisateur."""
         ...
 
 
-def load_entry_point_plugins(group: str = "watcher.plugins") -> list[Plugin]:
-    """Return plugins discovered via :mod:`importlib.metadata` entry points."""
+def discover_entry_point_plugins(group: str = "watcher.plugins") -> list[Plugin]:
+    """Discover plugins registered via ``importlib.metadata`` entry points.
+
+    Parameters
+    ----------
+    group:
+        Groupe d'entry points à inspecter. Par défaut ``"watcher.plugins"``.
+    """
 
     plugins: list[Plugin] = []
     try:
@@ -80,8 +92,8 @@ def reload_plugins(base: Path | None = None) -> list[Plugin]:
                 except Exception:  # pragma: no cover - best effort
                     logging.exception("Failed to load plugin %s", path)
 
-    plugins.extend(load_entry_point_plugins())
+    plugins.extend(discover_entry_point_plugins())
     return plugins
 
 
-__all__ = ["Plugin", "reload_plugins", "load_entry_point_plugins"]
+__all__ = ["Plugin", "reload_plugins", "discover_entry_point_plugins"]

@@ -19,7 +19,7 @@ def test_entry_point_plugin_loaded(monkeypatch):
     )
 
     monkeypatch.setattr(plugins, "entry_points", lambda group=None: [ep])
-    result = plugins.load_entry_point_plugins()
+    result = plugins.discover_entry_point_plugins()
     assert any(isinstance(p, HelloPlugin) for p in result)
 
 
@@ -31,4 +31,4 @@ def test_entry_point_plugin_failure(monkeypatch):
             raise RuntimeError("boom")
 
     monkeypatch.setattr(plugins, "entry_points", lambda group=None: [BrokenEP()])
-    assert plugins.load_entry_point_plugins() == []
+    assert plugins.discover_entry_point_plugins() == []
