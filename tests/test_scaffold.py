@@ -1,7 +1,18 @@
 import pytest
 from pathlib import Path
 
-from app.tools.scaffold import create_python_cli
+from app.tools.scaffold import create_python_cli, validate_name
+
+
+@pytest.mark.parametrize("name", ["foo", "Bar", "baz_123", "_underscore"])
+def test_validate_name_accepts_valid(name):
+    assert validate_name(name) == name
+
+
+@pytest.mark.parametrize("name", ["123abc", "bad-name", "bad name", "name!", ""])
+def test_validate_name_rejects_invalid(name):
+    with pytest.raises(ValueError):
+        validate_name(name)
 
 
 @pytest.mark.parametrize("name", ["foo", "Bar", "baz_123", "_underscore"])
