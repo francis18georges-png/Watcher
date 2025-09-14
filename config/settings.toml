@@ -1,69 +1,16 @@
-[ui]
-theme = "dark"
-wizard_autostart = true
-mode = "Sur"                 # Rapide | Sur | Exploration | AutoRefactor
+﻿[scraper]
+rate_per_domain = 1.0
+concurrency = 6
+user_agent = \"WatcherBot/1.0 (+https://github.com/francis18georges-png/Watcher)\"
 
-[llm]
-backend = "ollama"           # ollama | llamacpp
-host = "127.0.0.1:11434"     # Hostname and port of the Ollama server
-model = "llama3.2:3b"
-ctx = 8192
-temperature = 0.6
+[dataset]
+raw_dir = \"datasets/raw\"
+processed_dir = \"datasets/processed\"
 
-[dev]
-enable_repo = true
-test_timeout_sec = 60
-quality_min_coverage = 0.75
-quality_max_ruff = 0
-quality_bandit_fail = true
-semgrep_ruleset = "p/ci"
-
-[planner]
-max_diff_lines = 200
-ab_candidates = 2
-
-[memory]
-embed_backend = "ollama"
-embed_model = "nomic-embed-text"
-embed_host = "127.0.0.1:11434"
-top_k = 8
-db_path = "memory/mem.db"
-cache_size = 128
-
-[learn]
-target_score = 0.9
-max_iters = 5
-focus_languages = ["python","node","cpp","powershell"]
-
-[intelligence]
-prefer_ab_testing = true
-reward_weights = { tests = 0.5, perf = 0.2, quality = 0.2, security = 0.1 }
-stagnation_patience = 2
-
-[data]
-path = "data"
-
-[data.steps]
-load = "app.data.pipeline.load_raw_data"
-normalize = "app.data.pipeline.normalize_data"
-clean = "app.data.pipeline.clean_data"
-transform = "app.data.pipeline.transform_data"
+[embeddings]
+backend = \"local_faiss\"
 
 [training]
-epochs = 10
-batch_size = 32
 seed = 42
-
-[model]
-name = "default"
-
-[critic]
-polite_keywords = [
-    "please",
-    "thank you",
-    "merci",
-    "s'il vous plaît",
-    "s'il vous plait",
-    "bonjour",
-    "salut",
-]
+batch_size = 16
+lr = 1e-4

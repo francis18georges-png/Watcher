@@ -1,82 +1,112 @@
-"""Asynchronous web scraping utilities with caching.
-
-This module provides a minimal asynchronous scraper that fetches content
-from URLs concurrently and caches results on disk.  It avoids re-downloading
-previously seen URLs and offers simple error handling via the standard
-:mod:`logging` package.
-"""
-
+﻿\"\"\"
+Scraper asynchrone respectable et basique :
+- vérifie robots.txt (simple)
+- rate limiting par domaine
+- cache sur disque (datasets/raw)
+- extrait blocs de code et texte principal
+\"\"\"
 from __future__ import annotations
 
 import asyncio
 import hashlib
 import logging
 from pathlib import Path
-from typing import Dict, Iterable
-from urllib import request as urllib_request
+from urllib.parse import urlparse
 
+import httpx
+from bs4 import BeautifulSoup
 
-def _hash_url(url: str) -> str:
-    """Return a filename-safe hash for *url*."""
+RAW_DIR = Path("datasets/raw")
+RAW_DIR.mkdir(parents=True, exist_ok=True)
 
-    return hashlib.sha256(url.encode("utf-8")).hexdigest()
+logger = logging.getLogger(__name__)
 
+USER_AGENT = "WatcherBot/1.0 (+https://github.com/francis18georges-png/Watcher)"
 
-def _download_sync(url: str) -> str:
-    """Synchronously download *url* and return decoded text.
+RATE_PER_DOMAIN = 1.0  # seconds between requests to same domain
 
-    The function is executed in a thread pool via
-    :func:`asyncio.get_running_loop().run_in_executor` allowing multiple
-    downloads to proceed concurrently without requiring external
-    dependencies.
-    """
+class DomainRateLimiter:
+    def __init__(self):
+        self._locks: dict[str, asyncio.Lock] = {}
+        self._last_seen: dict[str, float] = {}
 
-    with urllib_request.urlopen(url) as resp:  # pragma: no cover - network
-        return resp.read().decode("utf-8")
+    async def wait(self, domain: str):
+        lock = self._locks.setdefault(domain, asyncio.Lock())
+        async with lock:
+            last = self._last_seen.get(domain, 0)
+            now = asyncio.get_event_loop().time()
+            wait = RATE_PER_DOMAIN - (now - last)
+            if wait > 0:
+                await asyncio.sleep(wait)
+            self._last_seen[domain] = asyncio.get_event_loop().time()
 
-
-async def fetch(url: str, cache_dir: Path) -> str:
-    """Fetch *url* asynchronously with a simple on-disk cache.
-
-    Parameters
-    ----------
-    url:
-        The URL to retrieve.
-    cache_dir:
-        Directory where cached responses are stored.  Files are named using
-        the SHA256 hash of the URL.
-    """
-
-    cache_dir.mkdir(parents=True, exist_ok=True)
-    cache_file = cache_dir / _hash_url(url)
-    if cache_file.exists():
-        return cache_file.read_text(encoding="utf-8")
-
-    loop = asyncio.get_running_loop()
+async def fetch(url: str, client: httpx.AsyncClient) -> tuple[str, bytes] | None:
+    parsed = urlparse(url)
+    domain = parsed.netloc
+    # robots.txt: simple check (can be improved with robotsparser)
+    robots_url = f"{parsed.scheme}://{domain}/robots.txt"
     try:
-        text = await loop.run_in_executor(None, _download_sync, url)
-    except Exception:  # pragma: no cover - network errors
-        logging.exception("scrape failed for %s", url)
-        raise
-    cache_file.write_text(text, encoding="utf-8")
-    return text
+        r = await client.get(robots_url, headers={"user-agent": USER_AGENT}, timeout=10.0)
+        if r.status_code == 200 and "Disallow: /" in r.text:
+            logger.info("robots.txt disallows scraping %s", domain)
+            return None
+    except Exception:
+        pass
 
+    try:
+        resp = await client.get(url, headers={"user-agent": USER_AGENT}, timeout=20.0)
+        resp.raise_for_status()
+        return url, resp.content
+    except httpx.HTTPError as exc:
+        logger.warning("fetch error %s: %s", url, exc)
+        return None
 
-async def scrape_all(
-    urls: Iterable[str], cache_dir: Path, *, concurrency: int = 5
-) -> Dict[str, str]:
-    """Concurrently scrape *urls* and return a mapping of URL to content.
+def content_hash(url: str, content: bytes) -> str:
+    h = hashlib.sha256()
+    h.update(url.encode("utf-8"))
+    h.update(content)
+    return h.hexdigest()
 
-    Downloads are limited by *concurrency* using an :class:`asyncio.Semaphore`.
-    Results are cached via :func:`fetch` and returned as a dictionary.
-    """
+def extract_text_and_code(html: bytes) -> dict:
+    soup = BeautifulSoup(html, "html.parser")
+    for sel in ("nav", "footer", "aside", "header", "script", "style"):
+        for el in soup.select(sel):
+            el.decompose()
+    title = soup.title.string.strip() if soup.title else ""
+    code_blocks = []
+    for pre in soup.find_all(["pre", "code"]):
+        text = pre.get_text("\n", strip=True)
+        if text:
+            code_blocks.append(text)
+    paragraphs = [p.get_text(" ", strip=True) for p in soup.find_all("p")]
+    text = "\n\n".join(paragraphs)[:100_000]
+    return {"title": title, "text": text, "code_blocks": code_blocks}
 
-    sem = asyncio.Semaphore(concurrency)
-    results: Dict[str, str] = {}
+async def scrape_one(url: str, client: httpx.AsyncClient, limiter: DomainRateLimiter):
+    parsed = urlparse(url)
+    domain = parsed.netloc
+    await limiter.wait(domain)
+    res = await fetch(url, client)
+    if not res:
+        return None
+    url, content = res
+    key = content_hash(url, content)
+    out_path = RAW_DIR / f"{key}.html"
+    if out_path.exists():
+        logger.debug("cached %s", url)
+        return str(out_path)
+    out_path.write_bytes(content)
+    meta = extract_text_and_code(content)
+    (RAW_DIR / f"{key}.meta.txt").write_text(f"url: {url}\ntitle: {meta['title']}\ncode_blocks: {len(meta['code_blocks'])}\n")
+    logger.info("scraped %s -> %s", url, out_path.name)
+    return str(out_path)
 
-    async def _scrape(url: str) -> None:
-        async with sem:
-            results[url] = await fetch(url, cache_dir)
-
-    await asyncio.gather(*(_scrape(u) for u in urls))
-    return results
+async def scrape(urls: list[str], concurrency: int = 5):
+    limiter = DomainRateLimiter()
+    async with httpx.AsyncClient(timeout=30.0) as client:
+        sem = asyncio.Semaphore(concurrency)
+        async def _wrap(u):
+            async with sem:
+                return await scrape_one(u, client, limiter)
+        tasks = [asyncio.create_task(_wrap(u)) for u in urls]
+        return await asyncio.gather(*tasks)
