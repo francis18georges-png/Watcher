@@ -32,3 +32,18 @@ def test_entry_point_plugin_failure(monkeypatch):
 
     monkeypatch.setattr(plugins, "entry_points", lambda group=None: [BrokenEP()])
     assert plugins.discover_entry_point_plugins() == []
+
+
+def test_invalid_plugin_skipped(monkeypatch):
+    class BadPlugin:
+        def run(self):  # pragma: no cover - trivial
+            return "bad"
+
+    class BadEP:
+        name = "bad"
+
+        def load(self):
+            return BadPlugin
+
+    monkeypatch.setattr(plugins, "entry_points", lambda group=None: [BadEP()])
+    assert plugins.discover_entry_point_plugins() == []
