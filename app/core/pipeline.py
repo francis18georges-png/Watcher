@@ -39,5 +39,10 @@ def transform_data(lines: Iterable[str]) -> list[int]:
         line = line.strip()
         if not line:
             continue
-        result.append(int(line))
+        try:
+            value = int(line)
+        except ValueError:
+            logger.warning("invalid integer '%s'", line)
+            continue
+        result.append(value)
     return result

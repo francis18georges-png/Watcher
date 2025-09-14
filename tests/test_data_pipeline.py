@@ -3,6 +3,7 @@ import time
 import pytest
 from app.core.memory import Memory
 from app.data.pipeline import load_raw_data, normalize_data
+from app.core.pipeline import transform_data
 
 
 def test_normalize_data_dedup_and_outliers():
@@ -73,3 +74,11 @@ def test_feedback_batch_loading_benchmark(tmp_path):
     batched = time.perf_counter() - start
 
     assert batched <= baseline
+
+
+def test_transform_data_invalid_line(caplog):
+    lines = ["1", "foo", "2"]
+    with caplog.at_level("WARNING"):
+        result = transform_data(lines)
+    assert result == [1, 2]
+    assert "invalid integer" in caplog.text
