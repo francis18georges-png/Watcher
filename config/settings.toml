@@ -28,6 +28,7 @@ embed_model = "nomic-embed-text"
 embed_host = "127.0.0.1:11434"
 top_k = 8
 db_path = "memory/mem.db"
+cache_size = 128
 
 [learn]
 target_score = 0.9

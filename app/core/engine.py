@@ -3,6 +3,7 @@
 from pathlib import Path
 import json
 import time
+from collections import OrderedDict
 from itertools import chain
 from threading import Thread
 from typing import Any
@@ -47,8 +48,9 @@ class Engine:
         self.planner = Planner()
         self.client = Client()
         self.critic = Critic()
-        # simple in-memory cache for chat responses
-        self._cache: dict[str, str] = {}
+        # LRU cache for chat responses
+        self._cache_size = int(cfg.get("cache_size", 128))
+        self._cache: OrderedDict[str, str] = OrderedDict()
         self.plugins: list[plugins.Plugin] = []
         self._load_plugins()
         self.start_msg = self._bootstrap()
@@ -113,9 +115,17 @@ class Engine:
             if reasoning is not None:
                 reasoning.add(f"prompt: {user_prompt}")
 
-            cache = self.__dict__.setdefault("_cache", {})
-            cached = cache.get(user_prompt)
+            cache: OrderedDict[str, str] = self.__dict__.setdefault(
+                "_cache", OrderedDict()
+            )
+            cache_size: int = self.__dict__.setdefault(
+                "_cache_size",
+                load_config().get("memory", {}).get("cache_size", 128),
+            )
+            cached = cache.pop(user_prompt, None)
             if cached is not None:
+                # move to most recently used position
+                cache[user_prompt] = cached
                 self.mem.add("chat_ai", cached)
                 self.last_prompt = user_prompt
                 self.last_answer = cached
@@ -142,6 +152,8 @@ class Engine:
                 msg = ", ".join(mapping.get(s, s) for s in suggestions)
                 self.mem.add("chat_ai", msg)
                 cache[user_prompt] = msg
+                if len(cache) > cache_size:
+                    cache.popitem(last=False)
                 self.last_prompt = user_prompt
                 self.last_answer = msg
                 if reasoning is not None:
@@ -176,6 +188,8 @@ class Engine:
             self.mem.add("chat_ai", answer)
             self.mem.add("trace", trace)
             cache[user_prompt] = answer
+            if len(cache) > cache_size:
+                cache.popitem(last=False)
             if reasoning is not None:
                 reasoning.add(f"answer: {answer}")
                 reasoning.save(self.mem)
