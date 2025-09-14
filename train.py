@@ -19,13 +19,27 @@ DATA_PATH = Path("datasets/simple_linear.csv")
 def load_data() -> tuple[list[float], list[float]]:
     xs: list[float] = []
     ys: list[float] = []
+
+    if not DATA_PATH.exists():
+        raise FileNotFoundError(f"Dataset not found at {DATA_PATH}")
+
     with DATA_PATH.open(encoding="utf-8") as f:
         reader = csv.reader(f)
-        next(reader)  # skip header
-        for row in reader:
-            x, y = map(float, row)
-            xs.append(x)
-            ys.append(y)
+        try:
+            next(reader)  # skip header
+            for line_no, row in enumerate(reader, start=2):
+                try:
+                    x, y = map(float, row)
+                except ValueError as exc:
+                    raise ValueError(f"Invalid data at line {line_no}: {row}") from exc
+                xs.append(x)
+                ys.append(y)
+        except (ValueError, StopIteration) as exc:
+            raise ValueError("Malformed or incomplete CSV data") from exc
+
+    if not xs or not ys:
+        raise ValueError("Dataset contains no data")
+
     return xs, ys
 
 
