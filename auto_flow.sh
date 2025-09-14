@@ -1,31 +1,32 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# 1) créer branche + noms automatiques
+feature="$1"                       # ex: db-cache
 ts=$(date +"%Y%m%d-%H%M%S")
-datefile=$(date +"%Y-%m-%d")
-branch="feature/$ts"
+today=$(date +"%Y-%m-%d")
+branch="feature/$feature-$ts"
+
+# 1) créer la branche
 git checkout -b "$branch"
 
-# 2) MAJ changelog & journal
-cat <<EOFCHANGE >> CHANGELOG.md
-## [$datefile]
+# 2) placeholder changelog + journal
+mkdir -p docs/journal
+cat <<EOFCHANGE >> docs/CHANGELOG.md
+## [$today]
 ### Added
-- feat($ts): auto entry (#PR)
+- feat($feature-$ts): description (#PR)
 EOFCHANGE
 
-mkdir -p docs/journal
-cat <<EOFJOURNAL > "docs/journal/$datefile.md"
-### $datefile
-- **Fait** : …
-- **Décisions / blocages** : …
-- **Prochaines étapes** : …
+cat <<EOFJOURNAL > "docs/journal/$today.md"
+### $today
+- **Fait** : ...
+- **Décisions / blocages** : ...
+- **Prochaines étapes** : ...
 EOFJOURNAL
 
 # 3) commit + push
 git add -A
-git commit -m "feat($ts): auto commit"
+git commit -m "feat($feature-$ts): auto commit"
 git push -u origin "$branch"
 
-echo "Branche poussée : $branch"
-echo "Créer la PR : https://github.com/francis18georges-png/Watcher/pull/new/$branch"
+echo "PR : https://github.com/francis18georges-png/Watcher/pull/new/$branch"
