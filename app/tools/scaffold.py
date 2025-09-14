@@ -70,13 +70,14 @@ def create_python_cli(name: str, base: Path, force: bool = False) -> str:
         textwrap.dedent(
             f"""\
         import argparse
+        import logging
 
         def main():
             p = argparse.ArgumentParser(prog="{name}", description="CLI {name}")
             p.add_argument("--ping", action="store_true", help="répond 'pong'")
             args = p.parse_args()
             if args.ping:
-                print("pong")
+                logging.getLogger(__name__).info("pong")
 
         if __name__ == "__main__":
             main()
@@ -108,18 +109,19 @@ def create_python_cli(name: str, base: Path, force: bool = False) -> str:
     (proj / "tests/test_cli.py").write_text(
         textwrap.dedent(
             f"""\
-        import sys, pathlib, runpy
+        import sys, pathlib, runpy, logging
 
         sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1]))
 
-        def test_ping(capsys):
+        def test_ping(caplog):
             argv = sys.argv
             sys.argv = ["{name}", "--ping"]
             try:
+                caplog.set_level(logging.INFO)
                 runpy.run_module("{name}.cli", run_name="__main__")
             finally:
                 sys.argv = argv
-            assert capsys.readouterr().out.strip() == "pong"
+            assert "pong" in caplog.text
     """
         ),
         encoding="utf-8",
