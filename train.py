@@ -8,7 +8,10 @@ and prints the learned parameters and mean squared error.
 from __future__ import annotations
 
 import csv
+import logging
 from pathlib import Path
+
+from app.core import logging_setup
 
 DATA_PATH = Path("datasets/simple_linear.csv")
 
@@ -43,9 +46,11 @@ def train(
 
 
 def main() -> None:
+    logging_setup.configure()
+    logger = logging.getLogger(__name__)
     xs, ys = load_data()
     w, b, mse = train(xs, ys)
-    print(f"w={w:.3f}, b={b:.3f}, mse={mse:.4f}")
+    logger.info("w=%0.3f, b=%0.3f, mse=%0.4f", w, b, mse)
 
 
 if __name__ == "__main__":
