@@ -14,3 +14,8 @@ Run Bandit to scan the codebase while ignoring Git metadata:
 ```
 bandit -q -r . -c bandit.yml
 ```
+
+## Quality Targets
+
+- Maintain at least **90%** test coverage.
+- Enforce `ruff` and `black` checks on every commit.
