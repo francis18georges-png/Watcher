@@ -168,7 +168,7 @@ def run(
     from subprocess import Popen
     from typing import cast
 
-    p: Popen[str] = Popen(
+    proc: Popen[str] = Popen(
         cmd,
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
@@ -177,19 +177,19 @@ def run(
     )
 
     try:
-        out, err = p.communicate(timeout=timeout)
+        out, err = proc.communicate(timeout=timeout)
     except subprocess.TimeoutExpired:
-        p.kill()
-        out, err = p.communicate()
+        proc.kill()
+        out, err = proc.communicate()
         result.timeout = True
 
     out_str = cast(str, out) if isinstance(out, str) else ""
     err_str = cast(str, err) if isinstance(err, str) else ""
-    result.code = p.returncode
+    result.code = proc.returncode
     result.out = out_str
     result.err = err_str
-    if p.returncode and p.returncode < 0:
-        sig = -p.returncode
+    if proc.returncode and proc.returncode < 0:
+        sig = -proc.returncode
         if sig == signal.SIGXCPU:
             result.cpu_exceeded = True
         elif sig == signal.SIGKILL:
