@@ -1,0 +1,64 @@
+﻿name: Auto-merge labeled PRs
+
+on:
+  pull_request:
+    types: [labeled, unlabeled, reopened, synchronize, ready_for_review]
+
+permissions:
+  contents: write
+  pull-requests: write
+  checks: read
+
+jobs:
+  auto-merge:
+    if: github.event.label && github.event.label.name == 'automerge'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Auto-merge when CI is green
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const pr = context.payload.pull_request;
+            if (!pr) {
+              core.info('No pull request context, exiting.');
+              return;
+            }
+            const prNumber = pr.number;
+            const owner = context.repo.owner;
+            const repo = context.repo.repo;
+
+            // Wait for GitHub to populate mergeable (sometimes null immediately)
+            let prData = null;
+            for (let i = 0; i < 10; i++) {
+              prData = (await github.rest.pulls.get({ owner, repo, pull_number: prNumber })).data;
+              if (prData.mergeable !== null) break;
+              await new Promise(r => setTimeout(r, 1000));
+            }
+
+            if (!prData.mergeable) {
+              core.setFailed(`PR #${prNumber} is not mergeable (mergeable=${prData.mergeable}).`);
+              return;
+            }
+
+            // Check combined status for the PR head
+            const headSha = prData.head.sha;
+            const combined = (await github.rest.repos.getCombinedStatusForRef({ owner, repo, ref: headSha })).data;
+            core.info(`Combined status: ${combined.state}`);
+            if (combined.state !== 'success' && combined.state !== 'neutral') {
+              core.setFailed(`Checks not green (state=${combined.state}). Aborting auto-merge.`);
+              return;
+            }
+
+            // merge the PR
+            try {
+              await github.rest.pulls.merge({
+                owner,
+                repo,
+                pull_number: prNumber,
+                merge_method: 'merge'
+              });
+              core.info(`Merged PR #${prNumber}`);
+            } catch (err) {
+              core.setFailed(`Failed to merge PR #${prNumber}: ${err.message}`);
+            }

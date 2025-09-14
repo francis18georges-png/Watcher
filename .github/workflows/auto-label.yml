@@ -1,0 +1,59 @@
+﻿name: Auto-label eligible PRs
+
+on:
+  pull_request:
+    types: [opened, reopened, synchronize]
+
+permissions:
+  issues: write
+  pull-requests: read
+
+jobs:
+  add-label:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Add automerge label for eligible PRs
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const pr = context.payload.pull_request;
+            if (!pr) return;
+            const prNumber = pr.number;
+            const owner = context.repo.owner;
+            const repo = context.repo.repo;
+            const branchName = pr.head.ref || '';
+            const author = pr.user.login || '';
+
+            // Customize the criteria below to reduce manual actions:
+            // Example: add automerge when branch starts with "feature/" OR PR author is the repo owner
+            const repoOwner = owner;
+            const shouldLabel = branchName.startsWith('feature/') || author === repoOwner;
+
+            if (!shouldLabel) {
+              core.info(`PR #${prNumber} not eligible for auto-label (branch=${branchName}, author=${author}).`);
+              return;
+            }
+
+            // Create label if it doesn't exist (ignore errors if already exists)
+            try {
+              await github.rest.issues.createLabel({
+                owner,
+                repo,
+                name: 'automerge',
+                color: 'F1C40F',
+                description: 'Auto-merge when CI is green'
+              });
+            } catch (e) {
+              // ignore if label exists or permission error
+              core.info('Label creation skipped or failed (may already exist).');
+            }
+
+            // Add label to PR
+            await github.rest.issues.addLabels({
+              owner,
+              repo,
+              issue_number: prNumber,
+              labels: ['automerge']
+            });
+            core.info(`Added label 'automerge' to PR #${prNumber}`);
