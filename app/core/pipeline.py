@@ -2,7 +2,11 @@ from __future__ import annotations
 
 from pathlib import Path
 from typing import Iterable, List
-import logging
+
+from app.core.logging_setup import get_logger
+
+
+logger = get_logger(__name__)
 
 
 def load_raw_data(path: str | Path) -> list[str]:
@@ -15,15 +19,15 @@ def load_raw_data(path: str | Path) -> list[str]:
 
     p = Path(path)
     if not p.exists():
-        logging.error("raw data file '%s' does not exist", p)
+        logger.error("raw data file '%s' does not exist", p)
         raise FileNotFoundError(p)
     if not p.is_file() or p.suffix.lower() != ".txt":
-        logging.error("raw data file '%s' has unsupported format", p)
+        logger.error("raw data file '%s' has unsupported format", p)
         raise ValueError(f"unsupported file format: {p}")
     try:
         text = p.read_text(encoding="utf-8").splitlines()
     except Exception as exc:  # pragma: no cover - defensive
-        logging.exception("failed to read raw data file '%s'", p)
+        logger.exception("failed to read raw data file '%s'", p)
         raise exc
     return [line.strip() for line in text if line.strip()]
 

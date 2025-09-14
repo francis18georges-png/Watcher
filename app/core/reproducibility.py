@@ -2,11 +2,14 @@
 
 from __future__ import annotations
 
-import logging
 import os
 import random
 
 from app.utils import np
+from app.core.logging_setup import get_logger
+
+
+logger = get_logger(__name__)
 
 
 def set_seed(seed: int) -> None:
@@ -37,4 +40,4 @@ def set_seed(seed: int) -> None:
     except ImportError:  # pragma: no cover - optional dependency
         pass
     except Exception as exc:  # pragma: no cover - optional dependency
-        logging.warning("Failed to seed PyTorch deterministically: %s", exc)
+        logger.warning("Failed to seed PyTorch deterministically: %s", exc)
