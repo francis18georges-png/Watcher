@@ -47,3 +47,22 @@ def test_invalid_plugin_skipped(monkeypatch):
 
     monkeypatch.setattr(plugins, "entry_points", lambda group=None: [BadEP()])
     assert plugins.discover_entry_point_plugins() == []
+
+
+def test_faulty_plugin_logged_and_skipped(caplog):
+    engine = Engine()
+
+    class BadPlugin:
+        name = "bad"
+
+        def run(self):
+            raise RuntimeError("boom")
+
+    # Bad plugin first to ensure subsequent plugins still run
+    engine.plugins = [BadPlugin(), HelloPlugin()]
+
+    with caplog.at_level("ERROR"):
+        outputs = engine.run_plugins()
+
+    assert outputs == ["Hello from plugin"]
+    assert any("Plugin bad failed" in rec.getMessage() for rec in caplog.records)
