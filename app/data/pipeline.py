@@ -146,16 +146,28 @@ def transform_data(
     dest_dir = PROCESSED_DIR
     dest_dir.mkdir(parents=True, exist_ok=True)
 
+    def _safe_dest(name: str) -> Path:
+        # Reject path separators to avoid directory traversal and ensure the
+        # resulting path stays within PROCESSED_DIR.
+        if any(sep in name for sep in ("/", "\\")):
+            raise ValueError(f"invalid filename: {name}")
+        dest = (dest_dir / name).resolve()
+        try:
+            dest.relative_to(PROCESSED_DIR)
+        except ValueError:
+            raise ValueError(f"path '{name}' escapes PROCESSED_DIR")
+        return dest
+
     if isinstance(data, Iterable) and not isinstance(data, dict):
         paths: list[Path] = []
         for idx, item in enumerate(data):
-            dest = dest_dir / f"{idx}_{filename}"
+            dest = _safe_dest(f"{idx}_{filename}")
             with dest.open("w", encoding="utf-8") as fh:
                 json.dump(item, fh, ensure_ascii=False, indent=2)
             paths.append(dest)
         return paths
 
-    dest = dest_dir / filename
+    dest = _safe_dest(filename)
     with dest.open("w", encoding="utf-8") as fh:
         json.dump(data, fh, ensure_ascii=False, indent=2)
     return dest
