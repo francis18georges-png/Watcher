@@ -30,7 +30,7 @@ def _read_toml(path: Path) -> dict[str, Any]:
             return tomllib.load(fh)
     except FileNotFoundError:
         logger.error("Configuration file not found: %s", path)
-        return {}
+        raise
     except tomllib.TOMLDecodeError as exc:
         logger.error("Invalid TOML in %s: %s", path, exc)
         raise
@@ -77,12 +77,13 @@ def load_config(profile: str | None = None) -> dict[str, Any]:
     base_path = Path(__file__).resolve().parent
     cfg_path = base_path / "settings.toml"
     cfg = _read_toml(cfg_path)
-    if not cfg:
-        raise FileNotFoundError(f"Configuration file not found: {cfg_path}")
 
     profile = profile or os.getenv("WATCHER_PROFILE")
     if profile:
-        profile_cfg = _read_toml(base_path / f"settings.{profile}.toml")
+        try:
+            profile_cfg = _read_toml(base_path / f"settings.{profile}.toml")
+        except FileNotFoundError:
+            profile_cfg = {}
         cfg = _deep_update(cfg, profile_cfg)
 
     return _validate(cfg)

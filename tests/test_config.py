@@ -11,7 +11,10 @@ def test_load_existing_config():
 
 
 def test_missing_base_file(monkeypatch):
-    monkeypatch.setattr(cfg_module, "_read_toml", lambda path: {})
+    def raise_not_found(_path):
+        raise FileNotFoundError
+
+    monkeypatch.setattr(cfg_module, "_read_toml", raise_not_found)
     load_config.cache_clear()
     with pytest.raises(FileNotFoundError):
         load_config()
