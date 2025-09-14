@@ -71,9 +71,7 @@ def embed_ollama(
         data = json.loads(resp.read())
         return [np.array(v, dtype=np.float32) for v in data["embeddings"]]
     except Exception as exc:  # pragma: no cover - network
-        logging.getLogger(__name__).warning(
-            "Embedding backend unreachable: %s", exc
-        )
+        logging.getLogger(__name__).warning("Embedding backend unreachable: %s", exc)
         return [np.zeros(1, dtype=np.float32) for _ in texts]
     finally:
         if conn is not None:

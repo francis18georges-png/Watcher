@@ -80,9 +80,7 @@ def test_embed_ollama_warning_logged(monkeypatch):
             return stub
         return original_get_logger(name, *args, **kwargs)
 
-    monkeypatch.setattr(
-        "app.tools.embeddings.logging.getLogger", fake_get_logger
-    )
+    monkeypatch.setattr("app.tools.embeddings.logging.getLogger", fake_get_logger)
 
     embed_ollama(["hello"], host="1.2.3.4:5678")
 
