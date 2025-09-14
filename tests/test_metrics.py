@@ -3,6 +3,10 @@ import time
 import urllib.request
 
 import pytest
+import importlib
+import builtins
+import sys
+import logging
 
 from app.utils.metrics import PerformanceMetrics
 from app.ui.main import start_metrics_server
@@ -78,3 +82,28 @@ def test_max_entries_limit() -> None:
     assert pm2.engine_calls == 4
     assert pm2.db_calls == 4
     assert pm2.plugin_calls == 4
+
+
+def test_numpy_fallback_warning(monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture) -> None:
+    """Ensure a warning is logged when NumPy is unavailable."""
+
+    # Remove any cached modules so import occurs afresh
+    sys.modules.pop("numpy", None)
+    sys.modules.pop("app.utils.np", None)
+
+    original_import = builtins.__import__
+
+    def fake_import(name, globals=None, locals=None, fromlist=(), level=0):
+        if name == "numpy":
+            raise ImportError("No module named 'numpy'")
+        return original_import(name, globals, locals, fromlist, level)
+
+    monkeypatch.setattr(builtins, "__import__", fake_import)
+
+    with caplog.at_level(logging.WARNING):
+        importlib.import_module("app.utils.np")
+
+    assert any(
+        "numpy is not installed, using numpy_stub instead" in record.message
+        for record in caplog.records
+    )
