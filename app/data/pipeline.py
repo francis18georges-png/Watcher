@@ -27,8 +27,15 @@ def load_raw_data(path: Path | str | None = None) -> dict | list[dict]:
     extension before reading.  When *path* points to a directory all ``.json``
     files inside are loaded and returned as a list of dictionaries.
     """
-
-    p = Path(path) if path else RAW_DIR / "data.json"
+    p = Path(path) if path else Path("data.json")
+    if not p.is_absolute():
+        p = RAW_DIR / p
+    p = p.resolve()
+    try:
+        p.relative_to(RAW_DIR)
+    except ValueError:
+        logger.error("raw data file '%s' escapes RAW_DIR", p)
+        raise ValueError(f"path '{p}' escapes RAW_DIR")
     if not p.exists():
         logger.error("raw data file '%s' does not exist", p)
         raise FileNotFoundError(p)
