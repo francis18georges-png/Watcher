@@ -32,9 +32,11 @@ def load_data() -> tuple[list[float], list[float]]:
 def train(
     xs: list[float], ys: list[float], lr: float = 0.01, epochs: int = 1000
 ) -> tuple[float, float, float]:
+    n = len(xs)
+    if n == 0:
+        raise ValueError("dataset must not be empty")
     w = 0.0
     b = 0.0
-    n = len(xs)
     for _ in range(epochs):
         y_pred = [w * x + b for x in xs]
         dw = (-2 / n) * sum((y - yp) * x for x, y, yp in zip(xs, ys, y_pred))
