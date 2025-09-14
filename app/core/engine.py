@@ -5,6 +5,7 @@ import json
 import time
 from itertools import chain
 from threading import Thread
+from typing import Any
 
 from config import load_config
 
@@ -235,9 +236,15 @@ class Engine:
         """Execute the data preparation pipeline."""
         try:
             start = time.perf_counter()
-            raw = pipeline.load_raw_data()
-            validate_feedback_schema(raw)
-            cleaned = pipeline.clean_data(raw)
+            raw: dict[str, Any] | list[dict[str, Any]] = pipeline.load_raw_data()
+            cleaned: dict[str, Any] | list[dict[str, Any]]
+            if isinstance(raw, list):
+                for item in raw:
+                    validate_feedback_schema(item)
+                cleaned = [pipeline.clean_data(item) for item in raw]
+            else:
+                validate_feedback_schema(raw)
+                cleaned = pipeline.clean_data(raw)
             path = pipeline.transform_data(cleaned)
             logger.info(
                 "data prepared in %.3fs -> %s", time.perf_counter() - start, path
