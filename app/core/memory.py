@@ -3,6 +3,7 @@ import time
 import logging
 import math
 from pathlib import Path
+from typing import Iterator
 
 from app.utils import np
 
@@ -83,6 +84,31 @@ class Memory:
                 "SELECT kind,prompt,answer,rating FROM feedback"
             ).fetchall()
         return rows
+
+    def iter_feedback(self, batch_size: int = 100) -> Iterator[tuple[str, str, str, float]]:
+        """Yield stored feedback entries in batches.
+
+        Parameters
+        ----------
+        batch_size:
+            Number of rows to fetch per batch.
+
+        Yields
+        ------
+        tuple[str, str, str, float]
+            Each ``(kind, prompt, answer, rating)`` tuple from the
+            ``feedback`` table.
+        """
+
+        with sqlite3.connect(self.db_path) as con:
+            c = con.cursor()
+            c.execute("SELECT kind,prompt,answer,rating FROM feedback")
+            while True:
+                rows = c.fetchmany(batch_size)
+                if not rows:
+                    break
+                for row in rows:
+                    yield row
 
     @staticmethod
     def _cosine_similarity(vec_blob: bytes, query_blob: bytes) -> float:
