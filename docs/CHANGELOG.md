@@ -7,3 +7,4 @@
 - Chargement en batch des retours mémoire et benchmark associé.
 - Cache chat responses.
 - Optimisation du pipeline de données : lecture/écriture en lot et test de performance associé.
+- docs(workflow): feuille de route et guide Git (#ID)
