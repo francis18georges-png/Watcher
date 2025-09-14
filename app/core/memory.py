@@ -88,7 +88,9 @@ class Memory:
             ).fetchall()
         return rows
 
-    def iter_feedback(self, batch_size: int = 100) -> Iterator[tuple[str, str, str, float]]:
+    def iter_feedback(
+        self, batch_size: int = 100
+    ) -> Iterator[tuple[str, str, str, float]]:
         """Yield stored feedback entries in batches.
 
         Parameters

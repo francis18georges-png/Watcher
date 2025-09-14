@@ -318,4 +318,6 @@ class Engine:
     def run_plugins(self) -> list[str]:
         """Execute all loaded plugins and return their outputs."""
         return [p.run() for p in self.plugins]
+
+
 logger = get_logger(__name__)
