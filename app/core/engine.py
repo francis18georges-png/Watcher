@@ -47,6 +47,8 @@ class Engine:
         self.planner = Planner()
         self.client = Client()
         self.critic = Critic()
+        # simple in-memory cache for chat responses
+        self._cache: dict[str, str] = {}
         self.plugins: list[plugins.Plugin] = []
         self._load_plugins()
         self.start_msg = self._bootstrap()
@@ -111,6 +113,20 @@ class Engine:
             if reasoning is not None:
                 reasoning.add(f"prompt: {user_prompt}")
 
+            cache = self.__dict__.setdefault("_cache", {})
+            cached = cache.get(user_prompt)
+            if cached is not None:
+                self.mem.add("chat_ai", cached)
+                self.last_prompt = user_prompt
+                self.last_answer = cached
+                if reasoning is not None:
+                    reasoning.add(f"answer: {cached}")
+                    reasoning.save(self.mem)
+                metrics.log_response_time(time.perf_counter() - start_time)
+                if hasattr(self, "bench"):
+                    metrics.log_evaluation_score(self.bench.run_variant("chat"))
+                return cached
+
             # Use the critic to obtain structured suggestions for the prompt.  If
             # the prompt lacks essential qualities we reply with these suggestions
             # rather than querying the LLM which keeps the tests lightweight and
@@ -125,6 +141,7 @@ class Engine:
                 }
                 msg = ", ".join(mapping.get(s, s) for s in suggestions)
                 self.mem.add("chat_ai", msg)
+                cache[user_prompt] = msg
                 self.last_prompt = user_prompt
                 self.last_answer = msg
                 if reasoning is not None:
@@ -158,6 +175,7 @@ class Engine:
 
             self.mem.add("chat_ai", answer)
             self.mem.add("trace", trace)
+            cache[user_prompt] = answer
             if reasoning is not None:
                 reasoning.add(f"answer: {answer}")
                 reasoning.save(self.mem)

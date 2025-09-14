@@ -95,3 +95,32 @@ def test_chat_suggests_details_without_llm(tmp_path, monkeypatch):
         ("chat_user", "ping"),
         ("chat_ai", answer),
     ]
+
+
+def test_chat_uses_cache_for_identical_prompts(tmp_path, monkeypatch):
+    def fake_embed(texts, model="nomic-embed-text"):
+        return [np.array([1.0])]
+
+    monkeypatch.setattr("app.core.memory.embed_ollama", fake_embed)
+    monkeypatch.setattr(Memory, "search", lambda self, q, top_k=8: [])
+
+    class DummyClient:
+        def __init__(self):
+            self.calls = 0
+
+        def generate(self, prompt: str) -> tuple[str, str]:
+            self.calls += 1
+            return "pong", "dummy-trace"
+
+    eng = Engine.__new__(Engine)
+    eng.mem = Memory(tmp_path / "mem.db")
+    eng.client = DummyClient()
+    eng.critic = Critic()
+
+    prompt = "please " + "word " * 60 + "thank you"
+
+    first = eng.chat(prompt)
+    second = eng.chat(prompt)
+
+    assert first == second == "pong"
+    assert eng.client.calls == 1
