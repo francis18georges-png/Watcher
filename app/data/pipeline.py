@@ -9,7 +9,7 @@ import time
 import statistics
 from dataclasses import dataclass
 from importlib import import_module
-from typing import Any, Callable, Protocol, runtime_checkable
+from typing import Any, Callable, Iterable, Protocol, runtime_checkable
 
 from app.config import load_config
 
@@ -18,18 +18,28 @@ RAW_DIR = BASE_DIR / "datasets" / "raw"
 PROCESSED_DIR = BASE_DIR / "datasets" / "processed"
 
 
-def load_raw_data(path: Path | str | None = None) -> dict:
+def load_raw_data(path: Path | str | None = None) -> dict | list[dict]:
     """Load and validate raw data from ``datasets/raw``.
 
-    The function ensures the file exists and uses a ``.json`` extension before
-    reading it. Clear log messages are emitted for missing files, unsupported
-    formats and malformed JSON content.
+    The function ensures the file or directory exists and uses a ``.json``
+    extension before reading.  When *path* points to a directory all ``.json``
+    files inside are loaded and returned as a list of dictionaries.
     """
 
     p = Path(path) if path else RAW_DIR / "data.json"
     if not p.exists():
         logging.error("raw data file '%s' does not exist", p)
         raise FileNotFoundError(p)
+    if p.is_dir():
+        data: list[dict] = []
+        for file in sorted(p.glob("*.json")):
+            try:
+                with file.open("r", encoding="utf-8") as fh:
+                    data.append(json.load(fh))
+            except json.JSONDecodeError:
+                logging.exception("raw data file '%s' contains invalid JSON", file)
+                raise
+        return data
     if p.suffix.lower() != ".json":
         logging.error("raw data file '%s' has unsupported format", p)
         raise ValueError(f"unsupported file format: {p}")
@@ -101,23 +111,41 @@ def clean_data(data: dict) -> dict:
     return {k: v for k, v in data.items() if v}
 
 
-def transform_data(data: dict, filename: str = "cleaned.json") -> Path:
+def transform_data(
+    data: dict | Iterable[dict], filename: str = "cleaned.json"
+) -> Path | list[Path]:
     """Persist cleaned *data* into ``datasets/processed``.
+
+    When *data* is an iterable of dictionaries each element is written to a
+    separate file using the pattern ``{index}_<filename>``.  This groups writes
+    to minimise filesystem overhead when persisting multiple records.
 
     Parameters
     ----------
     data:
-        Cleaned data to save.
+        Cleaned data to save or an iterable of multiple data items.
     filename:
-        Name of the JSON file to create in the processed directory.
+        Name of the JSON file to create in the processed directory. When
+        writing multiple items the name is used as a suffix.
 
     Returns
     -------
-    pathlib.Path
-        The path to the written file.
+    pathlib.Path | list[pathlib.Path]
+        The path(s) to the written file(s).
     """
+
     dest_dir = PROCESSED_DIR
     dest_dir.mkdir(parents=True, exist_ok=True)
+
+    if isinstance(data, Iterable) and not isinstance(data, dict):
+        paths: list[Path] = []
+        for idx, item in enumerate(data):
+            dest = dest_dir / f"{idx}_{filename}"
+            with dest.open("w", encoding="utf-8") as fh:
+                json.dump(item, fh, ensure_ascii=False, indent=2)
+            paths.append(dest)
+        return paths
+
     dest = dest_dir / filename
     with dest.open("w", encoding="utf-8") as fh:
         json.dump(data, fh, ensure_ascii=False, indent=2)
@@ -197,9 +225,13 @@ def run_pipeline(data: Any | None = None, hooks: list[Hook] | None = None) -> An
 
     cfg = load_config("data")
     steps_cfg = cfg.get("steps", {})
+
+    # Prefetch step callables to group module lookups and avoid repeated
+    # resolution during execution.
+    resolved_steps = [(name, _resolve_step(path)) for name, path in steps_cfg.items()]
+
     result: Any = data
-    for name, path in steps_cfg.items():
-        step = _resolve_step(path)
+    for name, step in resolved_steps:
         start = time.perf_counter()
         ok = True
         try:

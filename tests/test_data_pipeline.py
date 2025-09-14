@@ -36,6 +36,27 @@ def test_load_raw_data_invalid_json(tmp_path, caplog):
     assert "invalid JSON" in caplog.text
 
 
+def test_raw_batch_loading_benchmark(tmp_path):
+    """Compare individual file loading with directory batch loading."""
+
+    files = []
+    for i in range(50):
+        f = tmp_path / f"data_{i}.json"
+        f.write_text("{}", encoding="utf-8")
+        files.append(f)
+
+    start = time.perf_counter()
+    for f in files:
+        load_raw_data(f)
+    sequential = time.perf_counter() - start
+
+    start = time.perf_counter()
+    load_raw_data(tmp_path)
+    batched = time.perf_counter() - start
+
+    assert batched <= sequential
+
+
 def test_feedback_batch_loading_benchmark(tmp_path):
     """Compare naive feedback loading with batched iteration."""
 
