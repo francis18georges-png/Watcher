@@ -6,13 +6,14 @@ from contextlib import contextmanager
 from dataclasses import dataclass, field
 import logging
 import time
-from typing import Iterator, List
+from typing import Iterator, List, MutableSequence, Any
 
 
 @dataclass
 class PerformanceMetrics:
     """Collects timing, evaluation scores and error logs."""
 
+    max_entries: int | None = None
     response_times: List[float] = field(default_factory=list)
     evaluation_scores: List[float] = field(default_factory=list)
     error_logs: List[str] = field(default_factory=list)
@@ -26,20 +27,25 @@ class PerformanceMetrics:
     db_time_total: float = 0.0
     plugin_time_total: float = 0.0
 
+    def _append_with_limit(self, seq: MutableSequence[Any], value: Any) -> None:
+        seq.append(value)
+        if self.max_entries is not None and len(seq) > self.max_entries:
+            del seq[0]
+
     def log_response_time(self, duration: float) -> None:
         """Record a new response time measurement."""
 
-        self.response_times.append(duration)
+        self._append_with_limit(self.response_times, duration)
 
     def log_evaluation_score(self, score: float) -> None:
         """Record a new evaluation score."""
 
-        self.evaluation_scores.append(score)
+        self._append_with_limit(self.evaluation_scores, score)
 
     def log_error(self, message: str) -> None:
         """Record an error message and forward it to the logger."""
 
-        self.error_logs.append(message)
+        self._append_with_limit(self.error_logs, message)
         logging.getLogger(__name__).error(message)
 
     @contextmanager
@@ -52,7 +58,7 @@ class PerformanceMetrics:
         finally:
             duration = time.perf_counter() - start
             self.engine_calls += 1
-            self.engine_response_times.append(duration)
+            self._append_with_limit(self.engine_response_times, duration)
             self.engine_time_total += duration
             self.log_response_time(duration)
 
@@ -66,7 +72,7 @@ class PerformanceMetrics:
         finally:
             duration = time.perf_counter() - start
             self.db_calls += 1
-            self.db_response_times.append(duration)
+            self._append_with_limit(self.db_response_times, duration)
             self.db_time_total += duration
             self.log_response_time(duration)
 
@@ -80,7 +86,7 @@ class PerformanceMetrics:
         finally:
             duration = time.perf_counter() - start
             self.plugin_calls += 1
-            self.plugin_response_times.append(duration)
+            self._append_with_limit(self.plugin_response_times, duration)
             self.plugin_time_total += duration
             self.log_response_time(duration)
 
