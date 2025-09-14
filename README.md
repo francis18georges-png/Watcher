@@ -29,11 +29,13 @@ Mémoire vectorielle, curriculum adaptatif, A/B + bench et quality gate sécurit
 
 4. Installer les outils de développement :
 
-   ```bash
-   pip install -r requirements-dev.txt
-   ```
+    ```bash
+    pip install -r requirements-dev.txt
+    ```
 
-   Sur Windows, le script `installer.ps1` installe automatiquement toutes ces dépendances.
+    Ce fichier fixe des versions précises afin d'assurer une installation reproductible.
+
+    Sur Windows, le script `installer.ps1` installe automatiquement toutes ces dépendances.
 
 Les fichiers d'environnement (`*.env`), les journaux (`*.log`) et les environnements virtuels (`.venv/`) sont ignorés par Git afin d'éviter la mise en version de données sensibles ou temporaires.
 
