@@ -27,6 +27,12 @@ class Plugin(Protocol):
         ...
 
 
+def _valid_plugin(obj: object) -> bool:
+    """Return ``True`` when *obj* implements the :class:`Plugin` protocol."""
+
+    return hasattr(obj, "name") and callable(getattr(obj, "run", None))
+
+
 def discover_entry_point_plugins(group: str = "watcher.plugins") -> list[Plugin]:
     """Discover plugins registered via ``importlib.metadata`` entry points.
 
@@ -54,7 +60,12 @@ def discover_entry_point_plugins(group: str = "watcher.plugins") -> list[Plugin]
         try:
             cls = ep.load()
             plugin: Plugin = cls()
-            plugins.append(plugin)
+            if _valid_plugin(plugin):
+                plugins.append(plugin)
+            else:
+                logging.warning(
+                    "Invalid plugin %s", getattr(ep, "name", "<unknown>")
+                )
         except Exception:  # pragma: no cover - best effort
             logging.exception(
                 "Failed to load entry point %s", getattr(ep, "name", "<unknown>")
@@ -92,7 +103,10 @@ def reload_plugins(base: Path | None = None) -> list[Plugin]:
                     module = importlib.import_module(module_name)
                     cls = getattr(module, class_name)
                     plugin: Plugin = cls()
-                    plugins.append(plugin)
+                    if _valid_plugin(plugin):
+                        plugins.append(plugin)
+                    else:
+                        logging.warning("Invalid plugin %s", path)
                 except Exception:  # pragma: no cover - best effort
                     logging.exception("Failed to load plugin %s", path)
 
