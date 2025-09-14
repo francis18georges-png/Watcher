@@ -1,5 +1,12 @@
 # QA Notes
 
+## Flux Git
+
+1. `git checkout -b feature/<nom>`
+2. Commits atomiques (`feat: …`, `fix: …`, `docs: …`)
+3. `git push` puis ouverture d'une Pull Request
+4. Revue externe et fusion après `make check`
+
 ## Manual Verification
 
 1. Launch the GUI with `python -m app.ui.main`.
