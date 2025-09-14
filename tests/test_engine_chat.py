@@ -1,5 +1,6 @@
 from app.utils import np
 import sqlite3
+from unittest.mock import MagicMock
 
 from app.core.memory import Memory
 from app.core.engine import Engine
@@ -95,3 +96,25 @@ def test_chat_suggests_details_without_llm(tmp_path, monkeypatch):
         ("chat_user", "ping"),
         ("chat_ai", answer),
     ]
+
+
+def test_chat_caches_responses(tmp_path, monkeypatch):
+    def fake_embed(texts, model="nomic-embed-text"):
+        return [np.array([1.0])]
+
+    monkeypatch.setattr("app.core.memory.embed_ollama", fake_embed)
+    monkeypatch.setattr(Memory, "search", lambda self, q, top_k=8: [])
+
+    eng = Engine.__new__(Engine)
+    eng.mem = Memory(tmp_path / "mem.db")
+    eng.critic = Critic()
+
+    mock_generate = MagicMock(return_value=("pong", "dummy-trace"))
+    eng.client = type("DummyClient", (), {"generate": mock_generate})()
+
+    prompt = "please " + "word " * 60 + "thank you"
+    first = eng.chat(prompt)
+    second = eng.chat(prompt)
+
+    assert first == second == "pong"
+    assert mock_generate.call_count == 1

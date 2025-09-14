@@ -5,6 +5,7 @@ import json
 import logging
 import time
 from threading import Thread
+from functools import lru_cache
 
 from config import load_config
 
@@ -52,6 +53,11 @@ class Engine:
         self.last_answer = ""
         if perform_maintenance:
             Thread(target=self.perform_maintenance, daemon=True).start()
+
+    @lru_cache(maxsize=128)
+    def _generate(self, prompt: str) -> tuple[str, str]:
+        """Return LLM output while caching repeated prompts."""
+        return self.client.generate(prompt)
 
     def _bootstrap(self) -> str:
         """Load context and set up an initial ready agent."""
@@ -147,7 +153,7 @@ class Engine:
             if excerpts:
                 llm_prompt = "\n\n".join([llm_prompt, "\n".join(excerpts)])
 
-            answer, trace = self.client.generate(llm_prompt)
+            answer, trace = self._generate(llm_prompt)
 
             if details:
                 answer += "\n\nVoici quelques détails supplémentaires.\n" + "\n".join(
