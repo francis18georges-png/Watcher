@@ -4,6 +4,7 @@ from pathlib import Path
 import json
 import logging
 import time
+from functools import lru_cache
 from itertools import chain
 from threading import Thread
 
@@ -51,6 +52,7 @@ class Engine:
         self.start_msg = self._bootstrap()
         self.last_prompt = ""
         self.last_answer = ""
+        self._cached_chat_run = lru_cache(maxsize=128)(self._chat_run)
         if perform_maintenance:
             Thread(target=self.perform_maintenance, daemon=True).start()
 
@@ -89,6 +91,54 @@ class Engine:
 
         return ctx
 
+    def _chat_run(self, user_prompt: str) -> str:
+        """Internal helper implementing the chat logic without caching."""
+
+        # Store the user prompt and the assistant answer using distinct
+        # memory kinds so analytics can differentiate between them.
+        self.mem.add("chat_user", user_prompt)
+
+        # Use the critic to obtain structured suggestions for the prompt.  If
+        # the prompt lacks essential qualities we reply with these suggestions
+        # rather than querying the LLM which keeps the tests lightweight and
+        # mirrors the behaviour of a real assistant that would ask the user to
+        # clarify their question first.
+        suggestions = self.critic.suggest(user_prompt)
+        if suggestions:
+            # Map suggestion identifiers to short human messages.
+            mapping = {
+                "detail": "Voici quelques détails supplémentaires.",
+                "politeness": "manque de politesse",
+            }
+            msg = ", ".join(mapping.get(s, s) for s in suggestions)
+            self.mem.add("chat_ai", msg)
+            return msg
+
+        # Retrieve texts most similar to the prompt from memory.  Extract
+        # regular excerpts and detail suggestions separately so the latter can
+        # be surfaced in the final response without polluting the prompt sent
+        # to the LLM.
+        results = self.mem.search(user_prompt)
+        excerpts = [t for _s, _i, k, t in results if k != "detail"]
+        details = [t for _s, _i, k, t in results if k == "detail"]
+
+        # Combine the original prompt with retrieved excerpts before sending to
+        # the LLM.
+        llm_prompt = user_prompt
+        if excerpts:
+            llm_prompt = "\n\n".join([llm_prompt, "\n".join(excerpts)])
+
+        answer, trace = self.client.generate(llm_prompt)
+
+        if details:
+            answer += "\n\nVoici quelques détails supplémentaires.\n" + "\n".join(
+                details
+            )
+
+        self.mem.add("chat_ai", answer)
+        self.mem.add("trace", trace)
+        return answer
+
     def chat(self, prompt: str, reasoning: ReasoningChain | None = None) -> str:
         """Generate a response to *prompt* using the LLM client.
 
@@ -104,62 +154,14 @@ class Engine:
         start_time = time.perf_counter()
         try:
             user_prompt = validate_prompt(prompt)
-            # Store the user prompt and the assistant answer using distinct
-            # memory kinds so analytics can differentiate between them.
-            self.mem.add("chat_user", user_prompt)
             if reasoning is not None:
                 reasoning.add(f"prompt: {user_prompt}")
-
-            # Use the critic to obtain structured suggestions for the prompt.  If
-            # the prompt lacks essential qualities we reply with these suggestions
-            # rather than querying the LLM which keeps the tests lightweight and
-            # mirrors the behaviour of a real assistant that would ask the user to
-            # clarify their question first.
-            suggestions = self.critic.suggest(user_prompt)
-            if suggestions:
-                # Map suggestion identifiers to short human messages.
-                mapping = {
-                    "detail": "Voici quelques détails supplémentaires.",
-                    "politeness": "manque de politesse",
-                }
-                msg = ", ".join(mapping.get(s, s) for s in suggestions)
-                self.mem.add("chat_ai", msg)
-                self.last_prompt = user_prompt
-                self.last_answer = msg
-                if reasoning is not None:
-                    reasoning.add(f"answer: {msg}")
-                    reasoning.save(self.mem)
-                metrics.log_response_time(time.perf_counter() - start_time)
-                if hasattr(self, "bench"):
-                    metrics.log_evaluation_score(self.bench.run_variant("chat"))
-                return msg
-
-            # Retrieve texts most similar to the prompt from memory.  Extract
-            # regular excerpts and detail suggestions separately so the latter can
-            # be surfaced in the final response without polluting the prompt sent
-            # to the LLM.
-            results = self.mem.search(user_prompt)
-            excerpts = [t for _s, _i, k, t in results if k != "detail"]
-            details = [t for _s, _i, k, t in results if k == "detail"]
-
-            # Combine the original prompt with retrieved excerpts before sending to
-            # the LLM.
-            llm_prompt = user_prompt
-            if excerpts:
-                llm_prompt = "\n\n".join([llm_prompt, "\n".join(excerpts)])
-
-            answer, trace = self.client.generate(llm_prompt)
-
-            if details:
-                answer += "\n\nVoici quelques détails supplémentaires.\n" + "\n".join(
-                    details
-                )
-
-            self.mem.add("chat_ai", answer)
-            self.mem.add("trace", trace)
-            if reasoning is not None:
+                answer = self._chat_run(user_prompt)
                 reasoning.add(f"answer: {answer}")
                 reasoning.save(self.mem)
+            else:
+                answer = self._cached_chat_run(user_prompt)
+
             self.last_prompt = user_prompt
             self.last_answer = answer
             metrics.log_response_time(time.perf_counter() - start_time)
