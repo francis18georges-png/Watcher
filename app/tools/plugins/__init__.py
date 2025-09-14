@@ -4,9 +4,9 @@ from __future__ import annotations
 
 import importlib
 import logging
-from importlib.metadata import entry_points
+from importlib.metadata import EntryPoint, entry_points
 from pathlib import Path
-from typing import Protocol
+from typing import Iterable, Protocol
 
 import tomllib
 
@@ -39,9 +39,13 @@ def discover_entry_point_plugins(group: str = "watcher.plugins") -> list[Plugin]
     plugins: list[Plugin] = []
     try:
         try:
-            eps = entry_points(group=group)
+            eps: Iterable[EntryPoint] = entry_points(group=group)
         except TypeError:  # pragma: no cover - fallback for older Python
-            eps = entry_points().get(group, [])  # type: ignore[assignment]
+            eps = [
+                ep
+                for ep in entry_points()
+                if getattr(ep, "group", None) == group
+            ]
     except Exception:  # pragma: no cover - best effort
         logging.exception("Failed to query entry points")
         return plugins
