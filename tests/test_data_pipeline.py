@@ -15,6 +15,12 @@ def test_normalize_data_dedup_and_outliers():
     assert result["nums"] == [1, 2]
 
 
+def test_normalize_data_dedup_with_dicts():
+    data = {"items": [{"a": 1}, {"a": 1}, {"b": 2}]}
+    result = normalize_data(data)
+    assert result["items"] == [{"a": 1}, {"b": 2}]
+
+
 def test_load_raw_data_missing_file(caplog):
     missing = RAW_DIR / "missing.json"
     if missing.exists():

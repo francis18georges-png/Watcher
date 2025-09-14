@@ -98,12 +98,10 @@ def normalize_data(data: dict) -> dict:
             normalized[key] = value.strip()
             continue
         if isinstance(value, list):
-            seen: set[Any] = set()
             deduped: list[Any] = []
             for item in value:
                 item_norm = item.strip() if isinstance(item, str) else item
-                if item_norm not in seen:
-                    seen.add(item_norm)
+                if item_norm not in deduped:
                     deduped.append(item_norm)
             if deduped and all(isinstance(x, (int, float)) for x in deduped):
                 cleaned = _remove_numeric_outliers([float(x) for x in deduped])
