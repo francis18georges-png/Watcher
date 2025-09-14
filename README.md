@@ -65,6 +65,18 @@ Un utilitaire `create_python_cli` (dans `app.tools.scaffold`) permet de
 générer un squelette de projet sous `app/projects/<nom>`. Passer
 `force=True` écrase les fichiers existants sans demande de confirmation.
 
+## Plugins
+
+Watcher peut être étendu par des plugins implémentant l'interface
+`Plugin` définie dans `app/tools/plugins`. Deux mécanismes de
+découverte sont supportés :
+
+- déclaration explicite dans le fichier `plugins.toml` ;
+- [entry points](https://packaging.python.org/en/latest/specifications/entry-points/)
+  Python via le groupe `watcher.plugins`.
+
+Un exemple minimal est fourni dans `app/tools/plugins/hello.py`.
+
 ## Tests & Qualité
 
 Exécuter les vérifications locales avant de proposer du code :
