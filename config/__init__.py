@@ -83,6 +83,10 @@ def load_config(profile: str | None = None) -> dict[str, Any]:
         try:
             profile_cfg = _read_toml(base_path / f"settings.{profile}.toml")
         except FileNotFoundError:
+            logger.warning(
+                "Profile configuration file not found: %s",
+                base_path / f"settings.{profile}.toml",
+            )
             profile_cfg = {}
         cfg = _deep_update(cfg, profile_cfg)
 
