@@ -2,7 +2,7 @@ import json
 import time
 import pytest
 from app.core.memory import Memory
-from app.data.pipeline import RAW_DIR, load_raw_data, normalize_data
+from app.data.pipeline import RAW_DIR, load_raw_data, normalize_data, transform_data as save_data
 RAW_DIR.mkdir(parents=True, exist_ok=True)
 from app.core.pipeline import transform_data
 
@@ -54,6 +54,11 @@ def test_load_raw_data_path_escape(caplog):
             load_raw_data("../evil.json")
     assert "escapes RAW_DIR" in caplog.text
     assert all(record.name == "app.data.pipeline" for record in caplog.records)
+
+
+def test_transform_data_path_traversal():
+    with pytest.raises(ValueError):
+        save_data({}, filename="../evil.json")
 
 
 def test_raw_batch_loading_benchmark():
