@@ -1,5 +1,6 @@
 from app.utils import np
 import sqlite3
+from functools import lru_cache
 
 from app.core.memory import Memory
 from app.core.engine import Engine
@@ -22,6 +23,7 @@ def test_chat_saves_distinct_kinds(tmp_path, monkeypatch):
     eng.mem = Memory(tmp_path / "mem.db")
     eng.client = DummyClient()
     eng.critic = Critic()
+    eng._cached_chat_run = lru_cache(maxsize=128)(eng._chat_run)
 
     prompt = "please " + "word " * 60 + "thank you"
     answer = eng.chat(prompt)
@@ -61,6 +63,7 @@ def test_chat_includes_retrieved_terms(tmp_path, monkeypatch):
             return "pong", "dummy-trace"
 
     eng.client = DummyClient()
+    eng._cached_chat_run = lru_cache(maxsize=128)(eng._chat_run)
 
     prompt = "please " + "word " * 60 + "thank you"
     answer = eng.chat(prompt)
@@ -84,6 +87,7 @@ def test_chat_suggests_details_without_llm(tmp_path, monkeypatch):
     eng.mem = Memory(tmp_path / "mem.db")
     eng.client = DummyClient()
     eng.critic = Critic()
+    eng._cached_chat_run = lru_cache(maxsize=128)(eng._chat_run)
 
     answer = eng.chat("ping")
     assert "Voici quelques détails supplémentaires." in answer
@@ -94,4 +98,41 @@ def test_chat_suggests_details_without_llm(tmp_path, monkeypatch):
     assert rows == [
         ("chat_user", "ping"),
         ("chat_ai", answer),
+    ]
+
+
+def test_chat_uses_cache(tmp_path, monkeypatch):
+    def fake_embed(texts, model="nomic-embed-text"):
+        return [np.array([1.0])]
+
+    monkeypatch.setattr("app.core.memory.embed_ollama", fake_embed)
+    monkeypatch.setattr(Memory, "search", lambda self, q, top_k=8: [])
+
+    calls: list[str] = []
+
+    class DummyClient:
+        def generate(self, prompt: str) -> tuple[str, str]:
+            calls.append(prompt)
+            return "pong", "dummy-trace"
+
+    eng = Engine.__new__(Engine)
+    eng.mem = Memory(tmp_path / "mem.db")
+    eng.client = DummyClient()
+    eng.critic = Critic()
+    eng._cached_chat_run = lru_cache(maxsize=128)(eng._chat_run)
+
+    prompt = "please " + "word " * 60 + "thank you"
+    first = eng.chat(prompt)
+    second = eng.chat(prompt)
+
+    assert first == second == "pong"
+    assert calls == [prompt]
+
+    with sqlite3.connect(tmp_path / "mem.db") as con:
+        rows = con.execute("SELECT kind,text FROM items ORDER BY id").fetchall()
+
+    assert rows == [
+        ("chat_user", prompt),
+        ("chat_ai", "pong"),
+        ("trace", "dummy-trace"),
     ]

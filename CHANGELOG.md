@@ -5,7 +5,7 @@
 ### Added
 - Documentation de la feuille de route et du journal de bord.
 - Chargement en batch des retours mémoire et benchmark associé.
-- Cache chat responses.
+- Cache des réponses du chat en mémoire via `functools.lru_cache`.
 
 ## [2025-09-14]
 ### Added
