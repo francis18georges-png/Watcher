@@ -22,7 +22,11 @@ def test_embed_ollama_logs_warning(monkeypatch, caplog):
     monkeypatch.setattr("http.client.HTTPConnection", bad_conn)
     with caplog.at_level(logging.WARNING):
         embed_ollama(["hello"], host="1.2.3.4:5678")
-    assert "fail" in caplog.text
+    assert (
+        "app.tools.embeddings",
+        logging.WARNING,
+        "Embedding backend unreachable: fail",
+    ) in caplog.record_tuples
 
 
 def test_embed_ollama_host_argument(monkeypatch):
@@ -53,3 +57,33 @@ def test_embed_ollama_host_from_config(monkeypatch):
     monkeypatch.setattr("http.client.HTTPConnection", bad_conn)
     embed_ollama(["hi"])
     assert called == {"host": "confighost", "port": 4242}
+
+
+def test_embed_ollama_warning_logged(monkeypatch):
+    def bad_conn(*args, **kwargs):
+        raise OSError("fail")
+
+    monkeypatch.setattr("http.client.HTTPConnection", bad_conn)
+
+    class StubLogger:
+        def __init__(self):
+            self.messages = []
+
+        def warning(self, msg, exc):
+            self.messages.append(msg % exc)
+
+    stub = StubLogger()
+    original_get_logger = logging.getLogger
+
+    def fake_get_logger(name=None, *args, **kwargs):
+        if name == "app.tools.embeddings":
+            return stub
+        return original_get_logger(name, *args, **kwargs)
+
+    monkeypatch.setattr(
+        "app.tools.embeddings.logging.getLogger", fake_get_logger
+    )
+
+    embed_ollama(["hello"], host="1.2.3.4:5678")
+
+    assert stub.messages == ["Embedding backend unreachable: fail"]
