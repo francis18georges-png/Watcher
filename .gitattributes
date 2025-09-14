@@ -1,0 +1,8 @@
+﻿# Normalize line endings and reduce noisy diffs on Windows
+* text=auto
+
+# Force LF for Python and config files (preferred)
+*.py text eol=lf
+*.toml text eol=lf
+*.yml text eol=lf
+*.yaml text eol=lf
