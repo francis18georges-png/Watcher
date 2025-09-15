@@ -1,0 +1,25 @@
+name: automerge
+on:
+  pull_request_target:
+    types: [labeled, opened, synchronize]
+
+jobs:
+  automerge:
+    name: Automerge when labeled
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: write
+      contents: write
+      checks: read
+    steps:
+      - name: Checkout base branch
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.base.ref }}
+
+      - name: Attempt automerge when labelled
+        uses: pascalgn/automerge-action@v0.14.3
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          merge_method: merge
+          label: automerge
