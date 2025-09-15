@@ -1,10 +1,11 @@
-﻿\"\"\"
+"""
 Scraper asynchrone respectable et basique :
 - vérifie robots.txt (simple)
 - rate limiting par domaine
 - cache sur disque (datasets/raw)
 - extrait blocs de code et texte principal
-\"\"\"
+"""
+
 from __future__ import annotations
 
 import asyncio
@@ -25,6 +26,7 @@ USER_AGENT = "WatcherBot/1.0 (+https://github.com/francis18georges-png/Watcher)"
 
 RATE_PER_DOMAIN = 1.0  # seconds between requests to same domain
 
+
 class DomainRateLimiter:
     def __init__(self):
         self._locks: dict[str, asyncio.Lock] = {}
@@ -40,13 +42,16 @@ class DomainRateLimiter:
                 await asyncio.sleep(wait)
             self._last_seen[domain] = asyncio.get_event_loop().time()
 
+
 async def fetch(url: str, client: httpx.AsyncClient) -> tuple[str, bytes] | None:
     parsed = urlparse(url)
     domain = parsed.netloc
     # robots.txt: simple check (can be improved with robotsparser)
     robots_url = f"{parsed.scheme}://{domain}/robots.txt"
     try:
-        r = await client.get(robots_url, headers={"user-agent": USER_AGENT}, timeout=10.0)
+        r = await client.get(
+            robots_url, headers={"user-agent": USER_AGENT}, timeout=10.0
+        )
         if r.status_code == 200 and "Disallow: /" in r.text:
             logger.info("robots.txt disallows scraping %s", domain)
             return None
@@ -61,11 +66,13 @@ async def fetch(url: str, client: httpx.AsyncClient) -> tuple[str, bytes] | None
         logger.warning("fetch error %s: %s", url, exc)
         return None
 
+
 def content_hash(url: str, content: bytes) -> str:
     h = hashlib.sha256()
     h.update(url.encode("utf-8"))
     h.update(content)
     return h.hexdigest()
+
 
 def extract_text_and_code(html: bytes) -> dict:
     soup = BeautifulSoup(html, "html.parser")
@@ -82,6 +89,7 @@ def extract_text_and_code(html: bytes) -> dict:
     text = "\n\n".join(paragraphs)[:100_000]
     return {"title": title, "text": text, "code_blocks": code_blocks}
 
+
 async def scrape_one(url: str, client: httpx.AsyncClient, limiter: DomainRateLimiter):
     parsed = urlparse(url)
     domain = parsed.netloc
@@ -97,16 +105,21 @@ async def scrape_one(url: str, client: httpx.AsyncClient, limiter: DomainRateLim
         return str(out_path)
     out_path.write_bytes(content)
     meta = extract_text_and_code(content)
-    (RAW_DIR / f"{key}.meta.txt").write_text(f"url: {url}\ntitle: {meta['title']}\ncode_blocks: {len(meta['code_blocks'])}\n")
+    (RAW_DIR / f"{key}.meta.txt").write_text(
+        f"url: {url}\ntitle: {meta['title']}\ncode_blocks: {len(meta['code_blocks'])}\n"
+    )
     logger.info("scraped %s -> %s", url, out_path.name)
     return str(out_path)
+
 
 async def scrape(urls: list[str], concurrency: int = 5):
     limiter = DomainRateLimiter()
     async with httpx.AsyncClient(timeout=30.0) as client:
         sem = asyncio.Semaphore(concurrency)
+
         async def _wrap(u):
             async with sem:
                 return await scrape_one(u, client, limiter)
+
         tasks = [asyncio.create_task(_wrap(u)) for u in urls]
         return await asyncio.gather(*tasks)

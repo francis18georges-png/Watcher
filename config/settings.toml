@@ -1,16 +1,46 @@
-﻿[scraper]
+[scraper]
 rate_per_domain = 1.0
 concurrency = 6
-user_agent = \"WatcherBot/1.0 (+https://github.com/francis18georges-png/Watcher)\"
+user_agent = "WatcherBot/1.0 (+https://github.com/francis18georges-png/Watcher)"
 
 [dataset]
-raw_dir = \"datasets/raw\"
-processed_dir = \"datasets/processed\"
+raw_dir = "datasets/raw"
+processed_dir = "datasets/processed"
 
 [embeddings]
-backend = \"local_faiss\"
+backend = "local_faiss"
 
 [training]
 seed = 42
 batch_size = 16
 lr = 1e-4
+
+[ui]
+mode = "dev"
+
+[llm]
+model = "llama3.2:3b"
+host = "127.0.0.1:11434"
+ctx = 2048
+
+[dev]
+debug = true
+
+[planner]
+max_iterations = 10
+
+[memory]
+db_path = "memory/mem.db"
+cache_size = 128
+
+[learn]
+enabled = true
+
+[intelligence]
+reasoning_enabled = true
+
+[data]
+validation_enabled = true
+
+[model]
+type = "local"

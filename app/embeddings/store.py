@@ -1,8 +1,9 @@
-﻿\"\"\"
+"""
 Simple embeddings store abstraction (local FAISS-like example).
 - wraps encoder function (can be OpenAI / local model)
 - persists vector index + metadata
-\"\"\"
+"""
+
 from __future__ import annotations
 import pickle
 from pathlib import Path
@@ -10,9 +11,11 @@ from typing import Any
 
 import numpy as np
 
+
 # Placeholder: replace with real encoder (OpenAI, sentence-transformers, etc.)
 def fake_encoder(texts: list[str]) -> np.ndarray:
     return np.vstack([[float(len(t) % 512)] * 64 for t in texts]).astype("float32")
+
 
 class SimpleVectorStore:
     def __init__(self, path: str = "metrics/vecstore"):
