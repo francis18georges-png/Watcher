@@ -1,16 +1,64 @@
-﻿[scraper]
-rate_per_domain = 1.0
-concurrency = 6
-user_agent = \"WatcherBot/1.0 (+https://github.com/francis18georges-png/Watcher)\"
+[ui]
+mode = "Sur"
+theme = "dark"
+language = "fr"
+autosave = true
 
-[dataset]
-raw_dir = \"datasets/raw\"
-processed_dir = \"datasets/processed\"
+[llm]
+backend = "ollama"
+model = "llama3.2:3b"
+host = "127.0.0.1:11434"
+ctx = 4096
+fallback_phrase = "Echo"
 
-[embeddings]
-backend = \"local_faiss\"
+[dev]
+logging = "debug"
+trace_requests = false
+
+[planner]
+default_platform = "windows"
+default_license = "MIT"
+
+[memory]
+db_path = "memory/mem.db"
+cache_size = 128
+embed_model = "nomic-embed-text"
+embed_host = "127.0.0.1:11434"
+summary_max_tokens = 512
+
+[learn]
+optimizer = "adam"
+learning_rate = 0.1
+reward_clip = 1.0
+
+[intelligence]
+mode = "offline"
+curriculum = "default"
+
+[data]
+raw_dir = "datasets/raw"
+processed_dir = "datasets/processed"
+steps = {}
 
 [training]
 seed = 42
 batch_size = 16
 lr = 1e-4
+
+[model]
+name = "watcher"
+revision = "0.1"
+precision = "fp16"
+
+[scraper]
+cache_dir = "datasets/raw"
+rate_per_domain = 1.0
+concurrency = 6
+user_agent = "WatcherBot/1.0 (+https://github.com/francis18georges-png/Watcher)"
+
+[dataset]
+raw_dir = "datasets/raw"
+processed_dir = "datasets/processed"
+
+[embeddings]
+backend = "local_faiss"
