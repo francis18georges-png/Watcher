@@ -43,3 +43,22 @@ def test_scraper_caches(monkeypatch, tmp_path):
     assert calls == 1
     # Cached file exists
     assert list(tmp_path.iterdir())
+
+
+def test_scrape_all_default_cache_dir(monkeypatch, tmp_path):
+    """When cache_dir is omitted the configuration default is used."""
+
+    def fake_urlopen(url: str):
+        return DummyResponse("hello world")
+
+    monkeypatch.setattr(
+        scraper, "urllib_request", SimpleNamespace(urlopen=fake_urlopen)
+    )
+    monkeypatch.setattr(scraper, "_DEFAULT_CACHE_DIR", tmp_path)
+
+    async def _run() -> None:
+        await scraper.scrape_all(["https://example.com"])
+
+    asyncio.run(_run())
+
+    assert list(tmp_path.iterdir())
