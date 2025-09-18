@@ -1,22 +1,26 @@
 .RECIPEPREFIX := >
-.PHONY: format lint type security test check
+.PHONY: format lint type security test check nox
 
 format:
+> ruff --fix .
+> ruff format .
 > black .
 
 lint:
-> ruff check .
-> black --check .
+> nox -s lint
 
 type:
-> mypy .
+> nox -s typecheck
 
 security:
-> bandit -q -r . -c bandit.yml
-> semgrep --quiet --error --config config/semgrep.yml .
+> nox -s security
 
 test:
-> pytest -q
+> nox -s tests
 
-check: lint type security test
+check:
+> nox -s lint typecheck security tests
+
+nox:
+> nox -s lint typecheck security tests build
 

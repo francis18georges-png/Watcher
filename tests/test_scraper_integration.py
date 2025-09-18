@@ -3,6 +3,7 @@ from pathlib import Path
 
 from app.data.scraper import scrape
 
+
 def test_scrape_one_local_file(tmp_path: Path):
     html = "<html><head><title>t</title></head><body><p>hello</p><pre>print(1)</pre></body></html>"
     f = tmp_path / "t.html"

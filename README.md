@@ -39,6 +39,22 @@ Mémoire vectorielle, curriculum adaptatif, A/B + bench et quality gate sécurit
 
 Les fichiers d'environnement (`*.env`), les journaux (`*.log`) et les environnements virtuels (`.venv/`) sont ignorés par Git afin d'éviter la mise en version de données sensibles ou temporaires.
 
+## Environnement de développement
+
+Un dossier `.devcontainer/` est fourni pour disposer d'un environnement prêt à l'emploi
+dans VS Code ou GitHub Codespaces. Il utilise l'image Python 3.12 officielle,
+préconfigure les caches `pip` et `DVC` sur des volumes persistants et installe
+automatiquement les dépendances du projet ainsi que les hooks `pre-commit`.
+
+Pour ouvrir le projet dans un devcontainer :
+
+1. Installer l'extension [Dev Containers](https://marketplace.visualstudio.com/items?itemName=ms-vscode-remote.remote-containers).
+2. Dans VS Code, exécuter la commande **Dev Containers: Reopen in Container**.
+3. Attendre la fin du script `.devcontainer/post-create.sh` qui prépare l'environnement.
+
+Les caches partagés accélèrent notamment les installations pip et la synchronisation DVC
+entre plusieurs sessions Codespaces.
+
 ## Compatibilité NumPy
 
 Watcher tente d'utiliser la bibliothèque `numpy` lorsqu'elle est disponible.
@@ -93,21 +109,34 @@ Un exemple minimal est fourni dans `app/tools/plugins/hello.py`.
 
 ## Tests & Qualité
 
-Exécuter les vérifications locales avant de proposer du code :
+Watcher s'appuie désormais sur [Nox](https://nox.thea.codes/) pour unifier les
+linters, l'analyse statique, les tests et la construction du package :
 
 ```bash
-make check
+nox -s lint typecheck security tests
 ```
 
-Les commandes exécutées par `make check` sont :
+Les sessions peuvent également être exécutées individuellement (`nox -s lint`,
+`nox -s tests`, etc.) et une étape `nox -s build` génère les artefacts wheel et
+sdist.
+
+Pour automatiser les corrections, la cible `make format` applique Ruff (lint
+et formattage) puis Black, et `make check` délègue dorénavant à Nox.
+
+### Hooks pre-commit
+
+Le dépôt inclut une configuration `pre-commit` regroupant Ruff, Black, mypy,
+Bandit, Semgrep et Codespell. Après avoir installé les dépendances de
+développement, activez les hooks localement :
 
 ```bash
-ruff check .
-black --check .
-mypy .
-bandit -q -r . -c bandit.yml
-semgrep --quiet --error --config config/semgrep.yml .
-pytest -q
+pre-commit install
+```
+
+Vous pouvez ensuite valider l'ensemble des fichiers :
+
+```bash
+pre-commit run --all-files
 ```
 
 La configuration `bandit.yml` exclut notamment les répertoires `.git`, `datasets`,

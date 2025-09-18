@@ -1,0 +1,43 @@
+{
+  "$schema": "https://raw.githubusercontent.com/devcontainers/spec/main/schemas/devcontainer.json",
+  "name": "Watcher",
+  "build": {
+    "dockerfile": "Dockerfile",
+    "context": ".."
+  },
+  "containerEnv": {
+    "PIP_CACHE_DIR": "/home/vscode/.cache/pip",
+    "DVC_CACHE_DIR": "/workspaces/.cache/dvc",
+    "PYTHONHASHSEED": "0"
+  },
+  "mounts": [
+    "type=volume,source=watcher-pip-cache,target=/home/vscode/.cache/pip",
+    "type=volume,source=watcher-dvc-cache,target=/workspaces/.cache/dvc"
+  ],
+  "postCreateCommand": "bash .devcontainer/post-create.sh",
+  "customizations": {
+    "vscode": {
+      "settings": {
+        "python.defaultInterpreterPath": "/usr/local/bin/python",
+        "python.testing.pytestEnabled": true,
+        "python.testing.pytestArgs": [
+          "tests"
+        ],
+        "editor.formatOnSave": true,
+        "python.analysis.typeCheckingMode": "strict",
+        "python.formatting.provider": "black"
+      },
+      "extensions": [
+        "ms-python.python",
+        "ms-python.vscode-pylance",
+        "charliermarsh.ruff",
+        "ms-azuretools.vscode-docker",
+        "streetsidesoftware.code-spell-checker"
+      ]
+    }
+  },
+  "hostRequirements": {
+    "cpus": 4,
+    "memory": "8gb"
+  }
+}
