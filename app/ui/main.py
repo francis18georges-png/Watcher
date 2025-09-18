@@ -95,11 +95,17 @@ class WatcherApp(ttk.Frame):
         self.inp.pack(side="left", fill="both", expand=True)
         self.send_btn = ttk.Button(bottom, text="Envoyer", command=self._send)
         self.send_btn.pack(side="left", padx=8)
-        ttk.Label(bottom, text="Note").pack(side="left")
-        self.rate_var = tk.IntVar(value=0)
-        tk.Spinbox(bottom, from_=0, to=5, textvariable=self.rate_var, width=3).pack(
-            side="left", padx=4
+        ttk.Label(bottom, text="Note (0.0 – 1.0)").pack(side="left")
+        self.rate_var = tk.DoubleVar(value=0.0)
+        self.rate_input = tk.Spinbox(
+            bottom,
+            from_=0.0,
+            to=1.0,
+            increment=0.1,
+            textvariable=self.rate_var,
+            width=4,
         )
+        self.rate_input.pack(side="left", padx=4)
         ttk.Button(bottom, text="Noter", command=self._rate).pack(side="left")
         self.status = ttk.Label(
             self,
@@ -183,7 +189,16 @@ class WatcherApp(ttk.Frame):
         self._run_async(self.engine.auto_improve, "Improve")
 
     def _rate(self) -> None:
-        score = self.rate_var.get()
+        try:
+            score = float(self.rate_var.get())
+        except (tk.TclError, TypeError, ValueError):
+            messagebox.showerror(APP_NAME, "La note doit être un nombre entre 0.0 et 1.0.")
+            return
+
+        if not 0.0 <= score <= 1.0:
+            messagebox.showerror(APP_NAME, "La note doit être comprise entre 0.0 et 1.0.")
+            return
+
         msg = self.engine.add_feedback(score)
         self.out.insert("end", f"\n[Feedback] {msg}\n")
         self.out.see("end")
