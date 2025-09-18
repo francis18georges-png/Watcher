@@ -117,4 +117,23 @@ async def scrape_all(
     return {url: path for url, path in results if path is not None}
 
 
-__all__ = ["scrape_all", "DomainRateLimiter"]
+async def scrape(
+    urls: Iterable[str],
+    *,
+    concurrency: int = 5,
+    cache_dir: Path | None = None,
+) -> Dict[str, str]:
+    """Convenience wrapper around :func:`scrape_all` with a default cache directory.
+
+    When *cache_dir* is :data:`None`, the cache is stored below the repository's
+    ``datasets/cache`` folder.  The directory is created automatically and the
+    mapping returned by :func:`scrape_all` is forwarded unchanged.
+    """
+
+    if cache_dir is None:
+        cache_dir = Path(__file__).resolve().parents[2] / "datasets" / "cache"
+
+    return await scrape_all(urls, cache_dir, concurrency=concurrency)
+
+
+__all__ = ["scrape_all", "scrape", "DomainRateLimiter"]
