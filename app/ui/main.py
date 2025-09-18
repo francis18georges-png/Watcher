@@ -17,6 +17,15 @@ logger = logging.getLogger(__name__)
 
 
 APP_NAME = "Watcher"
+_SCORE_ERROR = "La note doit être comprise entre 0.0 et 1.0."
+
+
+def _validate_score(raw_score: float) -> float:
+    """Ensure *raw_score* falls within the accepted 0.0–1.0 interval."""
+
+    if not 0.0 <= raw_score <= 1.0:
+        raise ValueError(_SCORE_ERROR)
+    return raw_score
 
 
 class MetricsHandler(BaseHTTPRequestHandler):
@@ -190,13 +199,15 @@ class WatcherApp(ttk.Frame):
 
     def _rate(self) -> None:
         try:
-            score = float(self.rate_var.get())
+            raw_value = float(self.rate_var.get())
         except (tk.TclError, TypeError, ValueError):
-            messagebox.showerror(APP_NAME, "La note doit être un nombre entre 0.0 et 1.0.")
+            messagebox.showerror(APP_NAME, _SCORE_ERROR)
             return
 
-        if not 0.0 <= score <= 1.0:
-            messagebox.showerror(APP_NAME, "La note doit être comprise entre 0.0 et 1.0.")
+        try:
+            score = _validate_score(raw_value)
+        except ValueError:
+            messagebox.showerror(APP_NAME, _SCORE_ERROR)
             return
 
         msg = self.engine.add_feedback(score)
@@ -231,8 +242,9 @@ if __name__ == "__main__":
                     if q.lower().startswith("rate "):
                         try:
                             score = float(q.split()[1])
+                            score = _validate_score(score)
                         except (IndexError, ValueError):
-                            logger.warning("usage: rate <score>")
+                            logger.warning(_SCORE_ERROR)
                             continue
                         logger.info("%s", eng.add_feedback(score))
                         continue
