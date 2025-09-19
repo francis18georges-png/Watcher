@@ -4,7 +4,9 @@ from __future__ import annotations
 
 import importlib
 import logging
+from importlib import resources
 from importlib.metadata import EntryPoint, entry_points
+from importlib.resources.abc import Traversable
 from pathlib import Path
 from typing import Iterable, Protocol
 
@@ -67,7 +69,43 @@ def discover_entry_point_plugins(group: str = "watcher.plugins") -> list[Plugin]
     return plugins
 
 
-def reload_plugins(base: Path | None = None) -> list[Plugin]:
+Location = Path | Traversable
+
+
+def _resolve_manifest(base: Location | None) -> Location | None:
+    """Return the manifest file corresponding to *base*.
+
+    ``base`` may designate either a directory containing ``plugins.toml`` or the
+    manifest file itself.  When ``None`` the manifest embedded in the ``app``
+    package is returned.  ``None`` is returned when no manifest could be
+    located.
+    """
+
+    if base is None:
+        manifest = resources.files("app").joinpath("plugins.toml")
+    elif isinstance(base, Traversable):
+        manifest = base if base.is_file() else base.joinpath("plugins.toml")
+    else:
+        base_path = Path(base)
+        manifest = base_path if base_path.is_file() else base_path / "plugins.toml"
+
+    if isinstance(manifest, Traversable):
+        if not manifest.is_file():
+            return None
+        return manifest
+
+    if not manifest.exists():
+        return None
+    return manifest
+
+
+def _read_manifest(manifest: Location) -> str:
+    if isinstance(manifest, Traversable):
+        return manifest.read_text(encoding="utf-8")
+    return manifest.read_text(encoding="utf-8")
+
+
+def reload_plugins(base: Location | None = None) -> list[Plugin]:
     """Load plugin instances defined in ``plugins.toml``.
 
     Parameters
@@ -77,14 +115,11 @@ def reload_plugins(base: Path | None = None) -> list[Plugin]:
         ``None`` the project root is used.
     """
 
-    if base is None:
-        base = Path(__file__).resolve().parents[2]
-
-    cfg = base / "plugins.toml"
+    manifest = _resolve_manifest(base)
     plugins: list[Plugin] = []
-    if cfg.exists():
+    if manifest is not None:
         try:
-            data = tomllib.loads(cfg.read_text(encoding="utf-8"))
+            data = tomllib.loads(_read_manifest(manifest))
         except Exception:  # pragma: no cover - best effort
             logging.exception("Invalid plugins.toml")
         else:

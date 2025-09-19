@@ -346,7 +346,7 @@ class Engine:
     def _load_plugins(self) -> None:
         """Populate :attr:`plugins` from ``plugins.toml``."""
 
-        self.plugins = plugins.reload_plugins(self.base)
+        self.plugins = plugins.reload_plugins()
 
     def reload_plugins(self) -> str:
         """Reload plugins without restarting the engine."""
