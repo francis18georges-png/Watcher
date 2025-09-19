@@ -72,6 +72,12 @@ def discover_entry_point_plugins(group: str = "watcher.plugins") -> list[Plugin]
 Location = Path | Traversable
 
 
+def _default_manifest() -> Traversable:
+    """Return the plugin manifest bundled with the :mod:`app` package."""
+
+    return resources.files("app").joinpath("plugins.toml")
+
+
 def _resolve_manifest(base: Location | None) -> Location | None:
     """Return the manifest file corresponding to *base*.
 
@@ -82,7 +88,7 @@ def _resolve_manifest(base: Location | None) -> Location | None:
     """
 
     if base is None:
-        manifest = resources.files("app").joinpath("plugins.toml")
+        manifest = _default_manifest()
     elif isinstance(base, Traversable):
         manifest = base if base.is_file() else base.joinpath("plugins.toml")
     else:
@@ -112,10 +118,10 @@ def reload_plugins(base: Location | None = None) -> list[Plugin]:
     ----------
     base:
         Optional base directory containing the ``plugins.toml`` file.  When
-        ``None`` the project root is used.
+        ``None`` the manifest embedded in :mod:`app` is used.
     """
 
-    manifest = _resolve_manifest(base)
+    manifest = _resolve_manifest(base if base is not None else _default_manifest())
     plugins: list[Plugin] = []
     if manifest is not None:
         try:

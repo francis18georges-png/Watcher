@@ -9,8 +9,8 @@ from typing import Sequence
 
 from app.tools import plugins
 
-#: Base location containing the plugin manifest.
-_plugin_base: Traversable = resources.files("app")
+#: Location of the plugin manifest bundled with the :mod:`app` package.
+_plugin_base: Traversable = resources.files("app").joinpath("plugins.toml")
 
 
 def _iter_plugins() -> list[plugins.Plugin]:
