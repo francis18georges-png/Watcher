@@ -21,6 +21,7 @@ __pycache__/
 # Data
 data/
 memory/
+datasets/cache/
 
 # Coverage artifacts
 .coverage

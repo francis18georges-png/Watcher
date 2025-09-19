@@ -29,7 +29,9 @@ class _DummyEngine:
 def test_rate_records_high_value(monkeypatch):
     errors: list[tuple[str, str]] = []
 
-    monkeypatch.setattr(main.messagebox, "showerror", lambda title, msg: errors.append((title, msg)))
+    monkeypatch.setattr(
+        main.messagebox, "showerror", lambda title, msg: errors.append((title, msg))
+    )
 
     app = main.WatcherApp.__new__(main.WatcherApp)
     app.engine = _DummyEngine()

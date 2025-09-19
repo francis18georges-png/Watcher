@@ -3,10 +3,11 @@ import logging
 import os
 import shutil
 import subprocess
+import sys
 import tkinter as tk
 from http.server import BaseHTTPRequestHandler, HTTPServer
-from tkinter import messagebox, ttk
 from threading import Thread
+from tkinter import messagebox, ttk
 
 from app.core import logging_setup
 from app.core.engine import Engine
@@ -215,49 +216,108 @@ class WatcherApp(ttk.Frame):
         self.out.see("end")
 
 
-if __name__ == "__main__":
-    logging_setup.configure()
-    start_metrics_server()
+def _has_display() -> bool:
+    """Return ``True`` when a GUI display seems available."""
 
-    if not os.environ.get("DISPLAY"):
-        if shutil.which("Xvfb"):
-            logger.warning("DISPLAY absent, lancement de Xvfb...")
-            xvfb = subprocess.Popen(["Xvfb", ":99"])
-            os.environ["DISPLAY"] = ":99"
-            try:
-                root = tk.Tk()
-                WatcherApp(root)
-                root.mainloop()
-            finally:
-                xvfb.terminate()
-        else:
-            logger.warning("DISPLAY absent et Xvfb introuvable, mode CLI activé.")
-            eng = Engine()
-            logger.info("%s", eng.start_msg)
-            try:
-                while True:
-                    q = input("[You] ").strip()
-                    if q.lower() in {"exit", "quit"}:
-                        break
-                    if q.lower().startswith("rate "):
-                        try:
-                            score = float(q.split()[1])
-                            score = _validate_score(score)
-                        except (IndexError, ValueError):
-                            logger.warning(_SCORE_ERROR)
-                            continue
-                        logger.info("%s", eng.add_feedback(score))
-                        continue
-                    if not q:
-                        continue
-                    ans = eng.chat(q)
-                    logger.info("%s", ans)
-            except (EOFError, KeyboardInterrupt):
-                pass
-    else:
-        root = tk.Tk()
+    if os.name == "nt" or sys.platform == "darwin":
+        return True
+    return bool(os.environ.get("DISPLAY"))
+
+
+def _run_gui() -> None:
+    """Start the Tkinter interface."""
+
+    root = tk.Tk()
+    WatcherApp(root)
+    root.mainloop()
+
+
+def _run_gui_with_xvfb() -> int:
+    """Launch the GUI using Xvfb when no DISPLAY is available."""
+
+    logger.warning("DISPLAY absent, lancement de Xvfb...")
+    xvfb = subprocess.Popen(["Xvfb", ":99"])
+    os.environ["DISPLAY"] = ":99"
+    try:
+        _run_gui()
+    finally:
+        xvfb.terminate()
+    return 0
+
+
+def _run_cli(prompt: str | None = None) -> int:
+    """Start the CLI fallback interface."""
+
+    eng = Engine()
+    print(f"[Watcher] {eng.start_msg}")
+    if prompt is not None:
+        answer = eng.chat(prompt)
+        print(answer)
+        return 0
+
+    while True:
         try:
-            WatcherApp(root)
-            root.mainloop()
-        except Exception as e:  # pragma: no cover - UI
-            messagebox.showerror("Watcher", str(e))
+            q = input("[You] ").strip()
+        except (EOFError, KeyboardInterrupt):
+            print()
+            break
+        if not q:
+            continue
+        if q.lower() in {"exit", "quit"}:
+            break
+        if q.lower().startswith("rate "):
+            try:
+                score = float(q.split()[1])
+                score = _validate_score(score)
+            except (IndexError, ValueError):
+                print(_SCORE_ERROR)
+                continue
+            print(eng.add_feedback(score))
+            continue
+        ans = eng.chat(q)
+        print(ans)
+    return 0
+
+
+def launch(
+    *,
+    mode: str = "auto",
+    metrics_port: int = 8000,
+    enable_metrics: bool = True,
+    prompt: str | None = None,
+) -> int:
+    """Launch the Watcher user interface in the requested *mode*."""
+
+    logging_setup.configure()
+    server: HTTPServer | None = None
+    if enable_metrics:
+        server = start_metrics_server(metrics_port)
+
+    try:
+        if mode not in {"auto", "gui", "cli"}:
+            raise ValueError(f"unknown mode: {mode}")
+
+        if mode == "cli":
+            return _run_cli(prompt)
+
+        if _has_display():
+            try:
+                _run_gui()
+                return 0
+            except Exception as exc:  # pragma: no cover - UI initialisation
+                messagebox.showerror("Watcher", str(exc))
+                raise exc
+
+        if shutil.which("Xvfb"):
+            return _run_gui_with_xvfb()
+
+        logger.warning("DISPLAY absent et Xvfb introuvable, mode CLI activé.")
+        return _run_cli(prompt)
+    finally:
+        if server is not None:
+            server.shutdown()
+            server.server_close()
+
+
+if __name__ == "__main__":
+    raise SystemExit(launch())
