@@ -319,8 +319,9 @@ export LOGGING_CONFIG_PATH=./config/logging.yml
 export LOGGING_CONFIG_PATH=./config/logging.json
 ```
 
-Les deux fichiers décrivent un pipeline avec un formatter JSON et un filtre d'échantillonnage (`SamplingFilter`). Adaptez le
-paramètre `sample_rate` pour contrôler la proportion de messages conservés :
+Les deux fichiers décrivent un pipeline avec un formatter JSON et un filtre de contexte (`RequestIdFilter`) capable d'injecter les
+identifiants de requête et de trace, ainsi qu'un filtre d'échantillonnage (`SamplingFilter`). Adaptez le paramètre `sample_rate`
+pour contrôler la proportion de messages conservés :
 
 ```yaml
 filters:
@@ -329,8 +330,11 @@ filters:
     sample_rate: 0.1  # ne journalise qu'environ 10 % des messages
 ```
 
-Le module `app.core.logging_setup` expose également `set_trace_context(trace_id, sample_rate)` pour propager dynamiquement ces
-valeurs dans les journaux structurés.
+Les clés `request_id_field`, `trace_id_field` et `sample_rate_field` peuvent être
+personnalisées dans les fichiers YAML/JSON afin d'aligner les noms de colonnes
+avec vos outils d'observabilité. Le module `app.core.logging_setup` expose
+également `set_trace_context(trace_id, sample_rate)` pour propager dynamiquement
+ces valeurs dans les journaux structurés.
 
 Si `LOGGING_CONFIG_PATH` est absent ou que le fichier fourni est introuvable, le fichier `config/logging.yml` inclus dans le
 projet est utilisé. En dernier recours, Watcher applique la configuration basique de Python (`logging.basicConfig`) avec le
