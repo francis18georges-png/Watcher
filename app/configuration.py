@@ -2,16 +2,46 @@
 
 from __future__ import annotations
 
+import logging
 from pathlib import Path
 from typing import Mapping
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import Field, field_validator
+from pydantic_settings import (
+    BaseSettings,
+    PydanticBaseSettingsSource,
+    SettingsConfigDict,
+)
 
 
-class PathsSettings(BaseModel):
+class SectionSettings(BaseSettings):
+    """Base class for configuration sections.
+
+    The settings are primarily populated from the top-level :class:`Settings`
+    factory therefore environment lookups for the individual sections are
+    disabled.  This avoids repeated environment parsing while still benefiting
+    from Pydantic's validation when the sections are instantiated with data
+    originating from ``settings.toml`` or environment overrides.
+    """
+
+    model_config = SettingsConfigDict(extra="ignore", validate_default=True)
+
+    @classmethod
+    def settings_customise_sources(
+        cls,
+        settings_cls: type[BaseSettings],
+        init_settings: PydanticBaseSettingsSource,
+        env_settings: PydanticBaseSettingsSource,
+        dotenv_settings: PydanticBaseSettingsSource,
+        file_secret_settings: PydanticBaseSettingsSource,
+    ) -> tuple[PydanticBaseSettingsSource, ...]:
+        # Only use the data supplied by the parent :class:`Settings` instance so
+        # nested sections do not parse the environment individually.
+        return (init_settings,)
+
+
+class PathsSettings(SectionSettings):
     """Filesystem locations used by the application."""
-
-    model_config = ConfigDict(extra="ignore")
 
     base_dir: Path = Field(
         default_factory=lambda: Path(__file__).resolve().parents[1],
@@ -43,10 +73,8 @@ class PathsSettings(BaseModel):
         return (self.base_dir / path).resolve()
 
 
-class UISettings(BaseModel):
+class UISettings(SectionSettings):
     """User interface configuration."""
-
-    model_config = ConfigDict(extra="ignore")
 
     mode: str = Field(default="Sur", description="Mode d'affichage par défaut.")
     theme: str = Field(default="dark", description="Thème graphique préféré.")
@@ -54,10 +82,8 @@ class UISettings(BaseModel):
     autosave: bool = Field(default=True, description="Active l'enregistrement automatique.")
 
 
-class LLMSettings(BaseModel):
+class LLMSettings(SectionSettings):
     """Parameters for the local large language model backend."""
-
-    model_config = ConfigDict(extra="ignore")
 
     backend: str = Field(default="ollama", description="Backend préféré pour le LLM.")
     model: str = Field(default="llama3.2:3b", description="Identifiant du modèle à utiliser.")
@@ -80,28 +106,22 @@ class LLMSettings(BaseModel):
         return value
 
 
-class DevSettings(BaseModel):
+class DevSettings(SectionSettings):
     """Developer focused options."""
-
-    model_config = ConfigDict(extra="ignore")
 
     logging: str = Field(default="debug", description="Niveau de log par défaut.")
     trace_requests: bool = Field(default=False, description="Trace HTTP détaillée.")
 
 
-class PlannerSettings(BaseModel):
+class PlannerSettings(SectionSettings):
     """Planning defaults used by the assistant."""
-
-    model_config = ConfigDict(extra="ignore")
 
     default_platform: str = Field(default="windows", description="Plateforme cible par défaut.")
     default_license: str = Field(default="MIT", description="Licence de projet par défaut.")
 
 
-class MemorySettings(BaseModel):
+class MemorySettings(SectionSettings):
     """Vector memory and cache configuration."""
-
-    model_config = ConfigDict(extra="ignore")
 
     db_path: Path = Field(default=Path("memory/mem.db"), description="Chemin vers la base mémoire.")
     cache_size: int = Field(default=128, description="Taille du cache LRU pour les réponses.")
@@ -117,39 +137,31 @@ class MemorySettings(BaseModel):
         return value
 
 
-class LearningSettings(BaseModel):
+class LearningSettings(SectionSettings):
     """Hyper-parameters for the learning loop."""
-
-    model_config = ConfigDict(extra="ignore")
 
     optimizer: str = Field(default="adam")
     learning_rate: float = Field(default=0.1)
     reward_clip: float = Field(default=1.0)
 
 
-class IntelligenceSettings(BaseModel):
+class IntelligenceSettings(SectionSettings):
     """High level intelligence tuning parameters."""
-
-    model_config = ConfigDict(extra="ignore")
 
     mode: str = Field(default="offline")
     curriculum: str = Field(default="default")
 
 
-class DataSettings(BaseModel):
+class DataSettings(SectionSettings):
     """Data pipeline configuration."""
-
-    model_config = ConfigDict(extra="ignore")
 
     raw_dir: Path = Field(default=Path("datasets/raw"))
     processed_dir: Path = Field(default=Path("datasets/processed"))
     steps: Mapping[str, str] = Field(default_factory=dict, description="Etapes de pipeline déclarées.")
 
 
-class TrainingSettings(BaseModel):
+class TrainingSettings(SectionSettings):
     """Training hyper-parameters for ML components."""
-
-    model_config = ConfigDict(extra="ignore")
 
     seed: int = Field(default=42)
     batch_size: int = Field(default=16)
@@ -163,20 +175,16 @@ class TrainingSettings(BaseModel):
         return value
 
 
-class ModelSettings(BaseModel):
+class ModelSettings(SectionSettings):
     """Metadata describing the assistant model."""
-
-    model_config = ConfigDict(extra="ignore")
 
     name: str = Field(default="watcher")
     revision: str = Field(default="0.1")
     precision: str = Field(default="fp16")
 
 
-class ScraperSettings(BaseModel):
+class ScraperSettings(SectionSettings):
     """Web scraping and rate limiting configuration."""
-
-    model_config = ConfigDict(extra="ignore")
 
     rate_per_domain: float = Field(default=1.0)
     concurrency: int = Field(default=6)
@@ -197,33 +205,27 @@ class ScraperSettings(BaseModel):
         return value
 
 
-class DatasetSettings(BaseModel):
+class DatasetSettings(SectionSettings):
     """Dataset locations."""
-
-    model_config = ConfigDict(extra="ignore")
 
     raw_dir: Path = Field(default=Path("datasets/raw"))
     processed_dir: Path = Field(default=Path("datasets/processed"))
 
 
-class EmbeddingsSettings(BaseModel):
+class EmbeddingsSettings(SectionSettings):
     """Configuration for embedding backends."""
-
-    model_config = ConfigDict(extra="ignore")
 
     backend: str = Field(default="local_faiss")
 
 
-class SandboxSettings(BaseModel):
+class SandboxSettings(SectionSettings):
     """Runtime sandbox limits for executing code."""
-
-    model_config = ConfigDict(extra="ignore")
 
     cpu_seconds: int | None = Field(default=60, description="Quota CPU par processus.")
     memory_bytes: int | None = Field(
         default=256 * 1024 * 1024,
         description="Limite mémoire par processus en octets.",
-    )
+        )
     timeout_seconds: float = Field(default=30.0, description="Timeout pour l'exécution sandbox.")
 
     @field_validator("cpu_seconds", "memory_bytes")
@@ -241,10 +243,31 @@ class SandboxSettings(BaseModel):
         return value
 
 
-class CriticSettings(BaseModel):
-    """Critic configuration used for heuristic feedback."""
+class LoggingSettings(SectionSettings):
+    """Structured logging configuration."""
 
-    model_config = ConfigDict(extra="ignore")
+    config_path: Path | None = Field(
+        default=None,
+        description="Chemin vers un fichier de configuration logging YAML ou JSON.",
+    )
+    fallback_level: str = Field(
+        default="INFO",
+        description="Niveau appliqué si aucun fichier de configuration n'est disponible.",
+    )
+
+    @field_validator("fallback_level")
+    @classmethod
+    def _valid_level(cls, value: str) -> str:
+        if not value:
+            raise ValueError("fallback_level must not be empty")
+        level = value.upper()
+        if not isinstance(getattr(logging, level, None), int):
+            raise ValueError("fallback_level must reference a standard logging level")
+        return level
+
+
+class CriticSettings(SectionSettings):
+    """Critic configuration used for heuristic feedback."""
 
     polite_keywords: tuple[str, ...] = Field(
         default=(
@@ -265,6 +288,7 @@ __all__ = [
     "DatasetSettings",
     "DevSettings",
     "EmbeddingsSettings",
+    "LoggingSettings",
     "IntelligenceSettings",
     "LLMSettings",
     "LearningSettings",

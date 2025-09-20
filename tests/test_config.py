@@ -9,6 +9,7 @@ def test_load_existing_config():
     settings = get_settings()
     assert settings.llm.model == "llama3.2:3b"
     assert settings.llm.backend == "ollama"
+    assert settings.logging.fallback_level == "INFO"
 
 
 def test_missing_base_file(monkeypatch):

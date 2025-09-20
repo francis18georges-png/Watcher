@@ -142,11 +142,18 @@ def get_logger(name: str | None = None) -> logging.Logger:
     return logger if name is None else logger.getChild(name)
 
 
-def _configure_from_path(config_path: Path) -> None:
+def _configure_from_path(
+    config_path: Path, *, fallback_level: int | str | None = logging.INFO
+) -> None:
     """Load logging configuration from ``config_path`` if possible."""
 
     if not config_path.exists():  # pragma: no cover - config file missing
-        logging.basicConfig(level=logging.INFO)
+        level = fallback_level
+        if isinstance(level, str):
+            level = getattr(logging, level.upper(), logging.INFO)
+        if not isinstance(level, int):
+            level = logging.INFO
+        logging.basicConfig(level=level)
         return
 
     suffix = config_path.suffix.lower()
@@ -200,17 +207,30 @@ def _configure_from_path(config_path: Path) -> None:
 
 def configure() -> None:
     """Configure logging from the YAML configuration file if possible."""
+    from config import get_settings
+
+    settings = get_settings()
+    fallback_level = getattr(logging, settings.logging.fallback_level, logging.INFO)
+
+    config_path = settings.logging.config_path
+    if config_path is not None:
+        resolved = settings.paths.resolve(config_path)
+        _configure_from_path(resolved, fallback_level=fallback_level)
+        logger.setLevel(logging.NOTSET)
+        return
+
     env_path = os.environ.get("LOGGING_CONFIG_PATH")
     if env_path:
-        _configure_from_path(Path(env_path))
+        _configure_from_path(Path(env_path), fallback_level=fallback_level)
+        logger.setLevel(logging.NOTSET)
         return
 
     resource = resources.files("config") / "logging.yml"
     try:
         with resources.as_file(resource) as config_path:
-            _configure_from_path(config_path)
+            _configure_from_path(config_path, fallback_level=fallback_level)
     except FileNotFoundError:  # pragma: no cover - config resource missing
-        logging.basicConfig(level=logging.INFO)
+        logging.basicConfig(level=fallback_level)
     # Ensure application logger does not filter messages on its own and relies
     # on the configured handlers of the root logger instead.
     logger.setLevel(logging.NOTSET)
