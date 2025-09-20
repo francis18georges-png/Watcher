@@ -59,6 +59,49 @@ python -m app.core.benchmark check --update-badge
 La CI (`ci.yml`) exécute automatiquement ces commandes et échoue si un scénario
 dépasse l'un des seuils configurés.
 
+## Gestion des données avec DVC
+
+Watcher versionne ses jeux de données légers avec [DVC](https://dvc.org/).
+Installez l'outil (par exemple `pip install "dvc[s3]"`) avant d'exécuter les commandes ci-dessous.
+
+- L'étape `prepare-data` lit `datasets/raw/simple_linear.csv` et génère
+  `datasets/processed/simple_linear.csv` en appliquant les hyperparamètres
+  définis dans `params.yaml` (`prepare.sample_size`, `prepare.random_seed`).
+- L'étape `validate-data` exécute trois scripts (`scripts/validate_schema.py`,
+  `scripts/validate_size.py`, `scripts/validate_hash.py`) pour vérifier la
+  structure, la taille et l'empreinte MD5 du fichier préparé. Les attentes sont
+  décrites dans la section `validate.simple_linear` de `params.yaml`.
+
+Pour régénérer et valider les données locales :
+
+```bash
+dvc repro
+```
+
+Le dépôt est configuré avec un remote S3 `storage` pointant vers
+`s3://watcher-artifacts` (voir `.dvc/config`). Pour publier ou récupérer les
+artefacts :
+
+1. Configurer vos identifiants AWS via `aws configure` ou en définissant les
+   variables d'environnement `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY` et
+   `AWS_DEFAULT_REGION`.
+2. Initialiser la cible par défaut si nécessaire :
+
+   ```bash
+   dvc remote default storage
+   ```
+
+3. Synchroniser les données :
+
+   ```bash
+   dvc push   # envoie les artefacts locaux vers S3
+   dvc pull   # récupère les artefacts manquants depuis S3
+   ```
+
+Si vous devez utiliser un autre fournisseur (Azure Blob Storage, Google Cloud,
+etc.), ajustez l'URL du remote via `dvc remote modify storage url <nouvelle-url>`
+et mettez à jour la configuration d'authentification associée.
+
 ## Installation
 
 1. Cloner ce dépôt.
