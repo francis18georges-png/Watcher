@@ -69,6 +69,27 @@ Ces fichiers sont publiés en tant qu'artefacts de release. Téléchargez le SBO
 Le bundle Sigstore fournit également un horodatage de transparence et peut être vérifié hors-ligne grâce au
 [`rekor-cli`](https://github.com/sigstore/rekor) si vous devez archiver la preuve de signature.
 
+## Installation via pipx ou pip
+
+Pour installer la CLI `watcher` depuis un dépôt PyPI, privilégiez `pipx` qui isole automatiquement
+les dépendances dans un environnement dédié :
+
+```bash
+pipx install watcher
+```
+
+La commande `pipx upgrade watcher` mettra ensuite à jour l'application lorsqu'un nouveau tag
+SemVer est publié. Si vous préférez utiliser `pip`, créez ou activez un environnement virtuel
+et installez le package directement :
+
+```bash
+python -m pip install watcher
+```
+
+Cette installation apporte la commande `watcher` et l'ensemble des fichiers de configuration
+décrits dans ce dépôt. L'installeur Windows signé reste disponible en option via les releases
+GitHub (voir section précédente) pour les environnements qui privilégient un exécutable autonome.
+
 ## Benchmarks
 
 Le script `python -m app.core.benchmark run` exécute quatre scénarios
@@ -138,7 +159,7 @@ Si vous devez utiliser un autre fournisseur (Azure Blob Storage, Google Cloud,
 etc.), ajustez l'URL du remote via `dvc remote modify storage url <nouvelle-url>`
 et mettez à jour la configuration d'authentification associée.
 
-## Installation
+## Installation depuis les sources
 
 1. Cloner ce dépôt.
 2. Créer et activer un environnement Python 3.12 :

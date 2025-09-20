@@ -1,13 +1,60 @@
+[build-system]
+requires = ["setuptools>=69", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "watcher"
+version = "0.1.0"
+description = "Atelier local d'IA de programmation autonome (offline par défaut)."
+readme = "README.md"
+license = "MIT"
+requires-python = ">=3.11"
+authors = [{ name = "Watcher contributors" }]
+keywords = ["agents", "automation", "llm", "offline"]
+license-files = ["LICENSE"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "Programming Language :: Python",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+    "Topic :: Software Development :: Libraries",
+]
+dependencies = [
+    "alembic>=1.13,<2.0",
+    "beautifulsoup4>=4.12,<5.0",
+    "httpx>=0.27,<1.0",
+    "numpy>=1.26,<3.0",
+    "psutil>=5.9,<6.0",
+    "pydantic>=2.8,<3.0",
+    "pydantic-settings>=2.4,<3.0",
+    "rich>=13.7,<14.0",
+    "sentence-transformers>=2.2,<3.0",
+    "sqlalchemy>=2.0,<3.0",
+]
+
+[project.scripts]
+watcher = "app.cli:main"
+
+[project.urls]
+Documentation = "https://<github-username>.github.io/Watcher/"
+Source = "https://github.com/<github-username>/Watcher"
+
+[tool.setuptools]
+include-package-data = true
+
+[tool.setuptools.packages.find]
+include = ["app*", "config*"]
+
+[tool.setuptools.package-data]
+"app" = ["plugins.toml"]
+"config" = ["*.toml", "*.yml", "*.json"]
+
 [tool.black]
 line-length = 88
 target-version = ["py312"]
 
 [tool.ruff]
 line-length = 88
-
-[tool.setuptools]
-include-package-data = true
-
-[tool.setuptools.package-data]
-"app" = ["plugins.toml"]
-
