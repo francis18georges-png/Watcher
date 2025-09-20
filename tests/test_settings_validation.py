@@ -41,3 +41,10 @@ def test_logging_level_must_be_known() -> None:
 def test_logging_level_normalised() -> None:
     cfg = LoggingSettings(fallback_level="debug")
     assert cfg.fallback_level == "DEBUG"
+
+
+def test_sandbox_defaults() -> None:
+    sandbox = SandboxSettings()
+    assert sandbox.cpu_seconds == 60
+    assert sandbox.memory_bytes == 256 * 1024 * 1024
+    assert sandbox.timeout_seconds == pytest.approx(30.0)
