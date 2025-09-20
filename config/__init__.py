@@ -137,10 +137,6 @@ class _TomlSettingsSource(PydanticBaseSettingsSource):
         self._data = data
         return data
 
-    def get_field_value(self, field_name: str, field, value: Any) -> tuple[Any, bool]:
-        return value, False
-
-
 class Settings(BaseSettings):
     """Typed configuration object backed by ``pydantic-settings``."""
 
