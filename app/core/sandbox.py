@@ -3,7 +3,7 @@
 import logging
 import os
 from dataclasses import dataclass
-from typing import Mapping
+from typing import Callable, Mapping
 
 logger = logging.getLogger(__name__)
 
@@ -105,11 +105,26 @@ def _install_seccomp_network_filter() -> None:
         logger.debug("Unable to install seccomp filter", exc_info=True)
 
 
+def _invoke_on_start(
+    callback: Callable[[object], None] | None, process: object
+) -> None:
+    """Safely notify *callback* that *process* has started."""
+
+    if callback is None:
+        return
+
+    try:
+        callback(process)
+    except Exception:  # pragma: no cover - defensive logging
+        logger.exception("sandbox start callback failed")
+
+
 def _run_without_pywin32(
     cmd: list[str],
     timeout: float | None,
     cwd: str | os.PathLike[str] | None,
     env: Mapping[str, str],
+    on_start: Callable[[object], None] | None,
 ) -> SandboxResult:
     """Fallback execution for Windows when pywin32 is unavailable."""
     import subprocess
@@ -123,6 +138,8 @@ def _run_without_pywin32(
         cwd=cwd,
         env=dict(env),
     )
+
+    _invoke_on_start(on_start, p)
 
     try:
         out, err = p.communicate(timeout=timeout)
@@ -151,6 +168,7 @@ def run(
     cwd: str | os.PathLike[str] | None = None,
     env: Mapping[str, str | None] | None = None,
     allow_network: bool = False,
+    on_start: Callable[[object], None] | None = None,
 ) -> SandboxResult:
     """Exécute ``cmd`` avec quotas optionnels.
 
@@ -165,6 +183,8 @@ def run(
             correspondantes de l'environnement final.
         allow_network: Autoriser (``True``) ou bloquer (``False``) l'accès
             réseau.
+        on_start: Callback optionnel invoqué avec l'objet :class:`subprocess.Popen`
+            représentant le processus enfant dès son lancement.
 
     Returns:
         SandboxResult: Informations d'exécution comprenant codes et dépassements.
@@ -192,7 +212,9 @@ def run(
             logger.warning(
                 "pywin32 introuvable; exécution sans quotas CPU/mémoire sur Windows"
             )
-            return _run_without_pywin32(cmd, timeout, cwd_path, sanitized_env)
+            return _run_without_pywin32(
+                cmd, timeout, cwd_path, sanitized_env, on_start
+            )
 
         CloseHandle = cast(Callable[[int], None], CloseHandle)
 
@@ -226,6 +248,7 @@ def run(
             cwd=cwd_path,
             env=sanitized_env,
         )
+        _invoke_on_start(on_start, win_proc)
         handle = OpenProcess(win32con.PROCESS_ALL_ACCESS, False, win_proc.pid)
         win32job.AssignProcessToJobObject(job, handle)
         try:
@@ -293,6 +316,8 @@ def run(
         env=sanitized_env,
         close_fds=True,
     )
+
+    _invoke_on_start(on_start, proc)
 
     try:
         out, err = proc.communicate(timeout=timeout)

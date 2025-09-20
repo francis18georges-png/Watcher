@@ -1,6 +1,8 @@
 from importlib.metadata import EntryPoint
+from types import SimpleNamespace
 
 from app.core.engine import Engine
+from app.core import sandbox
 from app.tools import plugins
 from app.tools.plugins import (
     LoadedPlugin,
@@ -54,7 +56,7 @@ def test_invalid_plugin_skipped(monkeypatch):
     assert plugins.discover_entry_point_plugins() == []
 
 
-def test_faulty_plugin_logged_and_skipped(caplog):
+def test_faulty_plugin_logged_and_skipped(caplog, capsys):
     engine = Engine()
 
     failing_sig = compute_module_signature("tests.failing_plugin")
@@ -83,4 +85,43 @@ def test_faulty_plugin_logged_and_skipped(caplog):
         outputs = engine.run_plugins()
 
     assert outputs == ["dummy plugin loaded"]
-    assert any("failed with code" in rec.getMessage() for rec in caplog.records)
+    log_messages = "\n".join(rec.getMessage() for rec in caplog.records)
+    if not log_messages:
+        captured = capsys.readouterr()
+        log_messages = captured.err
+    assert "failed with code" in log_messages
+
+
+def test_run_plugins_tracks_active_processes(monkeypatch):
+    engine = Engine()
+    assert engine.plugins
+    engine.plugins = engine.plugins[:1]
+
+    snapshots: list[list[dict[str, object]]] = []
+
+    def _fake_run(cmd, **kwargs):
+        on_start = kwargs.get("on_start")
+        snapshots.append(engine.get_sandbox_processes())
+        if callable(on_start):
+            proc = SimpleNamespace(pid=54321)
+            on_start(proc)
+            snapshots.append(engine.get_sandbox_processes())
+        return sandbox.SandboxResult(code=0, out="tracked output")
+
+    monkeypatch.setattr("app.core.engine.sandbox.run", _fake_run)
+
+    outputs = engine.run_plugins()
+
+    assert outputs == ["tracked output"]
+    assert engine.get_sandbox_processes() == []
+    assert snapshots
+
+    pre_start = snapshots[0]
+    assert len(pre_start) == 1
+    assert pre_start[0]["pid"] is None
+    assert pre_start[0]["plugin"] is engine.plugins[0]
+
+    post_start = next((snap for snap in snapshots if snap and snap[0].get("pid")), [])
+    assert post_start
+    assert post_start[0]["pid"] == 54321
+    assert post_start[0]["import_path"] == engine.plugins[0].import_path
