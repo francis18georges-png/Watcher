@@ -16,6 +16,9 @@ from typing import Iterable, Protocol
 
 import tomllib
 
+#: Manifest bundled with the :mod:`app` package.
+DEFAULT_MANIFEST: Traversable = resources.files("app") / "plugins.toml"
+
 
 class Plugin(Protocol):
     """Interface commune à toutes les extensions Watcher.
@@ -200,7 +203,7 @@ def _resolve_manifest(base: Location | None) -> Location | None:
     """
 
     if base is None:
-        manifest: Location = resources.files("app") / "plugins.toml"
+        manifest: Location = DEFAULT_MANIFEST
     else:
         manifest = base
 
@@ -308,6 +311,7 @@ __all__ = [
     "Plugin",
     "LoadedPlugin",
     "SUPPORTED_PLUGIN_API_VERSION",
+    "DEFAULT_MANIFEST",
     "compute_module_signature",
     "reload_plugins",
     "discover_entry_point_plugins",

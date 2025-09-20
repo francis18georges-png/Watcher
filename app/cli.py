@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import argparse
-from importlib import resources
 from importlib.resources.abc import Traversable
 from typing import Sequence
 
@@ -11,7 +10,7 @@ from config import get_settings
 from app.tools import plugins
 
 #: Manifest bundled with the :mod:`app` package.
-_PLUGIN_MANIFEST: Traversable = resources.files("app") / "plugins.toml"
+_PLUGIN_MANIFEST: Traversable = plugins.DEFAULT_MANIFEST
 
 
 def _iter_plugins() -> list[plugins.Plugin]:
