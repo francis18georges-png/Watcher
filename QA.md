@@ -25,6 +25,13 @@ Install the development dependencies:
 pip install -r requirements-dev.txt
 ```
 
+Install the Git hooks once the dependencies are available:
+
+```
+pre-commit install
+pre-commit run --all-files
+```
+
 Run Bandit to scan the codebase while ignoring Git metadata:
 
 ```

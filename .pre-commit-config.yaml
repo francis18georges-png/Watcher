@@ -33,3 +33,4 @@ repos:
     rev: v4.6.0
     hooks:
       - id: end-of-file-fixer
+        name: Ensure files end with a newline
