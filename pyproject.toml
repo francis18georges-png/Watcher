@@ -7,6 +7,7 @@ line-length = 88
 
 [tool.setuptools]
 include-package-data = true
+license-files = ["LICENSE"]
 
 [tool.setuptools.package-data]
 "app" = ["plugins.toml"]
