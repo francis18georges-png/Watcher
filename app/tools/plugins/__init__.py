@@ -20,6 +20,24 @@ import tomllib
 DEFAULT_MANIFEST: Traversable = resources.files("app") / "plugins.toml"
 
 
+def _packaged_manifest() -> Traversable | None:
+    """Return the manifest shipped with the :mod:`app` package."""
+
+    try:
+        manifest = resources.files("app") / "plugins.toml"
+    except ModuleNotFoundError:
+        logging.debug(
+            "Unable to locate packaged plugin manifest; app package missing"
+        )
+        return None
+    if manifest.is_file():
+        return manifest
+    logging.debug(
+        "Unable to locate packaged plugin manifest inside app package"
+    )
+    return None
+
+
 class Plugin(Protocol):
     """Interface commune à toutes les extensions Watcher.
 
@@ -203,7 +221,10 @@ def _resolve_manifest(base: Location | None) -> Location | None:
     """
 
     if base is None:
-        manifest: Location = DEFAULT_MANIFEST
+        packaged = _packaged_manifest()
+        if packaged is None:
+            return None
+        manifest = packaged
     else:
         manifest = base
 
@@ -243,19 +264,7 @@ def reload_plugins(base: Location | None = None) -> list[LoadedPlugin]:
 
     manifest = _resolve_manifest(base)
     if manifest is None:
-        try:
-            candidate = resources.files("app") / "plugins.toml"
-        except ModuleNotFoundError:
-            logging.debug(
-                "Unable to locate packaged plugin manifest; app package missing"
-            )
-        else:
-            if candidate.is_file():
-                manifest = candidate
-            else:
-                logging.debug(
-                    "Unable to locate packaged plugin manifest inside app package"
-                )
+        manifest = _packaged_manifest()
     plugins: list[LoadedPlugin] = []
     if manifest is not None:
         try:

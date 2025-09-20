@@ -9,5 +9,5 @@ line-length = 88
 include-package-data = true
 
 [tool.setuptools.package-data]
-"app" = ["*.toml"]
+"app" = ["plugins.toml"]
 

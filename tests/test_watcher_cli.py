@@ -50,6 +50,9 @@ def _hide_source_manifest(tmp_path: Path):
 def test_plugin_list_installed_layout(tmp_path, capsys):
     with _hide_source_manifest(tmp_path):
         assert not Path("plugins.toml").exists()
+        base = cli._plugin_base()
+        assert base is not None
+        assert base.is_file()
         manifest = resources.files("app") / "plugins.toml"
         assert manifest.is_file()
         _assert_lists_hello(capsys, cli.main(["plugin", "list"]))
