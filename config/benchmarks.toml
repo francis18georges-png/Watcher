@@ -1,0 +1,18 @@
+[benchmarks]
+metrics_dir = "metrics"
+badge_file = "performance_badge.json"
+cache_ttl = 2.0
+default_variants = ["A", "B", "memory-batch", "chat"]
+
+[variants.chat]
+rounds = 2
+
+[thresholds.data_pipeline]
+speedup_min = 1.10
+batched_time_max = 0.50
+
+[thresholds.memory_feedback]
+speedup_min = 1.05
+
+[thresholds.chat_latency]
+avg_latency_max = 0.80
