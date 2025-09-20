@@ -57,9 +57,11 @@ jobs:
 
       - name: Run micro benchmarks
         if: runner.os == 'Linux'
-        run: |
-          python -m app.core.benchmark run --samples 5 --warmup 1
-          python -m app.core.benchmark check
+        run: python -m app.core.benchmark run --samples 5 --warmup 1
+
+      - name: Check benchmark thresholds
+        if: runner.os == 'Linux'
+        run: python -m app.core.benchmark check
 
       - name: Smoke test launcher in headless mode
         if: runner.os == 'Windows'
