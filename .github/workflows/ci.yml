@@ -90,6 +90,9 @@ jobs:
     name: Build Windows installer
     needs: quality
     runs-on: windows-latest
+    permissions:
+      contents: read
+      id-token: write
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -119,8 +122,16 @@ jobs:
           }
           Compress-Archive -Path "dist/Watcher/*" -DestinationPath $archive
 
+      - name: Sign installer archive
+        uses: sigstore/gh-action@v2.1.1
+        with:
+          artifact: dist/Watcher-Setup.zip
+          bundle: dist/Watcher-Setup.zip.sigstore
+
       - name: Upload Windows installer artifact
         uses: actions/upload-artifact@v4
         with:
           name: Watcher-Setup
-          path: dist/Watcher-Setup.zip
+          path: |
+            dist/Watcher-Setup.zip
+            dist/Watcher-Setup.zip.sigstore
