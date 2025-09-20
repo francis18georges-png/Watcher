@@ -1,6 +1,7 @@
 """Core orchestration engine for the Watcher project."""
 
 import json
+import logging
 import os
 import sys
 import tempfile
@@ -66,6 +67,7 @@ class Engine:
         self._cache_size = int(settings.memory.cache_size)
         self._cache: OrderedDict[str, str] = OrderedDict()
         self.plugins: list[plugins.LoadedPlugin] = []
+        self._sandbox_processes: list[dict[str, Any]] = []
         self._load_plugins()
         self.start_msg = self._bootstrap()
         self.last_prompt = ""
@@ -367,6 +369,11 @@ class Engine:
         self._load_plugins()
         return f"{len(self.plugins)} plugins rechargés"
 
+    def get_sandbox_processes(self) -> list[dict[str, Any]]:
+        """Return a shallow copy of active sandbox process metadata."""
+
+        return [dict(entry) for entry in self._sandbox_processes]
+
     def run_plugins(self) -> list[str]:
         """Execute all loaded plugins in isolated sandboxes."""
 
@@ -393,10 +400,31 @@ class Engine:
 
             env = {"PYTHONPATH": pythonpath} if pythonpath else None
 
+            entry = {
+                "pid": None,
+                "plugin": plugin,
+                "import_path": plugin.import_path,
+                "command": tuple(cmd),
+                "started_at": time.time(),
+            }
+            self._sandbox_processes.append(entry)
+
+            def _on_start(process: object, *, _entry=entry) -> None:
+                pid = getattr(process, "pid", None)
+                if pid is None:
+                    return
+                try:
+                    _entry["pid"] = int(pid)
+                except (TypeError, ValueError):
+                    _entry["pid"] = pid
+                _entry["started_at"] = time.time()
+
+            result: sandbox.SandboxResult | None = None
             try:
                 with tempfile.TemporaryDirectory(
                     prefix=f"watcher-plugin-{plugin.name}-"
                 ) as tmpdir:
+                    entry["cwd"] = Path(tmpdir)
                     result = sandbox.run(
                         cmd,
                         cpu_seconds=_PLUGIN_CPU_LIMIT_SECONDS,
@@ -405,9 +433,17 @@ class Engine:
                         cwd=Path(tmpdir),
                         env=env,
                         allow_network=False,
+                        on_start=_on_start,
                     )
             except Exception:  # pragma: no cover - best effort logging
                 logger.exception("Plugin %s failed to start", plugin.import_path)
+            finally:
+                try:
+                    self._sandbox_processes.remove(entry)
+                except ValueError:
+                    pass
+
+            if result is None:
                 continue
 
             if result.code == 0 and not result.timeout:
@@ -421,13 +457,16 @@ class Engine:
                 details.append("cpu limit")
             if result.memory_exceeded:
                 details.append("memory limit")
-            logger.error(
-                "Plugin %s failed with code %s: %s (%s)",
+            details_text = ", ".join(details) if details else "no additional info"
+            message = "Plugin %s failed with code %s: %s (%s)"
+            args_tuple = (
                 plugin.import_path,
                 result.code,
                 result.err.strip(),
-                ", ".join(details) if details else "no additional info",
+                details_text,
             )
+            logger.error(message, *args_tuple)
+            logging.getLogger().error(message, *args_tuple)
         return outputs
 
     def _plugin_metadata_valid(self, plugin: plugins.LoadedPlugin) -> bool:

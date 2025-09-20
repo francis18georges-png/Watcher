@@ -107,6 +107,7 @@ class WatcherApp(ttk.Frame):
         self.settings = get_settings()
         self.engine = Engine()
         self._plugin_process_cache: dict[str, psutil.Process] = {}
+        self._sandbox_processes: list[dict[str, Any]] = []
         master.title(APP_NAME)
         master.geometry("1100x700")
         master.minsize(900, 600)
@@ -182,6 +183,33 @@ class WatcherApp(ttk.Frame):
         ttk.Button(at, text="Améliorer (A/B)", command=self._improve).pack(
             side="left", padx=6
         )
+
+        monitor = ttk.LabelFrame(self.atelier, text="Plugins en cours")
+        monitor.pack(fill="both", expand=True, padx=8, pady=(12, 8))
+
+        columns = ("pid", "plugin", "cpu", "rss", "threads")
+        self.plugin_tree = ttk.Treeview(
+            monitor,
+            columns=columns,
+            show="headings",
+            height=6,
+        )
+        headings = {
+            "pid": "PID",
+            "plugin": "Plugin",
+            "cpu": "CPU %",
+            "rss": "RSS",
+            "threads": "Threads",
+        }
+        widths = {"pid": 80, "plugin": 260, "cpu": 80, "rss": 120, "threads": 80}
+        for column in columns:
+            self.plugin_tree.heading(column, text=headings[column])
+            self.plugin_tree.column(column, width=widths[column], anchor="center")
+        self.plugin_tree.pack(fill="both", expand=True, padx=8, pady=8)
+
+        after = getattr(self, "after", None)
+        if callable(after):
+            after(1000, self._update_plugin_monitor)
 
     def _collect_plugin_stats(
         self, entries: Iterable[object] | None = None
@@ -295,6 +323,56 @@ class WatcherApp(ttk.Frame):
 
         self._plugin_stats_snapshot = stats
         return stats
+
+    def _update_plugin_monitor(self) -> None:
+        """Refresh the plugin process Treeview with current sandbox data."""
+
+        entries: list[dict[str, Any]] = []
+        engine = getattr(self, "engine", None)
+        if engine is not None:
+            getter = getattr(engine, "get_sandbox_processes", None)
+            if callable(getter):
+                entries = list(getter())
+            else:
+                entries = list(getattr(engine, "_sandbox_processes", []))
+
+        self._sandbox_processes = entries
+        stats = self._collect_plugin_stats(entries)
+
+        tree = getattr(self, "plugin_tree", None)
+        if tree is None:
+            return
+
+        try:
+            children = list(tree.get_children())
+        except Exception:
+            children = []
+        for item in children:
+            try:
+                tree.delete(item)
+            except Exception:  # pragma: no cover - best effort cleanup
+                logger.debug("Unable to remove Treeview item %s", item, exc_info=True)
+
+        for stat in stats:
+            cpu_percent = float(stat.get("cpu_percent", 0.0) or 0.0)
+            values = (
+                stat.get("pid"),
+                stat.get("plugin_name") or stat.get("import_path"),
+                f"{cpu_percent:.1f}",
+                stat.get("rss", 0),
+                stat.get("num_threads", 0),
+            )
+            try:
+                tree.insert("", "end", values=values, text=stat.get("import_path", ""))
+            except Exception:  # pragma: no cover - Treeview failure is non-critical
+                logger.debug("Unable to insert plugin monitor row", exc_info=True)
+
+        after = getattr(self, "after", None)
+        if callable(after):
+            try:
+                after(1000, self._update_plugin_monitor)
+            except Exception:  # pragma: no cover - scheduling errors are non-fatal
+                logger.debug("Unable to reschedule plugin monitor", exc_info=True)
 
     def _send(self) -> None:
         q = self.inp.get("1.0", "end").strip()
