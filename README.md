@@ -170,16 +170,15 @@ non pertinents.
 
 ## Gouvernance des contributions
 
-- Les modèles disponibles dans `.github/ISSUE_TEMPLATE/` ajoutent automatiquement
-  les labels `needs-triage` et `bug`/`enhancement` selon le type d'issue. Le
-  modèle de discussion sous `.github/DISCUSSION_TEMPLATE/` applique le label
-  `discussion`.
+- Les formulaires présents dans `.github/ISSUE_TEMPLATE/` ajoutent
+  systématiquement `status:needs-triage` ainsi qu'un label `type:*`
+  (`type:bug`, `type:feature`, `type:discussion`).
 - Le fichier `.github/CODEOWNERS` assigne les revues aux équipes responsables.
   Adaptez les alias (`@WatcherOrg/...`) à votre organisation GitHub.
 - Avant toute fusion, assurez-vous que `nox -s lint typecheck security tests
   build` est vert sur la CI et qu'au moins un CODEOWNER a approuvé la PR. Un
-  mainteneur peut ensuite poser le label `automerge` qui déclenchera la fusion
-  automatique.
+  mainteneur peut ensuite poser `status:ready-to-merge` qui déclenchera la
+  fusion automatique.
 
 Pour plus de détails (priorités, gestion du label `blocked`, etc.), consultez
 `docs/merge-policy.md`.

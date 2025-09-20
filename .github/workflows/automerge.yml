@@ -1,11 +1,11 @@
-﻿name: automerge
+name: ready-to-merge
 on:
   pull_request_target:
     types: [labeled, opened, synchronize]
 
 jobs:
   automerge:
-    name: Automerge when labeled
+    name: Merge PR when label is ready
     runs-on: ubuntu-latest
     permissions:
       pull-requests: write
@@ -17,9 +17,9 @@ jobs:
         with:
           ref: ${{ github.event.pull_request.head.ref }}
 
-      - name: Automerge if labelled and checks passed
+      - name: Merge if ready-to-merge and checks passed
         uses: pascalgn/automerge-action@v0.14.3
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           merge_method: merge
-          label: automerge
+          label: status:ready-to-merge

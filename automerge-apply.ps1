@@ -1,5 +1,5 @@
 <#
-PowerShell script to push current branch, create "automerge" label if needed,
+PowerShell script to push current branch, create "status:ready-to-merge" label if needed,
 and add the label to a PR to trigger auto-label/auto-merge workflows.
 
 Usage:
@@ -39,9 +39,9 @@ if ($LASTEXITCODE -ne 0) {
 }
 Write-Info "Push OK."
 
-$labelName = "automerge"
-$labelColor = "F1C40F"
-$labelDesc = "Auto-merge when CI is green"
+$labelName = "status:ready-to-merge"
+$labelColor = "2ECC71"
+$labelDesc = "Auto-merge when CI is green and approvals obtained"
 
 # Try GitHub CLI first
 $ghPath = Get-Command gh -ErrorAction SilentlyContinue
@@ -114,7 +114,7 @@ try {
   $resp = Invoke-RestMethod -Method Post -Uri "$apiBase/repos/$owner/$repoName/labels" -Headers @{
     Authorization = "token $token"
     Accept = "application/vnd.github+json"
-    "User-Agent" = "automerge-script"
+    "User-Agent" = "ready-to-merge-script"
   } -Body $labelBody -ErrorAction Stop
   Write-Info "Label created."
 } catch {
@@ -135,7 +135,7 @@ try {
   $resp2 = Invoke-RestMethod -Method Post -Uri "$apiBase/repos/$owner/$repoName/issues/$Pr/labels" -Headers @{
     Authorization = "token $token"
     Accept = "application/vnd.github+json"
-    "User-Agent" = "automerge-script"
+    "User-Agent" = "ready-to-merge-script"
   } -Body $labelAddBody -ErrorAction Stop
   Write-Info "Label added to PR #$Pr."
   exit 0

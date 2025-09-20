@@ -2,8 +2,8 @@ name: Rapport de bug
 description: Signaler un comportement inattendu ou une régression.
 title: "[Bug]: "
 labels:
-  - bug
-  - needs-triage
+  - status:needs-triage
+  - type:bug
 body:
   - type: markdown
     attributes:
