@@ -1,8 +1,10 @@
 name: Release
 
 on:
-  release:
-    types: [published]
+  push:
+    tags:
+      - 'v*.*.*'
+  workflow_dispatch:
 
 jobs:
   publish-windows-installer:
@@ -21,6 +23,8 @@ jobs:
 
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -42,12 +46,6 @@ jobs:
         shell: pwsh
         run: pyinstaller packaging/watcher.spec --noconfirm
 
-      - name: Sign executable with Sigstore
-        uses: sigstore/gh-action@v2.1.1
-        with:
-          artifact: dist/Watcher/Watcher.exe
-          bundle: dist/Watcher/Watcher.exe.sigstore
-
       - name: Package installer archive
         shell: pwsh
         run: |
@@ -57,9 +55,23 @@ jobs:
           }
           Compress-Archive -Path "dist/Watcher/*" -DestinationPath $archive
 
-      - name: Upload release assets
+      - name: Sign release artifact
+        uses: sigstore/gh-action@v2.1.1
+        with:
+          artifact: dist/Watcher-Setup.zip
+          bundle: dist/Watcher-Setup.zip.sigstore
+
+      - name: Publish GitHub release
         uses: softprops/action-gh-release@v1
         with:
+          tag_name: ${{ github.ref_name }}
+          name: Watcher ${{ github.ref_name }}
+          generate_release_notes: true
+          draft: false
+          prerelease: false
+          fail_on_unmatched_files: true
           files: |
             dist/Watcher-Setup.zip
-            dist/Watcher/Watcher.exe.sigstore
+            dist/Watcher-Setup.zip.sigstore
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
