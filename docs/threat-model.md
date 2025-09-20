@@ -12,6 +12,50 @@ contre-mesures disponibles. Elle complète la charte publiée dans [ETHICS.md](e
 | Chaîne d'exécution | Scripts Python, plugins et automatisations. | Moyenne |
 | Journal d'audit | Traces JSON (`watcher.log`) et historiques d'évaluations. | Moyenne |
 
+## Cartographie des risques
+
+```mermaid
+flowchart LR
+    subgraph Assets[Actifs]
+        A1(Données utilisateur)
+        A2(Mémoire vectorielle)
+        A3(Chaîne d'exécution)
+        A4(Journal d'audit)
+    end
+
+    subgraph Threats[Menaces]
+        T1(Plugins malveillants)
+        T2(Corruption de jeux de données)
+        T3(Fuite d'information)
+        T4(Escalade locale)
+    end
+
+    subgraph Controls[Contremesures]
+        C1(Revues & CI)
+        C2(DVC & sauvegardes)
+        C3(Journalisation chiffrée)
+        C4(Confinement des dépendances)
+    end
+
+    A1 --> T2
+    A1 --> T3
+    A2 --> T2
+    A2 --> T4
+    A3 --> T1
+    A3 --> T4
+    A4 --> T3
+
+    T1 --> C1
+    T1 --> C4
+    T2 --> C2
+    T3 --> C3
+    T3 --> C1
+    T4 --> C4
+```
+
+Ce diagramme relie chaque actif aux principaux vecteurs d'attaque puis aux contrôles mis en place. Il sert de
+référence rapide pour vérifier que chaque risque bénéficie d'au moins une mitigation.
+
 ## Surfaces d'attaque
 
 1. **Plugins malveillants** : injection de code via `plugins.toml` ou entry points.
@@ -30,6 +74,34 @@ contre-mesures disponibles. Elle complète la charte publiée dans [ETHICS.md](e
   d'intégrité.
 - **Contrôles utilisateurs** : la charte [ETHICS.md](ethics.md) rappelle les bonnes pratiques de gestion des
   retours et des données sensibles.
+
+## Séquence de réponse à incident
+
+```plantuml
+@startuml
+skinparam shadowing false
+skinparam sequenceArrowThickness 1
+skinparam sequenceMessageAlign center
+
+actor Mainteneur
+participant "Détection" as Detection
+participant "Analyse" as Analysis
+participant "Remédiation" as Remediation
+participant "Suivi" as FollowUp
+
+Mainteneur -> Detection : Alerte (CI / logs)
+Detection -> Analysis : Qualifier l'incident
+Analysis --> Mainteneur : Rapport de risque
+Analysis -> Remediation : Plan d'action
+Remediation -> FollowUp : Correctifs déployés
+FollowUp --> Mainteneur : Validation & post-mortem
+FollowUp -> Detection : Mise à jour des seuils
+@enduml
+```
+
+Cette séquence illustre la boucle de réponse opérationnelle : les journaux déclenchent la détection, une analyse
+évalue l'impact, la remédiation applique les correctifs puis le suivi met à jour la surveillance pour éviter la
+récurrence.
 
 ## Recommandations opérationnelles
 

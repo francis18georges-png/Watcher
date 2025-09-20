@@ -2,16 +2,32 @@ site_name: "Watcher"
 site_description: "Documentation technique et opérationnelle de l'atelier Watcher"
 site_url: "https://<github-username>.github.io/Watcher/"
 repo_url: "https://github.com/<github-username>/Watcher"
+
 theme:
   name: material
   language: fr
+  palette:
+    - scheme: default
+      primary: indigo
+      accent: blue
+      toggle:
+        icon: material/weather-night
+        name: Passer en mode sombre
+    - scheme: slate
+      primary: indigo
+      accent: blue
+      toggle:
+        icon: material/weather-sunny
+        name: Passer en mode clair
   features:
     - navigation.tabs
     - navigation.sections
     - navigation.top
+    - navigation.indexes
     - content.code.copy
     - content.code.annotate
     - toc.follow
+
 markdown_extensions:
   - admonition
   - attr_list
@@ -41,8 +57,10 @@ markdown_extensions:
       emoji_generator: !!python/name:pymdownx.emoji.to_svg
   - pymdownx.plantuml:
       server: https://www.plantuml.com/plantuml
+
 plugins:
   - search
+
 nav:
   - Accueil: index.md
   - Architecture:
@@ -51,12 +69,14 @@ nav:
           - 2025-09-12: journal/2025-09-12.md
           - 2025-09-14: journal/2025-09-14.md
           - 2025-09-19: journal/2025-09-19.md
+  - Sécurité et conformité:
+      - Modèle de menaces: threat-model.md
+      - Charte éthique: ethics.md
   - Exploitation:
       - Conventions de logging: logging.md
       - Feuille de route: ROADMAP.md
       - Journal des modifications: CHANGELOG.md
-  - Sécurité:
-      - Modèle de menaces: threat-model.md
-      - Charte éthique: ethics.md
+      - Politique de fusion: merge-policy.md
+
 extra_javascript:
   - https://unpkg.com/mermaid@10.9.1/dist/mermaid.min.js

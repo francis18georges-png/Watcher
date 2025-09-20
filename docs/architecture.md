@@ -20,26 +20,52 @@ Cette page résume leurs responsabilités et les interactions majeures.
 ## Vue globale
 
 ```mermaid
-flowchart TD
-    User[Utilisateur]
-    CLI[CLI & Scripts]
-    Core[Orchestrateur]
-    Agents[Agents spécialisés]
-    Memory[(Mémoire vectorielle)]
-    QA[Qualité & Benchmarks]
-    Logs[(Journal JSON)]
+flowchart LR
+    subgraph Client
+        User[Utilisateur]
+        CLI[CLI & scripts]
+    end
 
-    User --> CLI
-    CLI --> Core
+    subgraph Orchestration
+        Core[Orchestrateur]
+        Curriculum[Curriculum adaptatif]
+        Plugins[Gestion des plugins]
+    end
+
+    subgraph Execution
+        Agents[Agents spécialisés]
+        Tools[Outils & exécutants]
+    end
+
+    subgraph DataLayer[Persistance]
+        Memory[(Mémoire vectorielle)]
+        Datasets[(Datasets DVC)]
+        Logs[(Journal JSON)]
+    end
+
+    subgraph Assurance
+        QA[Benchmarks & QA]
+        Security[Garde-fous sécurité]
+    end
+
+    User --> CLI --> Core
+    Core --> Curriculum
+    Core --> Plugins
     Core --> Agents
-    Agents --> Memory
+    Agents --> Tools
     Agents --> QA
-    Core --> Logs
     QA --> Core
+    Agents --> Memory
+    Tools --> Memory
     Memory --> Agents
+    Core --> Logs
+    Security --> Core
+    Security --> QA
+    Datasets --> Agents
+    Agents --> Datasets
 ```
 
-La figure met en évidence la boucle de rétroaction : les agents consultent la mémoire vectorielle,
+La figure met en évidence la boucle de rétroaction : les agents consultent la mémoire vectorielle,
 exécutent des outils, puis alimentent les bancs d'essai et les journaux. Les résultats réinjectés dans
 l'orchestrateur lui permettent d'affiner la stratégie d'entraînement.
 
@@ -59,6 +85,7 @@ package "Watcher" {
   [Curriculum adaptatif] as Curriculum
   [Mémoire vectorielle] as VectorStore
   [Qualité & sécurité] as Quality
+  [Bus d'événements] as EventBus
 }
 
 User --> CLI : Configure & lance les runs
@@ -69,11 +96,32 @@ Orchestrator --> VectorStore : Lecture/écriture de contexte
 Orchestrator --> Quality : Benchmarks & garde-fous
 Quality --> Orchestrator : Rapports
 VectorStore --> Plugins : Fournit le contexte
+Quality --> EventBus : Alertes
+EventBus --> Orchestrator : Décisions automatisées
 @enduml
 ```
 
 Ces interactions soulignent l'importance de la modularité : chaque composant peut être remplacé ou étendu
 sans casser la chaîne de valeur à condition de respecter les interfaces documentées.
+
+## Chaîne d'observabilité
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant Agent
+    participant Logger
+    participant Sink as Stockage (JSON)
+    participant Monitor as Tableau de bord
+
+    Agent->>Logger: événement(structuré)
+    Logger-->>Sink: append log
+    Sink-->>Monitor: export métriques
+    Monitor-->>Agent: feedback sur dérives
+```
+
+Cette séquence illustre comment les événements structurés alimentent la surveillance. La journalisation JSON
+autorise l'export vers des tableaux de bord tout en conservant la traçabilité locale.
 
 ## Points d'extension
 
