@@ -43,24 +43,44 @@ sample_rate_ctx: ContextVar[float | None] = ContextVar("sample_rate", default=No
 class RequestIdFilter(logging.Filter):
     """Logging filter to inject contextual identifiers into log records."""
 
+    def __init__(
+        self,
+        name: str = "",
+        *,
+        request_id_field: str = "request_id",
+        trace_id_field: str = "trace_id",
+        sample_rate_field: str = "sample_rate",
+    ) -> None:
+        super().__init__(name)
+        self.request_id_field = request_id_field
+        self.trace_id_field = trace_id_field
+        self.sample_rate_field = sample_rate_field
+
     def filter(self, record: logging.LogRecord) -> bool:  # pragma: no cover - simple
         request_id = request_id_ctx.get("")
         trace_id = trace_id_ctx.get("")
         sample_rate = sample_rate_ctx.get(None)
-        record.request_id = request_id
+        setattr(record, self.request_id_field, request_id)
         if trace_id:
-            record.trace_id = trace_id
-        if sample_rate is not None and not hasattr(record, "sample_rate"):
-            record.sample_rate = sample_rate
+            setattr(record, self.trace_id_field, trace_id)
+        if sample_rate is not None and not hasattr(record, self.sample_rate_field):
+            setattr(record, self.sample_rate_field, sample_rate)
         return True
 
 
 class SamplingFilter(logging.Filter):
     """Probabilistically drop log records based on a sampling rate."""
 
-    def __init__(self, name: str = "", sample_rate: float = 1.0) -> None:
+    def __init__(
+        self,
+        name: str = "",
+        *,
+        sample_rate: float = 1.0,
+        sample_rate_field: str = "sample_rate",
+    ) -> None:
         super().__init__(name)
         self.sample_rate = self._validate_rate(sample_rate)
+        self.sample_rate_field = sample_rate_field
 
     @staticmethod
     def _validate_rate(rate: float) -> float:
@@ -79,7 +99,7 @@ class SamplingFilter(logging.Filter):
         else:
             rate = self._validate_rate(rate)
 
-        record.sample_rate = rate
+        setattr(record, self.sample_rate_field, rate)
         if rate >= 1.0:
             return True
         if rate <= 0.0:
@@ -90,9 +110,20 @@ class SamplingFilter(logging.Filter):
 class JSONFormatter(logging.Formatter):
     """Format log records as JSON."""
 
-    def __init__(self, *args: object, sample_rate: float | None = None, **kwargs: object) -> None:
+    def __init__(
+        self,
+        *args: object,
+        sample_rate: float | None = None,
+        request_id_field: str = "request_id",
+        trace_id_field: str = "trace_id",
+        sample_rate_field: str = "sample_rate",
+        **kwargs: object,
+    ) -> None:
         super().__init__(*args, **kwargs)
         self.default_sample_rate = sample_rate
+        self.request_id_field = request_id_field
+        self.trace_id_field = trace_id_field
+        self.sample_rate_field = sample_rate_field
 
     def format(self, record: logging.LogRecord) -> str:  # pragma: no cover - formatting
         log_record = {
@@ -103,15 +134,17 @@ class JSONFormatter(logging.Formatter):
             "name": record.name,
             "message": record.getMessage(),
         }
-        if hasattr(record, "request_id") and record.request_id:
-            log_record["request_id"] = record.request_id
-        if hasattr(record, "trace_id") and record.trace_id:
-            log_record["trace_id"] = record.trace_id
-        sample_rate = getattr(record, "sample_rate", None)
+        request_id = getattr(record, self.request_id_field, None)
+        if request_id:
+            log_record[self.request_id_field] = request_id
+        trace_id = getattr(record, self.trace_id_field, None)
+        if trace_id:
+            log_record[self.trace_id_field] = trace_id
+        sample_rate = getattr(record, self.sample_rate_field, None)
         if sample_rate is None:
             sample_rate = self.default_sample_rate
         if sample_rate is not None:
-            log_record["sample_rate"] = sample_rate
+            log_record[self.sample_rate_field] = sample_rate
         return json.dumps(log_record)
 
 
@@ -160,6 +193,32 @@ def _matches_target(candidate: object, expected: type[object]) -> bool:
         qualified_name = f"{expected.__module__}.{expected.__qualname__}"
         return normalized == qualified_name
     return False
+
+
+def _normalise_config(config: dict[str, Any]) -> None:
+    """Resolve dotted paths pointing to Watcher logging helpers."""
+
+    def _replace(component: dict[str, Any], target: type[object]) -> None:
+        for key in ("()", "class"):
+            if _matches_target(component.get(key), target):
+                component["()"] = target
+                if key != "()":
+                    component.pop(key, None)
+                break
+
+    formatters = config.get("formatters")
+    if isinstance(formatters, dict):
+        for formatter_config in formatters.values():
+            if isinstance(formatter_config, dict):
+                _replace(formatter_config, JSONFormatter)
+
+    filters = config.get("filters")
+    if isinstance(filters, dict):
+        for filter_config in filters.values():
+            if not isinstance(filter_config, dict):
+                continue
+            _replace(filter_config, RequestIdFilter)
+            _replace(filter_config, SamplingFilter)
 
 
 def _apply_sample_rate(config: dict[str, Any], sample_rate: float | None) -> None:
@@ -236,6 +295,7 @@ def _configure_from_path(
     if suffix == ".json":
         with config_path.open("r", encoding="utf-8") as f:
             config = json.load(f)
+        _normalise_config(config)
         _apply_sample_rate(config, sample_rate)
         logging.config.dictConfig(config)
         _set_formatter_sample_rate(sample_rate)
@@ -244,6 +304,7 @@ def _configure_from_path(
     if yaml:
         with config_path.open("r", encoding="utf-8") as f:
             config = yaml.safe_load(f)
+        _normalise_config(config)
         _apply_sample_rate(config, sample_rate)
         logging.config.dictConfig(config)
         _set_formatter_sample_rate(sample_rate)
@@ -255,13 +316,23 @@ def _configure_from_path(
         "formatters": {
             "json": {
                 "()": "app.core.logging_setup.JSONFormatter",
+                "request_id_field": "request_id",
+                "trace_id_field": "trace_id",
+                "sample_rate_field": "sample_rate",
+                "sample_rate": 1.0,
             }
         },
         "filters": {
-            "request_id": {"()": "app.core.logging_setup.RequestIdFilter"},
+            "request_id": {
+                "()": "app.core.logging_setup.RequestIdFilter",
+                "request_id_field": "request_id",
+                "trace_id_field": "trace_id",
+                "sample_rate_field": "sample_rate",
+            },
             "sampling": {
                 "()": "app.core.logging_setup.SamplingFilter",
                 "sample_rate": 1.0,
+                "sample_rate_field": "sample_rate",
             },
         },
         "handlers": {
@@ -282,6 +353,7 @@ def _configure_from_path(
         },
         "root": {"level": "INFO", "handlers": ["console", "file"]},
     }
+    _normalise_config(config)
     _apply_sample_rate(config, sample_rate)
     logging.config.dictConfig(config)
     _set_formatter_sample_rate(sample_rate)
@@ -289,19 +361,31 @@ def _configure_from_path(
 
 def configure(*, sample_rate: float | None = None) -> None:
     """Configure logging from the YAML configuration file if possible."""
-    from config import get_settings
 
-    settings = get_settings()
-    fallback_level = getattr(logging, settings.logging.fallback_level, logging.INFO)
+    fallback_level: int | str | None = logging.INFO
+    settings = None
 
-    config_path = settings.logging.config_path
-    if config_path is not None:
-        resolved = settings.paths.resolve(config_path)
-        _configure_from_path(
-            resolved, fallback_level=fallback_level, sample_rate=sample_rate
+    try:
+        from config import get_settings
+    except ImportError as exc:  # pragma: no cover - import cycle guard
+        if getattr(exc, "name", None) not in {"config", "get_settings"}:
+            raise
+    else:
+        settings = get_settings()
+        fallback_level = getattr(
+            logging, settings.logging.fallback_level, logging.INFO
         )
-        logger.setLevel(logging.NOTSET)
-        return
+
+    config_path = None
+    if settings is not None:
+        config_path = settings.logging.config_path
+        if config_path is not None:
+            resolved = settings.paths.resolve(config_path)
+            _configure_from_path(
+                resolved, fallback_level=fallback_level, sample_rate=sample_rate
+            )
+            logger.setLevel(logging.NOTSET)
+            return
 
     env_path = os.environ.get("LOGGING_CONFIG_PATH")
     if env_path:

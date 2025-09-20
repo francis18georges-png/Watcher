@@ -137,3 +137,62 @@ def test_configure_applies_sample_rate_to_formatter_class(
     assert err == ""
     data = json.loads(out.strip())
     assert data["sample_rate"] == 0.2
+
+
+def test_configure_supports_custom_field_names(tmp_path, capfd, monkeypatch):
+    config = {
+        "version": 1,
+        "disable_existing_loggers": False,
+        "formatters": {
+            "json": {
+                "()": "app.core.logging_setup.JSONFormatter",
+                "request_id_field": "requestId",
+                "trace_id_field": "traceId",
+                "sample_rate_field": "sampleRate",
+            }
+        },
+        "filters": {
+            "request": {
+                "()": "app.core.logging_setup.RequestIdFilter",
+                "request_id_field": "requestId",
+                "trace_id_field": "traceId",
+                "sample_rate_field": "sampleRate",
+            },
+            "sampling": {
+                "()": "app.core.logging_setup.SamplingFilter",
+                "sample_rate": 1.0,
+                "sample_rate_field": "sampleRate",
+            },
+        },
+        "handlers": {
+            "console": {
+                "class": "logging.StreamHandler",
+                "level": "INFO",
+                "formatter": "json",
+                "filters": ["request", "sampling"],
+                "stream": "ext://sys.stdout",
+            }
+        },
+        "root": {"level": "INFO", "handlers": ["console"]},
+    }
+    config_path = tmp_path / "logging.json"
+    config_path.write_text(json.dumps(config))
+    monkeypatch.setenv("LOGGING_CONFIG_PATH", str(config_path))
+
+    _cleanup()
+    logging_setup.set_request_id("req-999")
+    logging_setup.set_trace_context(trace_id="trace-custom", sample_rate=0.4)
+    logging_setup.configure()
+    logger = logging_setup.get_logger("test")
+    monkeypatch.setattr(logging_setup.random, "random", lambda: 0.1)
+    logger.info("payload")
+
+    out, err = capfd.readouterr()
+    _cleanup()
+    logging_setup.set_trace_context()
+
+    assert err == ""
+    data = json.loads(out.strip())
+    assert data["requestId"] == "req-999"
+    assert data["traceId"] == "trace-custom"
+    assert data["sampleRate"] == 0.4

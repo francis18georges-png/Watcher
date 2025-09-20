@@ -4,13 +4,21 @@ disable_existing_loggers: False
 formatters:
   json:
     (): app.core.logging_setup.JSONFormatter
+    request_id_field: request_id
+    trace_id_field: trace_id
+    sample_rate_field: sample_rate
+    sample_rate: 1.0
 
 filters:
   request_id:
     (): app.core.logging_setup.RequestIdFilter
+    request_id_field: request_id
+    trace_id_field: trace_id
+    sample_rate_field: sample_rate
   sampling:
     (): app.core.logging_setup.SamplingFilter
     sample_rate: 1.0
+    sample_rate_field: sample_rate
 
 handlers:
   console:
