@@ -3,6 +3,20 @@
 Atelier local d'IA de programmation autonome (offline par défaut).
 Mémoire vectorielle, curriculum adaptatif, A/B + bench et quality gate sécurité.
 
+## Documentation
+
+La documentation technique est générée avec [MkDocs Material](https://squidfunk.github.io/mkdocs-material/)
+et déployée automatiquement sur GitHub Pages : https://<github-username>.github.io/Watcher/.
+
+Pour la prévisualiser localement :
+
+```bash
+pip install -r requirements-dev.txt
+mkdocs serve
+```
+
+Le workflow GitHub Actions `deploy-docs.yml` publie le site statique à chaque push sur `main`.
+
 ## Installation
 
 1. Cloner ce dépôt.

@@ -1,0 +1,62 @@
+site_name: "Watcher"
+site_description: "Documentation technique et opérationnelle de l'atelier Watcher"
+site_url: "https://<github-username>.github.io/Watcher/"
+repo_url: "https://github.com/<github-username>/Watcher"
+theme:
+  name: material
+  language: fr
+  features:
+    - navigation.tabs
+    - navigation.sections
+    - navigation.top
+    - content.code.copy
+    - content.code.annotate
+    - toc.follow
+markdown_extensions:
+  - admonition
+  - attr_list
+  - def_list
+  - footnotes
+  - md_in_html
+  - toc:
+      permalink: "#"
+  - pymdownx.details
+  - pymdownx.highlight
+  - pymdownx.inlinehilite
+  - pymdownx.snippets:
+      base_path:
+        - docs
+        - .
+      check_paths: true
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+        - name: plantuml
+          class: plantuml
+          format: !!python/name:pymdownx.superfences.fence_code_format
+  - pymdownx.tabbed:
+      alternate_style: true
+  - pymdownx.emoji:
+      emoji_generator: !!python/name:pymdownx.emoji.to_svg
+  - pymdownx.plantuml:
+      server: https://www.plantuml.com/plantuml
+plugins:
+  - search
+nav:
+  - Accueil: index.md
+  - Architecture:
+      - Vue d'ensemble: architecture.md
+      - Journal de conception:
+          - 2025-09-12: journal/2025-09-12.md
+          - 2025-09-14: journal/2025-09-14.md
+          - 2025-09-19: journal/2025-09-19.md
+  - Exploitation:
+      - Conventions de logging: logging.md
+      - Feuille de route: ROADMAP.md
+      - Journal des modifications: CHANGELOG.md
+  - Sécurité:
+      - Modèle de menaces: threat-model.md
+      - Charte éthique: ethics.md
+extra_javascript:
+  - https://unpkg.com/mermaid@10.9.1/dist/mermaid.min.js
