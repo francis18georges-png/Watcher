@@ -5,6 +5,10 @@ import os
 from dataclasses import dataclass
 from typing import Callable, Mapping
 
+_DEFAULT_CPU_LIMIT_SECONDS = 30
+_DEFAULT_MEMORY_LIMIT_BYTES = 512 * 1024 * 1024
+_DEFAULT_TIMEOUT_SECONDS = 30.0
+
 logger = logging.getLogger(__name__)
 
 _ALLOWED_ENV_VARS = {
@@ -121,14 +125,27 @@ def _invoke_on_start(
 
 def _run_without_pywin32(
     cmd: list[str],
-    timeout: float | None,
+    timeout: float,
     cwd: str | os.PathLike[str] | None,
     env: Mapping[str, str],
     on_start: Callable[[object], None] | None,
+    cpu_seconds: int | None,
+    memory_bytes: int | None,
 ) -> SandboxResult:
     """Fallback execution for Windows when pywin32 is unavailable."""
+
     import subprocess
+    import threading
     from subprocess import Popen
+
+    try:
+        import psutil  # type: ignore[import-not-found]
+    except Exception:  # pragma: no cover - optional dependency
+        psutil = None  # type: ignore[assignment]
+        if cpu_seconds is not None or memory_bytes is not None:
+            logger.warning(
+                "psutil introuvable; resource limits enforced best-effort only"
+            )
 
     p: Popen[str] = Popen(
         cmd,
@@ -141,6 +158,49 @@ def _run_without_pywin32(
 
     _invoke_on_start(on_start, p)
 
+    limit_flags = {"cpu": False, "mem": False}
+    monitor_stop: threading.Event | None = None
+    monitor_thread: threading.Thread | None = None
+
+    if psutil is not None and (cpu_seconds is not None or memory_bytes is not None):
+        monitor_stop = threading.Event()
+
+        def _enforce_limits() -> None:
+            try:
+                proc = psutil.Process(p.pid)
+            except Exception:  # pragma: no cover - best effort
+                return
+
+            interval = 0.1
+            while not monitor_stop.is_set():
+                exceeded = False
+                if cpu_seconds is not None:
+                    try:
+                        cpu_time = sum(proc.cpu_times()[:2])
+                    except Exception:
+                        break
+                    if cpu_time >= cpu_seconds:
+                        limit_flags["cpu"] = True
+                        exceeded = True
+                if not exceeded and memory_bytes is not None:
+                    try:
+                        rss = proc.memory_info().rss
+                    except Exception:
+                        break
+                    if rss >= memory_bytes:
+                        limit_flags["mem"] = True
+                        exceeded = True
+                if exceeded:
+                    try:
+                        proc.kill()
+                    except Exception:  # pragma: no cover - best effort
+                        pass
+                    break
+                monitor_stop.wait(interval)
+
+        monitor_thread = threading.Thread(target=_enforce_limits, daemon=True)
+        monitor_thread.start()
+
     try:
         out, err = p.communicate(timeout=timeout)
         timeout_flag = False
@@ -148,6 +208,11 @@ def _run_without_pywin32(
         p.kill()
         out, err = p.communicate()
         timeout_flag = True
+    finally:
+        if monitor_stop is not None:
+            monitor_stop.set()
+        if monitor_thread is not None:
+            monitor_thread.join(timeout=1)
 
     out_str = out if isinstance(out, str) else ""
     err_str = err if isinstance(err, str) else ""
@@ -156,6 +221,8 @@ def _run_without_pywin32(
         out=out_str,
         err=err_str,
         timeout=timeout_flag,
+        cpu_exceeded=limit_flags["cpu"],
+        memory_exceeded=limit_flags["mem"],
     )
 
 
@@ -164,7 +231,7 @@ def run(
     *,
     cpu_seconds: int | None = None,
     memory_bytes: int | None = None,
-    timeout: float | None = 30,
+    timeout: float | None = None,
     cwd: str | os.PathLike[str] | None = None,
     env: Mapping[str, str | None] | None = None,
     allow_network: bool = False,
@@ -174,9 +241,12 @@ def run(
 
     Args:
         cmd: Commande à lancer.
-        cpu_seconds: Limite de temps CPU en secondes.
-        memory_bytes: Limite mémoire maximale en octets.
-        timeout: Temps d'expiration mur (timeout) pour ``subprocess.run``.
+        cpu_seconds: Limite de temps CPU en secondes. Si ``None`` est fourni,
+            :data:`_DEFAULT_CPU_LIMIT_SECONDS` est appliqué.
+        memory_bytes: Limite mémoire maximale en octets. Si ``None`` est
+            fourni, :data:`_DEFAULT_MEMORY_LIMIT_BYTES` est appliqué.
+        timeout: Temps d'expiration mur (timeout) pour ``subprocess.run``. Lorsque
+            ``None`` est fourni, une valeur par défaut sécurisée est appliquée.
         cwd: Répertoire de travail isolé pour le processus enfant.
         env: Variables d'environnement additionnelles à injecter après
             nettoyage. Les valeurs explicites ``None`` retirent les clés
@@ -192,6 +262,13 @@ def run(
     import sys
 
     result = SandboxResult()
+
+    if cpu_seconds is None:
+        cpu_seconds = _DEFAULT_CPU_LIMIT_SECONDS
+    if memory_bytes is None:
+        memory_bytes = _DEFAULT_MEMORY_LIMIT_BYTES
+    if timeout is None:
+        timeout = _DEFAULT_TIMEOUT_SECONDS
 
     sanitized_env = _prepare_environment(env)
     if not allow_network:
@@ -213,7 +290,13 @@ def run(
                 "pywin32 introuvable; exécution sans quotas CPU/mémoire sur Windows"
             )
             return _run_without_pywin32(
-                cmd, timeout, cwd_path, sanitized_env, on_start
+                cmd,
+                timeout,
+                cwd_path,
+                sanitized_env,
+                on_start,
+                cpu_seconds,
+                memory_bytes,
             )
 
         CloseHandle = cast(Callable[[int], None], CloseHandle)

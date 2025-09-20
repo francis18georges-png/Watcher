@@ -398,7 +398,11 @@ class Engine:
                 plugin.api_version,
             ]
 
-            env = {"PYTHONPATH": pythonpath} if pythonpath else None
+            env_overrides: dict[str, str] = {}
+            if pythonpath:
+                env_overrides["PYTHONPATH"] = pythonpath
+            env_overrides.setdefault("PYTHONNOUSERSITE", "1")
+            env = {key: value for key, value in env_overrides.items() if value}
 
             entry = {
                 "pid": None,
