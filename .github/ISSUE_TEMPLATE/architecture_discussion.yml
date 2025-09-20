@@ -1,8 +1,10 @@
-name: Support & architecture
+name: Discussion architecture & support
 description: Poser une question sur l'architecture, le design ou l'utilisation de Watcher.
 title: "[Discussion]: "
 labels:
-  - discussion
+  - status:needs-triage
+  - type:discussion
+discussion_category_name: Support & architecture
 body:
   - type: markdown
     attributes:

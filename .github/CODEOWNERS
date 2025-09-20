@@ -1,9 +1,34 @@
-# Consultez README.md pour la gouvernance des revues et la signification des labels.
-# Les équipes référencées doivent exister dans l'organisation GitHub hébergeant ce dépôt.
+# Consultez README.md et docs/merge-policy.md pour la gouvernance des revues et
+# la signification des labels.
+# Les équipes référencées doivent exister dans l'organisation GitHub hébergeant
+# ce dépôt et être autorisées à relire les zones assignées.
 
-*               @WatcherOrg/maintainers
-app/            @WatcherOrg/maintainers
-config/         @WatcherOrg/security-team
-docs/           @WatcherOrg/documentation
-tests/          @WatcherOrg/qa
-.github/        @WatcherOrg/maintainers
+*                         @WatcherOrg/maintainers
+
+# Front et API utilisateur
+app/                      @WatcherOrg/app-core
+app/ui/                   @WatcherOrg/design-system
+
+# Expérience développeur et automatisation
+.github/workflows/        @WatcherOrg/release-engineering
+automation-playbook.sh    @WatcherOrg/release-engineering
+scripts/                  @WatcherOrg/release-engineering
+
+# Données et pipeline ML
+datasets/                 @WatcherOrg/ml-research
+train.py                  @WatcherOrg/ml-research
+
+# Documentation et gouvernance
+docs/                     @WatcherOrg/documentation
+
+# Sécurité et configuration sensible
+config/                   @WatcherOrg/security-team
+plugins.toml              @WatcherOrg/security-team
+
+# Qualité et tests
+tests/                    @WatcherOrg/qa
+QA.md                     @WatcherOrg/qa
+
+# Infrastructure GitHub
+.github/ISSUE_TEMPLATE/   @WatcherOrg/maintainers
+.github/CODEOWNERS        @WatcherOrg/maintainers
