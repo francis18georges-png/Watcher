@@ -1,0 +1,42 @@
+name: Demande de fonctionnalité
+description: Proposer une amélioration ou une nouvelle fonctionnalité.
+title: "[Feature]: "
+labels:
+  - enhancement
+  - needs-triage
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Merci de détailler la valeur ajoutée pour les utilisateurs ainsi que les impacts potentiels.
+  - type: checkboxes
+    id: impact
+    attributes:
+      label: Alignement
+      options:
+        - label: Cette demande respecte les objectifs décrits dans `docs/ROADMAP.md`.
+        - label: J'ai vérifié qu'aucune issue ouverte ne couvre déjà ce besoin.
+          required: true
+  - type: textarea
+    id: summary
+    attributes:
+      label: Description
+      description: Expliquez la proposition et le problème sous-jacent.
+      placeholder: "En tant qu'utilisateur, je voudrais..."
+    validations:
+      required: true
+  - type: textarea
+    id: solution
+    attributes:
+      label: Solution proposée
+      description: Détaillez l'approche technique ou UX pressentie.
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives envisagées
+      description: Mentionnez les autres options étudiées et pourquoi elles n'ont pas été retenues.
+  - type: textarea
+    id: additional
+    attributes:
+      label: Contexte supplémentaire
+      description: Ajouter des liens, maquettes, références ou contraintes.

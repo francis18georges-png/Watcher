@@ -1,0 +1,9 @@
+# Consultez README.md pour la gouvernance des revues et la signification des labels.
+# Les équipes référencées doivent exister dans l'organisation GitHub hébergeant ce dépôt.
+
+*               @WatcherOrg/maintainers
+app/            @WatcherOrg/maintainers
+config/         @WatcherOrg/security-team
+docs/           @WatcherOrg/documentation
+tests/          @WatcherOrg/qa
+.github/        @WatcherOrg/maintainers

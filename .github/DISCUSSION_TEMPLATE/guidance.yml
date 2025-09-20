@@ -1,0 +1,28 @@
+name: Support & architecture
+description: Poser une question sur l'architecture, le design ou l'utilisation de Watcher.
+title: "[Discussion]: "
+labels:
+  - discussion
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Utilisez ce modèle pour recueillir l'avis de la communauté ou valider une approche avant d'ouvrir une Pull Request.
+  - type: textarea
+    id: question
+    attributes:
+      label: Sujet
+      description: Décrivez la question principale ou le point de décision.
+      placeholder: "Quel module dois-je étendre pour ... ?"
+    validations:
+      required: true
+  - type: textarea
+    id: context
+    attributes:
+      label: Contexte
+      description: Précisez ce que vous avez déjà essayé et fournissez les liens utiles.
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Pistes envisagées
+      description: Si vous avez une solution en tête, décrivez-la ici.

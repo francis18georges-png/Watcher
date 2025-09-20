@@ -6,6 +6,9 @@
 2. Commits atomiques (`feat: …`, `fix: …`, `docs: …`)
 3. `git push` puis ouverture d'une Pull Request
 4. Revue externe et fusion après `make check`
+5. Laisser le label par défaut `needs-triage` sur la PR ; un mainteneur le
+   retirera après revue. Une fois la CI verte, seul un mainteneur pose
+   `automerge` pour déclencher la fusion automatique.
 
 ## Manual Verification
 
