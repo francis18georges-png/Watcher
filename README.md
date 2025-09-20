@@ -9,6 +9,11 @@ Mémoire vectorielle, curriculum adaptatif, A/B + bench et quality gate sécurit
 
 La documentation technique est générée avec [MkDocs Material](https://squidfunk.github.io/mkdocs-material/)
 et déployée automatiquement via GitHub Pages : https://<github-username>.github.io/Watcher/.
+Elle regroupe notamment :
+
+- une [vue d'ensemble de l'architecture](docs/architecture.md) illustrée par des diagrammes Mermaid et PlantUML ;
+- un [modèle de menaces](docs/threat-model.md) détaillant les actifs critiques et les mesures de mitigation ;
+- les guides d'exploitation (journalisation, feuille de route, politique de merge, etc.).
 
 Pour la prévisualiser localement :
 

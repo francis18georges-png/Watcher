@@ -1,16 +1,24 @@
 # Modèle de menaces
 
 Cette analyse synthétise les actifs critiques de Watcher, les vecteurs d'attaque plausibles et les
-contre-mesures disponibles. Elle complète la charte publiée dans [ETHICS.md](ethics.md).
+contre-mesures disponibles. Elle complète la charte publiée dans [ETHICS.md](ethics.md) et les contrôles
+documentés dans `QA.md`.
+
+## Hypothèses de sécurité
+
+- Les exécutions se déroulent principalement hors ligne ou derrière un pare-feu contrôlé.
+- Les dépendances Python proviennent de sources vérifiées et sont épinglées dans `requirements*.txt`.
+- Les contributeurs appliquent les hooks `pre-commit` et exécutent la CI avant la fusion.
+- Les secrets (clés API, jeux de données sensibles) ne sont jamais versionnés dans le dépôt Git.
 
 ## Actifs protégés
 
-| Actif | Description | Priorité |
-| --- | --- | --- |
-| Données utilisateur | Projets, journaux, ensembles DVC stockés localement. | Élevée |
-| Mémoire vectorielle | Représentations persistantes des apprentissages agents. | Élevée |
-| Chaîne d'exécution | Scripts Python, plugins et automatisations. | Moyenne |
-| Journal d'audit | Traces JSON (`watcher.log`) et historiques d'évaluations. | Moyenne |
+| Actif | Description | Priorité | Surveillance |
+| --- | --- | --- | --- |
+| Données utilisateur | Projets, journaux, ensembles DVC stockés localement. | Élevée | Hash DVC, intégration Git & sauvegardes chiffrées |
+| Mémoire vectorielle | Représentations persistantes des apprentissages agents. | Élevée | Vérifications d'intégrité SQLite/SQLCipher |
+| Chaîne d'exécution | Scripts Python, plugins et automatisations. | Moyenne | Hooks `pre-commit`, CI `nox`, signature des releases |
+| Journal d'audit | Traces JSON (`watcher.log`) et historiques d'évaluations. | Moyenne | Rotation, checksum et archivage hors-ligne |
 
 ## Cartographie des risques
 
@@ -56,6 +64,17 @@ flowchart LR
 Ce diagramme relie chaque actif aux principaux vecteurs d'attaque puis aux contrôles mis en place. Il sert de
 référence rapide pour vérifier que chaque risque bénéficie d'au moins une mitigation.
 
+## Correspondance STRIDE
+
+| Catégorie | Description | Exemples Watcher | Contremesures |
+| --- | --- | --- | --- |
+| **S**poofing | Usurpation d'identité d'un agent ou d'un plugin. | Plugin qui se présente comme "officiel" via `plugins.toml`. | Signature des paquets, revue des dépendances, contrôle du hash. |
+| **T**ampering | Altération de données ou de configurations. | Modification malveillante d'un dataset DVC ou de `params.yaml`. | `dvc status`, contrôle d'accès fichier, CI stricte. |
+| **R**epudiation | Négation d'une action effectuée. | Effacement d'un log d'exécution pour masquer un incident. | Journalisation append-only, stockage externe immuable. |
+| **I**nformation disclosure | Fuite d'informations sensibles. | Exfiltration des journaux contenant des prompts. | Chiffrement au repos, filtrage des logs, charte éthique. |
+| **D**enial of service | Déni de service sur l'orchestrateur. | Boucle infinie dans un plugin ou un outil externe. | Limites d'exécution (`timeout`, sandbox), supervision des ressources. |
+| **E**levation of privilege | Élévation de privilèges locaux. | Exploitation d'un script d'automatisation avec des droits élevés. | Exécution restreinte (PowerShell Constrained Language Mode), revue de code. |
+
 ## Surfaces d'attaque
 
 1. **Plugins malveillants** : injection de code via `plugins.toml` ou entry points.
@@ -66,14 +85,17 @@ référence rapide pour vérifier que chaque risque bénéficie d'au moins une m
 ## Mesures de mitigation
 
 - **Isolation des dépendances** : utilisation d'environnements virtuels (`.venv/`) et contrôle des versions
-  via `requirements*.txt`.
+  via `requirements*.txt` et `requirements-dev.txt`.
 - **Revue de code** : hooks `pre-commit`, linting (Ruff), analyse statique (mypy) et audits de sécurité
-  (Bandit, Semgrep) exécutés par Nox et CI.
-- **Surveillance** : journalisation JSON centralisée et rotation configurable pour tracer chaque action.
+  (Bandit, Semgrep) exécutés par `nox -s security` et la CI.
+- **Surveillance** : journalisation JSON centralisée, rotation configurable et export vers des tableaux de bord
+  (ex. `metrics/performance_badge.svg`).
 - **Gouvernance des données** : DVC impose un suivi précis des jeux de données et facilite les vérifications
   d'intégrité.
 - **Contrôles utilisateurs** : la charte [ETHICS.md](ethics.md) rappelle les bonnes pratiques de gestion des
   retours et des données sensibles.
+- **Hardening système** : sandbox optionnelle (`app.core.sandbox`) pour isoler les commandes shell et quotas de
+  ressources (temps, mémoire) définis dans `config/settings*.toml`.
 
 ## Séquence de réponse à incident
 
