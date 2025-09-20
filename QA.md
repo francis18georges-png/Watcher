@@ -69,3 +69,30 @@ Run Semgrep using the local ruleset:
 ```
 semgrep --quiet --error --config config/semgrep.yml .
 ```
+
+Scan the Git history for hard-coded secrets. The command fails if any match is
+found.
+
+```
+gitleaks detect --source . --no-banner
+```
+
+Audit Python dependencies. The `--strict` flag elevates known
+vulnerabilities to hard failures.
+
+```
+pip-audit --strict
+```
+
+Generate a CycloneDX SBOM and scan the working tree for high and critical
+vulnerabilities (including secrets). The scan ignores unfixed issues to avoid
+noise while still failing the build on actionable items.
+
+```
+python -c "from pathlib import Path; Path('dist').mkdir(parents=True, exist_ok=True)"
+trivy sbom --format cyclonedx --output dist/Watcher-sbom.json .
+trivy fs --scanners vuln,secret --severity HIGH,CRITICAL --ignore-unfixed --exit-code 1 --no-progress .
+```
+
+The CI pipeline uploads `dist/Watcher-sbom.json` as a build artifact for each
+runner so downstream tooling can reuse the inventory without recomputing it.

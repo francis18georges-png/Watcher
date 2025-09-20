@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from pathlib import Path
+
 import nox
 
 PYTHON_VERSIONS = ["3.12"]
@@ -13,8 +15,10 @@ SOURCE_DIRECTORIES = (
     "train.py",
     "app/plugins.toml",
 )
+SBOM_PATH = Path("dist/Watcher-sbom.json")
+SBOM_DIRECTORY = SBOM_PATH.parent
 
-nox.options.sessions = ("lint", "typecheck", "security", "tests", "build")
+nox.options.sessions = ("lint", "typecheck", "tests", "build", "security")
 nox.options.reuse_existing_virtualenvs = True
 
 
@@ -61,6 +65,35 @@ def security(session: nox.Session) -> None:
         "--skip=.git,.mypy_cache,.pytest_cache,.venv,build,dist,.dvc/cache",
         "-L",
         "crate",
+    )
+    session.run("gitleaks", "detect", "--source", ".", "--no-banner")
+    session.run("pip-audit", "--strict")
+    session.run(
+        "python",
+        "-c",
+        f"from pathlib import Path; Path('{SBOM_DIRECTORY.as_posix()}').mkdir(parents=True, exist_ok=True)",
+    )
+    session.run(
+        "trivy",
+        "sbom",
+        "--format",
+        "cyclonedx",
+        "--output",
+        SBOM_PATH.as_posix(),
+        ".",
+    )
+    session.run(
+        "trivy",
+        "fs",
+        "--scanners",
+        "vuln,secret",
+        "--severity",
+        "HIGH,CRITICAL",
+        "--ignore-unfixed",
+        "--exit-code",
+        "1",
+        "--no-progress",
+        ".",
     )
 
 
