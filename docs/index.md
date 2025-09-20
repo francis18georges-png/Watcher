@@ -25,6 +25,9 @@ système, son modèle de sécurité et les pratiques d'exploitation.
   [ROADMAP.md](ROADMAP.md), [CHANGELOG.md](CHANGELOG.md) et le [journal de conception](journal/).
 - Pour les règles de fusion et la gouvernance de projet, référez-vous à la
   [politique de merge](merge-policy.md).
+- Chaque release `vMAJOR.MINOR.PATCH` publie un installeur Windows signé, un SBOM CycloneDX (`Watcher-sbom.json`) et une
+  provenance SLSA (`Watcher-Setup.intoto.jsonl`). Ces artefacts permettent de vérifier l'intégrité du binaire et d'auditer
+  la liste des dépendances Python utilisées lors du build.
 
 ## Prévisualiser la documentation localement
 

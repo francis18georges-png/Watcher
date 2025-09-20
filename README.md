@@ -20,6 +20,19 @@ mkdocs serve
 Le workflow GitHub Actions [`deploy-docs.yml`](.github/workflows/deploy-docs.yml) construit le site avec `mkdocs build --strict`
 avant de le publier sur l'environnement **GitHub Pages** à chaque push sur `main`.
 
+## Releases, SBOM et provenance
+
+Chaque tag SemVer (`vMAJOR.MINOR.PATCH`) déclenche le workflow [`release.yml`](.github/workflows/release.yml) qui produit
+un installeur Windows signé, un SBOM CycloneDX et une attestation de provenance SLSA niveau 3.
+
+- `Watcher-Setup.zip` : archive contenant l'installeur généré par PyInstaller.
+- `Watcher-Setup.zip.sigstore` : bundle Sigstore pour vérifier la signature du binaire (`sigstore verify --bundle ...`).
+- `Watcher-sbom.json` : inventaire CycloneDX des dépendances Python installées lors du build (`cyclonedx-bom` / `cyclonedx-py`).
+- `Watcher-Setup.intoto.jsonl` : provenance SLSA générée par [`slsa-github-generator`](https://github.com/slsa-framework/slsa-github-generator).
+
+Ces fichiers sont publiés en tant qu'artefacts de release. Téléchargez le SBOM pour auditer les composants et la provenance
+`*.intoto.jsonl` pour tracer la chaîne de build ou alimenter un vérificateur SLSA.
+
 ## Benchmarks
 
 Le script `python -m app.core.benchmark run` exécute trois scénarios représentatifs
