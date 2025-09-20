@@ -428,6 +428,11 @@ accélère les itérations et facilite la reprise après interruption.
 Sandbox d'exécution confinée, tests et linters obligatoires avant adoption de code.
 Semgrep utilise un fichier de règles local (`config/semgrep.yml`), aucun accès réseau requis.
 
+Pour le périmètre supporté, les canaux de signalement privés (PGP, formulaire, programme HackerOne) et les délais de réponse,
+consultez la [politique de sécurité](SECURITY.md).
+Les signalements doivent respecter la politique d'embargo décrite dans ce document et utiliser l'adresse dédiée
+`security@watcher.dev` ou l'un des autres canaux indiqués.
+
 ## Confidentialité
 
 Watcher fonctionne hors ligne par défaut et n'envoie aucune donnée vers l'extérieur.
