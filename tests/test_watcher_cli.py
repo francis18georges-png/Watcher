@@ -1,6 +1,9 @@
 from contextlib import contextmanager
 from importlib import resources
 from pathlib import Path
+from types import SimpleNamespace
+
+import pytest
 
 from app import cli
 
@@ -11,8 +14,20 @@ def _assert_lists_hello(capsys, exit_code: int) -> None:
     assert "hello" in {line.strip() for line in captured.out.splitlines()}
 
 
-def test_plugin_list_shows_default_plugin(capsys):
-    _assert_lists_hello(capsys, cli.main(["plugin", "list"]))
+@pytest.fixture(autouse=True)
+def _stub_cli_settings(monkeypatch):
+    """Avoid loading full configuration when exercising the CLI."""
+
+    settings = SimpleNamespace(
+        llm=SimpleNamespace(backend="stub-backend", model="stub-model")
+    )
+    monkeypatch.setattr(cli, "get_settings", lambda: settings)
+    return settings
+
+
+def test_plugin_list_shows_default_plugin(tmp_path, capsys):
+    with _hide_source_manifest(tmp_path):
+        _assert_lists_hello(capsys, cli.main(["plugin", "list"]))
 
 
 @contextmanager
