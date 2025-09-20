@@ -430,6 +430,10 @@ non pertinents.
 
 ## Gouvernance des contributions
 
+Les attentes pour les contributeurs et les canaux d'escalade sont décrites dans le [Code de conduite](CODE_OF_CONDUCT.md).
+Pour préparer votre environnement, exécuter les scripts nécessaires (Nox, DVC, benchmarks) et comprendre la politique de
+review/merge, consultez le guide [CONTRIBUTING.md](CONTRIBUTING.md).
+
 - Les formulaires présents dans `.github/ISSUE_TEMPLATE/` ajoutent
   systématiquement `status:needs-triage` ainsi qu'un label `type:*`
   (`type:bug`, `type:feature`, `type:discussion`).
