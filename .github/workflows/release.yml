@@ -11,6 +11,7 @@ jobs:
     permissions:
       contents: write
       id-token: write
+      attestations: write
     steps:
       - name: Validate SemVer tag
         shell: pwsh
@@ -38,6 +39,19 @@ jobs:
           python -m pip install -r requirements.txt
           python -m pip install pyinstaller
 
+      - name: Install CycloneDX BOM tool
+        shell: pwsh
+        run: python -m pip install cyclonedx-bom
+
+      - name: Generate SBOM for release
+        shell: pwsh
+        run: |
+          if (-not (Test-Path 'dist')) {
+            New-Item -ItemType Directory -Path 'dist' | Out-Null
+          }
+          python -m cyclonedx_py environment --format json |
+            Out-File -Encoding utf8 dist/Watcher-sbom.json
+
       - name: Build Windows executable
         shell: pwsh
         run: pyinstaller packaging/watcher.spec --noconfirm
@@ -63,3 +77,30 @@ jobs:
           files: |
             dist/Watcher-Setup.zip
             dist/Watcher/Watcher.exe.sigstore
+            dist/Watcher-sbom.json
+
+  generate-provenance:
+    name: Generate SLSA provenance
+    needs: publish-windows-installer
+    runs-on: ubuntu-latest
+    permissions:
+      actions: read
+      contents: write
+      id-token: write
+      attestations: write
+    steps:
+      - name: Download release artifact
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          mkdir -p dist
+          gh release download "${{ github.event.release.tag_name }}" \
+            --pattern "Watcher-Setup.zip" \
+            --dir dist
+
+      - name: Generate SLSA provenance
+        id: provenance
+        uses: slsa-framework/slsa-github-generator/actions/attestations/slsa-provenance@v2
+        with:
+          subject-path: dist/Watcher-Setup.zip
+          upload-release-asset: true
