@@ -20,6 +20,7 @@ def _setup_engine(tmp_path, monkeypatch):
 
     eng = Engine.__new__(Engine)
     eng.mem = Memory(tmp_path / "mem.db")
+    eng.mem.set_offline(False)
     eng.base = tmp_path
     eng.prepare_data = lambda: "data"
 

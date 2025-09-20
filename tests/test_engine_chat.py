@@ -20,6 +20,7 @@ def test_chat_saves_distinct_kinds(tmp_path, monkeypatch):
 
     eng = Engine.__new__(Engine)
     eng.mem = Memory(tmp_path / "mem.db")
+    eng.mem.set_offline(False)
     eng.client = DummyClient()
     eng.critic = Critic()
 
@@ -45,6 +46,7 @@ def test_chat_includes_retrieved_terms(tmp_path, monkeypatch):
 
     eng = Engine.__new__(Engine)
     eng.mem = Memory(tmp_path / "mem.db")
+    eng.mem.set_offline(False)
     eng.critic = Critic()
 
     def fake_search(self, query: str, top_k: int = 8):
@@ -82,6 +84,7 @@ def test_chat_suggests_details_without_llm(tmp_path, monkeypatch):
 
     eng = Engine.__new__(Engine)
     eng.mem = Memory(tmp_path / "mem.db")
+    eng.mem.set_offline(False)
     eng.client = DummyClient()
     eng.critic = Critic()
 
@@ -114,6 +117,7 @@ def test_chat_uses_cache_for_identical_prompts(tmp_path, monkeypatch):
 
     eng = Engine.__new__(Engine)
     eng.mem = Memory(tmp_path / "mem.db")
+    eng.mem.set_offline(False)
     eng.client = DummyClient()
     eng.critic = Critic()
 
@@ -143,6 +147,7 @@ def test_chat_evicts_least_recent(tmp_path, monkeypatch):
 
     eng = Engine.__new__(Engine)
     eng.mem = Memory(tmp_path / "mem.db")
+    eng.mem.set_offline(False)
     eng.client = DummyClient()
     eng.critic = Critic()
     eng._cache_size = 2

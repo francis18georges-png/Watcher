@@ -11,6 +11,7 @@ def test_summarize_limits_items(tmp_path, monkeypatch):
     monkeypatch.setattr("app.core.memory.embed_ollama", fake_embed)
     db_path = tmp_path / "mem.db"
     mem = Memory(db_path)
+    mem.set_offline(False)
     max_items = 5
     for i in range(max_items + 3):
         mem.add("note", f"msg {i}")

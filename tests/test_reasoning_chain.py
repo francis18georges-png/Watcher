@@ -23,6 +23,7 @@ def test_chat_records_reasoning(tmp_path, monkeypatch):
 
     eng = Engine.__new__(Engine)
     eng.mem = Memory(tmp_path / "mem.db")
+    eng.mem.set_offline(False)
     eng.client = DummyClient()
     eng.critic = Critic()
 

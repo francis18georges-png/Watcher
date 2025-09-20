@@ -7,6 +7,7 @@ from app.core.memory import Memory
 def _make_engine(tmp_path):
     eng = Engine.__new__(Engine)
     eng.mem = Memory(tmp_path / "mem.db")
+    eng.mem.set_offline(False)
     eng.last_prompt = "question"
     eng.last_answer = "answer"
     return eng
