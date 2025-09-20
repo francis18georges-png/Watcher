@@ -1,4 +1,5 @@
 from contextlib import contextmanager
+from importlib import resources
 from pathlib import Path
 
 from app import cli
@@ -34,4 +35,6 @@ def _hide_source_manifest(tmp_path: Path):
 def test_plugin_list_installed_layout(tmp_path, capsys):
     with _hide_source_manifest(tmp_path):
         assert not Path("plugins.toml").exists()
+        manifest = resources.files("app") / "plugins.toml"
+        assert manifest.is_file()
         _assert_lists_hello(capsys, cli.main(["plugin", "list"]))
