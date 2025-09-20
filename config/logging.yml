@@ -4,6 +4,7 @@ disable_existing_loggers: False
 formatters:
   json:
     (): app.core.logging_setup.JSONFormatter
+    sample_rate: 1.0
 
 filters:
   request_id:

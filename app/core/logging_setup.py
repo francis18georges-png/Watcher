@@ -10,7 +10,9 @@ import json
 import os
 import random
 import importlib.resources as resources
+from collections.abc import MutableMapping
 from contextvars import ContextVar
+from typing import Any
 
 try:
     import yaml  # type: ignore[import-untyped]
@@ -142,10 +144,45 @@ def get_logger(name: str | None = None) -> logging.Logger:
     return logger if name is None else logger.getChild(name)
 
 
-def _configure_from_path(config_path: Path) -> None:
+def _apply_sample_rate(
+    config: MutableMapping[str, Any], sample_rate: float | None
+) -> None:
+    """Override sample rate configuration when requested."""
+
+    if sample_rate is None:
+        return
+
+    rate = SamplingFilter._validate_rate(sample_rate)
+
+    filters = config.get("filters")
+    if isinstance(filters, MutableMapping):
+        for filter_config in filters.values():
+            if not isinstance(filter_config, MutableMapping):
+                continue
+            if (
+                filter_config.get("()") == "app.core.logging_setup.SamplingFilter"
+                or "sample_rate" in filter_config
+            ):
+                filter_config["sample_rate"] = rate
+
+    formatters = config.get("formatters")
+    if isinstance(formatters, MutableMapping):
+        for formatter_config in formatters.values():
+            if not isinstance(formatter_config, MutableMapping):
+                continue
+            if (
+                formatter_config.get("()")
+                == "app.core.logging_setup.JSONFormatter"
+            ) or "sample_rate" in formatter_config:
+                formatter_config["sample_rate"] = rate
+
+
+def _configure_from_path(config_path: Path, sample_rate: float | None = None) -> None:
     """Load logging configuration from ``config_path`` if possible."""
 
     if not config_path.exists():  # pragma: no cover - config file missing
+        if sample_rate is not None:
+            SamplingFilter._validate_rate(sample_rate)
         logging.basicConfig(level=logging.INFO)
         return
 
@@ -153,12 +190,16 @@ def _configure_from_path(config_path: Path) -> None:
     if suffix == ".json":
         with config_path.open("r", encoding="utf-8") as f:
             config = json.load(f)
+        if isinstance(config, MutableMapping):
+            _apply_sample_rate(config, sample_rate)
         logging.config.dictConfig(config)
         return
 
     if yaml:
         with config_path.open("r", encoding="utf-8") as f:
             config = yaml.safe_load(f)
+        if isinstance(config, MutableMapping):
+            _apply_sample_rate(config, sample_rate)
         logging.config.dictConfig(config)
         return
 
@@ -168,6 +209,7 @@ def _configure_from_path(config_path: Path) -> None:
         "formatters": {
             "json": {
                 "()": "app.core.logging_setup.JSONFormatter",
+                "sample_rate": 1.0,
             }
         },
         "filters": {
@@ -195,20 +237,28 @@ def _configure_from_path(config_path: Path) -> None:
         },
         "root": {"level": "INFO", "handlers": ["console", "file"]},
     }
+    _apply_sample_rate(config, sample_rate)
     logging.config.dictConfig(config)
 
 
-def configure() -> None:
-    """Configure logging from the YAML configuration file if possible."""
+def configure(*, sample_rate: float | None = None) -> None:
+    """Configure structured logging with optional sampling overrides.
+
+    Parameters
+    ----------
+    sample_rate:
+        Optional sampling rate applied to the ``SamplingFilter`` and
+        ``JSONFormatter`` when provided. Values must be between 0 and 1.
+    """
     env_path = os.environ.get("LOGGING_CONFIG_PATH")
     if env_path:
-        _configure_from_path(Path(env_path))
+        _configure_from_path(Path(env_path), sample_rate=sample_rate)
         return
 
     resource = resources.files("config") / "logging.yml"
     try:
         with resources.as_file(resource) as config_path:
-            _configure_from_path(config_path)
+            _configure_from_path(config_path, sample_rate=sample_rate)
     except FileNotFoundError:  # pragma: no cover - config resource missing
         logging.basicConfig(level=logging.INFO)
     # Ensure application logger does not filter messages on its own and relies
