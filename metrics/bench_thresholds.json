@@ -1,0 +1,17 @@
+{
+  "learner_update": {
+    "max_mean_ms": 12.0,
+    "max_p95_ms": 14.0,
+    "max_peak_kb": 40.0
+  },
+  "metrics_tracking": {
+    "max_mean_ms": 13.0,
+    "max_p95_ms": 14.5,
+    "max_peak_kb": 10.0
+  },
+  "planner_briefing": {
+    "max_mean_ms": 1.0,
+    "max_p95_ms": 1.2,
+    "max_peak_kb": 5.0
+  }
+}
