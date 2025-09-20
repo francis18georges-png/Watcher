@@ -13,6 +13,51 @@ env:
   TORCH_DETERMINISTIC: "1"
 
 jobs:
+  build-python-distributions:
+    name: Build Python distributions
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Validate SemVer tag
+        run: |
+          set -euo pipefail
+          if [[ "${GITHUB_REF_NAME}" != v[0-9]*.[0-9]*.[0-9]* ]]; then
+            echo "Release tag '${GITHUB_REF_NAME}' must match vMAJOR.MINOR.PATCH" >&2
+            exit 1
+          fi
+
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: |
+            requirements.txt
+            requirements-dev.txt
+
+      - name: Install build dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install build
+
+      - name: Build wheel and sdist
+        run: python -m build
+
+      - name: Upload distributions
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-python-distributions
+          if-no-files-found: error
+          path: |
+            dist/*.whl
+            dist/*.tar.gz
+
   build-windows-installer:
     name: Build and sign Windows installer
     runs-on: windows-latest
@@ -281,6 +326,7 @@ jobs:
   publish-release:
     name: Publish GitHub release
     needs:
+      - build-python-distributions
       - build-windows-installer
       - build-unix-executables
       - generate-provenance
@@ -322,5 +368,7 @@ jobs:
             dist/Watcher-linux-sbom.json
             dist/Watcher-macos-x86_64.zip
             dist/Watcher-macos-sbom.json
+            dist/watcher-*.whl
+            dist/watcher-*.tar.gz
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

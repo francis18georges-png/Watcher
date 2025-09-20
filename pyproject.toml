@@ -1,3 +1,41 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "watcher"
+version = "0.4.0"
+description = "Atelier local d'IA de programmation autonome (offline par défaut)."
+readme = "README.md"
+requires-python = ">=3.12"
+license = { file = "LICENSE" }
+authors = [{ name = "Watcher contributors" }]
+dependencies = [
+    "httpx==0.27.0",
+    "rich==13.7.1",
+    "beautifulsoup4==4.12.2",
+    "sentence-transformers==2.2.2",
+    "pydantic==2.8.2",
+    "pydantic-settings==2.4.0",
+    "SQLAlchemy==2.0.32",
+    "alembic==1.13.2",
+]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.12",
+]
+
+[project.scripts]
+watcher = "app.cli:main"
+
+[tool.setuptools.packages.find]
+include = ["app*", "config*"]
+
 [tool.black]
 line-length = 88
 target-version = ["py312"]
@@ -11,4 +49,5 @@ license-files = ["LICENSE"]
 
 [tool.setuptools.package-data]
 "app" = ["plugins.toml"]
+"config" = ["*.toml", "*.yml", "*.json"]
 
