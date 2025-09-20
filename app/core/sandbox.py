@@ -36,8 +36,13 @@ class SandboxResult:
     cpu_exceeded: bool = False
     memory_exceeded: bool = False
 
-def _sanitize_environment(extra: Mapping[str, str] | None = None) -> dict[str, str]:
-    """Return a sanitized environment dictionary."""
+
+def _prepare_environment(extra: Mapping[str, str | None] | None = None) -> dict[str, str]:
+    """Return a sanitized environment dictionary.
+
+    ``extra`` values set to ``None`` explicitly remove a key from the final
+    environment which allows callers to opt-out from inherited variables.
+    """
 
     env: dict[str, str] = {}
     for key in _ALLOWED_ENV_VARS:
@@ -51,11 +56,53 @@ def _sanitize_environment(extra: Mapping[str, str] | None = None) -> dict[str, s
 
     if extra:
         for key, value in extra.items():
-            if value is not None:
+            if value is None:
+                env.pop(key, None)
+            else:
                 env[key] = value
 
     env.setdefault("PYTHONUNBUFFERED", "1")
     return env
+
+
+def _install_seccomp_network_filter() -> None:
+    """Best effort network filter using seccomp when available."""
+
+    try:
+        import errno
+        import seccomp
+    except Exception:
+        # ``seccomp`` might be unavailable on certain systems.  In this case we
+        # still rely on environment based network blocking inside the executed
+        # Python process.
+        return
+
+    filt = seccomp.SyscallFilter(defaction=seccomp.SCMP_ACT_ALLOW)
+    for syscall in [
+        "socket",
+        "connect",
+        "accept",
+        "accept4",
+        "sendto",
+        "sendmsg",
+        "recvfrom",
+        "recvmsg",
+        "getsockname",
+        "getpeername",
+        "bind",
+        "listen",
+    ]:
+        try:
+            filt.add_rule(seccomp.SCMP_ACT_ERRNO(errno.EPERM), syscall)
+        except OSError:
+            continue
+    try:
+        filt.load()
+    except OSError:
+        # Loading the filter can fail on platforms where seccomp is not
+        # permitted.  The execution still proceeds albeit without kernel level
+        # filtering, falling back to the Python level guard.
+        logger.debug("Unable to install seccomp filter", exc_info=True)
 
 
 def _run_without_pywin32(
@@ -102,7 +149,7 @@ def run(
     memory_bytes: int | None = None,
     timeout: float | None = 30,
     cwd: str | os.PathLike[str] | None = None,
-    env: Mapping[str, str] | None = None,
+    env: Mapping[str, str | None] | None = None,
     allow_network: bool = False,
 ) -> SandboxResult:
     """Exécute ``cmd`` avec quotas optionnels.
@@ -114,7 +161,8 @@ def run(
         timeout: Temps d'expiration mur (timeout) pour ``subprocess.run``.
         cwd: Répertoire de travail isolé pour le processus enfant.
         env: Variables d'environnement additionnelles à injecter après
-            nettoyage.
+            nettoyage. Les valeurs explicites ``None`` retirent les clés
+            correspondantes de l'environnement final.
         allow_network: Autoriser (``True``) ou bloquer (``False``) l'accès
             réseau.
 
@@ -125,7 +173,7 @@ def run(
 
     result = SandboxResult()
 
-    sanitized_env = _sanitize_environment(env)
+    sanitized_env = _prepare_environment(env)
     if not allow_network:
         sanitized_env["WATCHER_BLOCK_NETWORK"] = "1"
 
@@ -228,34 +276,7 @@ def run(
         if memory_bytes is not None:
             resource.setrlimit(resource.RLIMIT_AS, (memory_bytes, memory_bytes))
         if not allow_network:
-            try:
-                import errno
-                import seccomp
-
-                filt = seccomp.SyscallFilter(defaction=seccomp.SCMP_ACT_ALLOW)
-                for syscall in [
-                    "socket",
-                    "connect",
-                    "accept",
-                    "accept4",
-                    "sendto",
-                    "sendmsg",
-                    "recvfrom",
-                    "recvmsg",
-                    "getsockname",
-                    "getpeername",
-                    "bind",
-                    "listen",
-                ]:
-                    try:
-                        filt.add_rule(seccomp.SCMP_ACT_ERRNO(errno.EPERM), syscall)
-                    except OSError:
-                        continue
-                filt.load()
-            except Exception:
-                # Best effort: seccomp might be unavailable; environment based
-                # blocking is still enforced in the child process.
-                pass
+            _install_seccomp_network_filter()
 
     from subprocess import Popen
     from typing import cast

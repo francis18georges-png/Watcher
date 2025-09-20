@@ -376,13 +376,7 @@ class Engine:
         )
 
         for plugin in self.plugins:
-            actual_signature = plugins.compute_module_signature(plugin.module)
-            if actual_signature is None or not hmac.compare_digest(
-                actual_signature, plugin.signature
-            ):
-                logger.error(
-                    "Plugin %s signature mismatch; skipping", plugin.import_path
-                )
+            if not self._plugin_metadata_valid(plugin):
                 continue
 
             cmd = [
@@ -397,7 +391,7 @@ class Engine:
                 plugin.api_version,
             ]
 
-            env = {"PYTHONPATH": pythonpath} if pythonpath else {}
+            env = {"PYTHONPATH": pythonpath} if pythonpath else None
 
             try:
                 with tempfile.TemporaryDirectory(
@@ -408,7 +402,7 @@ class Engine:
                         cpu_seconds=_PLUGIN_CPU_LIMIT_SECONDS,
                         memory_bytes=_PLUGIN_MEMORY_LIMIT_BYTES,
                         timeout=_PLUGIN_TIMEOUT_SECONDS,
-                        cwd=tmpdir,
+                        cwd=Path(tmpdir),
                         env=env,
                         allow_network=False,
                     )
@@ -435,6 +429,32 @@ class Engine:
                 ", ".join(details) if details else "no additional info",
             )
         return outputs
+
+    def _plugin_metadata_valid(self, plugin: plugins.LoadedPlugin) -> bool:
+        """Ensure loaded plugin metadata is trustworthy before execution."""
+
+        if plugin.api_version != plugins.SUPPORTED_PLUGIN_API_VERSION:
+            logger.error(
+                "Plugin %s declares unsupported api_version %s",
+                plugin.import_path,
+                plugin.api_version,
+            )
+            return False
+
+        actual_signature = plugins.compute_module_signature(plugin.module)
+        if actual_signature is None:
+            logger.error(
+                "Unable to compute signature for plugin %s", plugin.import_path
+            )
+            return False
+
+        if not hmac.compare_digest(actual_signature, plugin.signature):
+            logger.error(
+                "Plugin %s signature mismatch; skipping", plugin.import_path
+            )
+            return False
+
+        return True
 
 
 logger = get_logger(__name__)
