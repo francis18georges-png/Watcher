@@ -12,7 +12,7 @@ from urllib.parse import urlparse
 
 from app.utils import np
 
-from config import load_config
+from config import get_settings
 
 
 def embed_ollama(
@@ -42,15 +42,11 @@ def embed_ollama(
     """
 
     # Copy the memory configuration to avoid mutating the cached config
-    cfg = load_config().get("memory", {}).copy()
+    settings = get_settings()
+    memory_cfg = settings.memory
 
-    if model is not None:
-        cfg["embed_model"] = model
-    if host is not None:
-        cfg["embed_host"] = host
-
-    model = cfg.get("embed_model", "nomic-embed-text")
-    host = cfg.get("embed_host", "127.0.0.1:11434")
+    model = model or memory_cfg.embed_model
+    host = host or memory_cfg.embed_host
 
     parsed = urlparse(host if "://" in host else f"http://{host}")
 

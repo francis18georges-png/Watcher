@@ -1,13 +1,14 @@
 import pytest
 
-from config import load_config
 import config as cfg_module
+from config import clear_settings_cache, get_settings
 
 
 def test_load_existing_config():
-    cfg = load_config()
-    assert cfg["llm"]["model"] == "llama3.2:3b"
-    assert cfg["llm"]["backend"] == "ollama"
+    clear_settings_cache()
+    settings = get_settings()
+    assert settings.llm.model == "llama3.2:3b"
+    assert settings.llm.backend == "ollama"
 
 
 def test_missing_base_file(monkeypatch):
@@ -15,6 +16,6 @@ def test_missing_base_file(monkeypatch):
         raise FileNotFoundError
 
     monkeypatch.setattr(cfg_module, "_read_toml", raise_not_found)
-    load_config.cache_clear()
+    clear_settings_cache()
     with pytest.raises(FileNotFoundError):
-        load_config()
+        get_settings()

@@ -8,7 +8,7 @@ from itertools import chain
 from threading import Thread
 from typing import Any
 
-from config import load_config
+from config import get_settings
 
 from app.core import autograder as AG
 from app.core.benchmark import Bench
@@ -32,16 +32,15 @@ class Engine:
     """High level interface coordinating memory, planning and benchmarking."""
 
     def __init__(self, perform_maintenance: bool = False) -> None:
-        self.base = Path(__file__).resolve().parents[2]
+        settings = get_settings()
+        self.settings = settings
+        self.base = settings.paths.base_dir
 
-        cfg = load_config().get("memory", {})
+        db_path = settings.memory.db_path
+        if not db_path.is_absolute():
+            db_path = settings.paths.resolve(db_path)
 
-        db_path = cfg.get("db_path", "memory/mem.db")
-        path = Path(db_path)
-        if not path.is_absolute():
-            path = self.base / path
-
-        self.mem = Memory(path)
+        self.mem = Memory(db_path)
         self.qg = QualityGate()
         self.bench = Bench()
         self.learner = Learner(self.bench, self.base / "data")
@@ -49,7 +48,7 @@ class Engine:
         self.client = Client()
         self.critic = Critic()
         # LRU cache for chat responses
-        self._cache_size = int(cfg.get("cache_size", 128))
+        self._cache_size = int(settings.memory.cache_size)
         self._cache: OrderedDict[str, str] = OrderedDict()
         self.plugins: list[plugins.Plugin] = []
         self._load_plugins()
@@ -119,8 +118,7 @@ class Engine:
                 "_cache", OrderedDict()
             )
             cache_size: int = self.__dict__.setdefault(
-                "_cache_size",
-                load_config().get("memory", {}).get("cache_size", 128),
+                "_cache_size", self.settings.memory.cache_size
             )
             cached = cache.pop(user_prompt, None)
             if cached is not None:

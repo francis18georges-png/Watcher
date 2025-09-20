@@ -16,24 +16,12 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
-from app.config import load_config
+from config import get_settings
 
 
 def _default_polite_keywords() -> tuple[str, ...]:
     """Return default polite keywords, allowing configuration overrides."""
-    cfg = load_config("critic")
-    keywords = cfg.get("polite_keywords") if isinstance(cfg, dict) else None
-    if keywords:
-        return tuple(keywords)
-    return (
-        "please",
-        "thank you",
-        "merci",
-        "s'il vous plaît",
-        "s'il vous plait",
-        "bonjour",
-        "salut",
-    )
+    return tuple(get_settings().critic.polite_keywords)
 
 
 @dataclass

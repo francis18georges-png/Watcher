@@ -7,6 +7,7 @@ from importlib import resources
 from importlib.resources.abc import Traversable
 from typing import Sequence
 
+from config import get_settings
 from app.tools import plugins
 
 #: Base location containing the plugin manifest bundled with the :mod:`app` package.
@@ -22,7 +23,14 @@ def _iter_plugins() -> list[plugins.Plugin]:
 def main(argv: Sequence[str] | None = None) -> int:
     """Entry point for the :mod:`watcher` command."""
 
-    parser = argparse.ArgumentParser(prog="watcher", description="Watcher CLI")
+    settings = get_settings()
+    parser = argparse.ArgumentParser(
+        prog="watcher",
+        description=(
+            "Watcher CLI (LLM backend: "
+            f"{settings.llm.backend} / model: {settings.llm.model})"
+        ),
+    )
     sub = parser.add_subparsers(dest="command", required=True)
 
     plugin_parser = sub.add_parser("plugin", help="Plugin related commands")
