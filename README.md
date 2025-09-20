@@ -1,6 +1,6 @@
 # Watcher
 
-![Benchmark performance badge](metrics/performance_badge.svg)
+![Benchmark status badge](metrics/performance_badge.svg)
 
 Atelier local d'IA de programmation autonome (offline par défaut).
 Mémoire vectorielle, curriculum adaptatif, A/B + bench et quality gate sécurité.
@@ -18,6 +18,25 @@ mkdocs serve
 ```
 
 Le workflow GitHub Actions `deploy-docs.yml` publie le site statique à chaque push sur `main`.
+
+## Benchmarks
+
+Le script `python -m app.core.benchmark run` exécute trois scénarios représentatifs
+(`planner_briefing`, `learner_update`, `metrics_tracking`) en mesurant le temps
+et l'utilisation mémoire via `tracemalloc`. Chaque exécution ajoute une entrée
+historique dans `metrics/benchmarks.jsonl`, met à jour le résumé courant dans
+`metrics/benchmarks-latest.json` et régénère le badge `metrics/performance_badge.svg`.
+
+Les seuils de non-régression sont définis dans `metrics/bench_thresholds.json`.
+Pour vérifier qu'ils sont respectés, utilisez :
+
+```bash
+python -m app.core.benchmark run --samples 5 --warmup 1
+python -m app.core.benchmark check --update-badge
+```
+
+La CI (`ci.yml`) exécute automatiquement ces commandes et échoue si un scénario
+dépasse l'un des seuils configurés.
 
 ## Installation
 

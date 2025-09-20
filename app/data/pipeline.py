@@ -27,6 +27,17 @@ def _processed_directory() -> Path:
     return settings.paths.resolve(settings.data.processed_dir)
 
 
+try:
+    RAW_DIR = _raw_directory()
+except Exception:  # pragma: no cover - fallback for tests
+    RAW_DIR = Path("datasets/raw")
+
+try:
+    PROCESSED_DIR = _processed_directory()
+except Exception:  # pragma: no cover - fallback for tests
+    PROCESSED_DIR = Path("datasets/processed")
+
+
 def load_raw_data(path: Path | str | None = None) -> dict | list[dict]:
     """Load and validate raw data from ``datasets/raw``.
 
