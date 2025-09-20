@@ -3,15 +3,33 @@
 from __future__ import annotations
 
 import argparse
-from importlib.resources.abc import Traversable
+from importlib import resources
+from pathlib import Path
 from typing import Sequence
 
 from config import get_settings
 from app.core.reproducibility import set_seed
 from app.tools import plugins
 
+
+def _plugin_base() -> plugins.Location | None:
+    """Return the preferred manifest location for plugin discovery."""
+
+    manifest = Path("plugins.toml")
+    if manifest.is_file():
+        return manifest
+
+    try:
+        candidate = resources.files("app") / "plugins.toml"
+    except ModuleNotFoundError:
+        return None
+    if candidate.is_file():
+        return candidate
+    return None
+
+
 #: Manifest bundled with the :mod:`app` package.
-_PLUGIN_MANIFEST: Traversable = plugins.DEFAULT_MANIFEST
+_PLUGIN_MANIFEST: plugins.Location | None = _plugin_base()
 
 
 def _iter_plugins() -> list[plugins.Plugin]:
