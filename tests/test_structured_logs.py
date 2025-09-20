@@ -15,21 +15,27 @@ def _cleanup() -> None:
 def test_logs_are_json(capfd, monkeypatch):
     monkeypatch.delenv("LOGGING_CONFIG_PATH", raising=False)
     logging_setup.set_request_id("req-123")
+    logging_setup.set_trace_context(trace_id="trace-abc", sample_rate=0.5)
     logging_setup.configure()
     logger = logging_setup.get_logger("test")
+    monkeypatch.setattr(logging_setup.random, "random", lambda: 0.1)
     logger.info("hello world")
     out, err = capfd.readouterr()
     _cleanup()
+    logging_setup.set_trace_context()
     data = json.loads(out.strip())
     assert data["message"] == "hello world"
     assert data["level"] == "INFO"
     assert data["request_id"] == "req-123"
     assert data["name"] == "watcher.test"
+    assert data["trace_id"] == "trace-abc"
+    assert data["sample_rate"] == 0.5
 
 
 def test_basic_logging_when_config_missing(capfd, monkeypatch):
     monkeypatch.setenv("LOGGING_CONFIG_PATH", "missing.yml")
     _cleanup()
+    logging_setup.set_trace_context()
     logging_setup.configure()
     logger = logging_setup.get_logger("test")
     logger.info("hello world")
@@ -41,6 +47,7 @@ def test_basic_logging_when_config_missing(capfd, monkeypatch):
 def test_errors_are_logged(capfd, monkeypatch):
     monkeypatch.delenv("LOGGING_CONFIG_PATH", raising=False)
     _cleanup()
+    logging_setup.set_trace_context(trace_id="trace-error", sample_rate=1.0)
     logging_setup.configure()
     logger = logging_setup.get_logger("test")
     try:
@@ -49,6 +56,44 @@ def test_errors_are_logged(capfd, monkeypatch):
         logger.exception("failed")
     out, err = capfd.readouterr()
     _cleanup()
+    logging_setup.set_trace_context()
     data = json.loads(out.strip())
     assert data["level"] == "ERROR"
     assert data["message"] == "failed"
+    assert data["trace_id"] == "trace-error"
+
+
+def test_sampling_filter_respects_context(monkeypatch):
+    record = logging.LogRecord(
+        name="watcher.test",
+        level=logging.INFO,
+        pathname=__file__,
+        lineno=0,
+        msg="payload",
+        args=(),
+        exc_info=None,
+    )
+    flt = logging_setup.SamplingFilter(sample_rate=0.2)
+    logging_setup.set_trace_context(sample_rate=0.4)
+    monkeypatch.setattr(logging_setup.random, "random", lambda: 0.3)
+    try:
+        assert flt.filter(record) is True
+        assert record.sample_rate == 0.4
+    finally:
+        logging_setup.set_trace_context()
+
+
+def test_sampling_filter_blocks_when_probability_low(monkeypatch):
+    record = logging.LogRecord(
+        name="watcher.test",
+        level=logging.INFO,
+        pathname=__file__,
+        lineno=0,
+        msg="payload",
+        args=(),
+        exc_info=None,
+    )
+    flt = logging_setup.SamplingFilter(sample_rate=0.5)
+    monkeypatch.setattr(logging_setup.random, "random", lambda: 0.9)
+    assert flt.filter(record) is False
+    assert record.sample_rate == 0.5
