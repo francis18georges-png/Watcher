@@ -5,6 +5,11 @@
 Atelier local d'IA de programmation autonome (offline par défaut).
 Mémoire vectorielle, curriculum adaptatif, A/B + bench et quality gate sécurité.
 
+## Version
+
+La dernière version stable est **v0.4.0** (tag `v0.4.0`, publiée le 20 septembre 2025). Consultez le
+[CHANGELOG](CHANGELOG.md) pour le détail des nouveautés et correctifs.
+
 ## Documentation
 
 La documentation technique est générée avec [MkDocs Material](https://squidfunk.github.io/mkdocs-material/)

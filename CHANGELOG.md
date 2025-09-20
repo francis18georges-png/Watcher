@@ -3,6 +3,11 @@
 ## [Unreleased]
 
 ### Added
+- Rien pour le moment.
+
+## [v0.4.0] - 2025-09-20
+
+### Added
 - Documentation de la feuille de route et du journal de bord.
 - Chargement en batch des retours mémoire et benchmark associé.
 - Cache chat responses.
