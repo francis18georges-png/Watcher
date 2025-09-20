@@ -1,0 +1,19 @@
+version: 2
+updates:
+  - package-ecosystem: "pip"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    requirements:
+      - "requirements.txt"
+      - "requirements-dev.txt"
+    open-pull-requests-limit: 5
+    reviewers:
+      - "WatcherOrg/release-engineering"
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 3
+    reviewers:
+      - "WatcherOrg/release-engineering"
