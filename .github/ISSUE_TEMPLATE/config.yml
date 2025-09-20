@@ -5,4 +5,4 @@ contact_links:
     about: Consultez la check-list QA avant d'ouvrir un ticket.
   - name: Guide des labels et des revues
     url: https://github.com/WatcherOrg/Watcher/blob/main/docs/merge-policy.md
-    about: Résumé du workflow de tri, des labels `scope:*` et du label `status:auto-merge`.
+    about: Résumé du workflow de tri, des labels `scope:*`, des labels requis `status:maintainer-approved`, `status:qa-approved`, `status:queued-for-merge`, ainsi que du label `status:auto-merge`.
