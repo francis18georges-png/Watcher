@@ -9,6 +9,8 @@ Mémoire vectorielle, curriculum adaptatif, A/B + bench et quality gate sécurit
 
 La documentation technique est générée avec [MkDocs Material](https://squidfunk.github.io/mkdocs-material/)
 et déployée automatiquement via GitHub Pages : https://<github-username>.github.io/Watcher/.
+Activez GitHub Pages dans les paramètres du dépôt (source : **GitHub Actions**) pour autoriser le workflow
+`deploy-docs.yml` à publier le site.
 
 Pour la prévisualiser localement :
 
