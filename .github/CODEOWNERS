@@ -15,6 +15,7 @@ packaging/                @WatcherOrg/app-core
 # scope:ops — Automatisation, CI/CD et outillage développeur
 .github/workflows/        @WatcherOrg/release-engineering
 .github/auto_merge.yml    @WatcherOrg/release-engineering
+.github/dependabot.yml    @WatcherOrg/release-engineering
 automation-playbook.sh    @WatcherOrg/release-engineering
 auto_flow.sh              @WatcherOrg/release-engineering
 noxfile.py                @WatcherOrg/release-engineering
