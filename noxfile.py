@@ -5,7 +5,14 @@ from __future__ import annotations
 import nox
 
 PYTHON_VERSIONS = ["3.12"]
-SOURCE_DIRECTORIES = ("app", "config", "datasets", "tests", "train.py", "plugins.toml")
+SOURCE_DIRECTORIES = (
+    "app",
+    "config",
+    "datasets",
+    "tests",
+    "train.py",
+    "app/plugins.toml",
+)
 
 nox.options.sessions = ("lint", "typecheck", "security", "tests", "build")
 nox.options.reuse_existing_virtualenvs = True

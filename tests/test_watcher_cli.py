@@ -1,3 +1,4 @@
+import importlib
 from contextlib import contextmanager
 from importlib import resources
 from pathlib import Path
@@ -57,3 +58,21 @@ def test_plugin_list_installed_layout(tmp_path, capsys):
         manifest = resources.files("app") / "plugins.toml"
         assert manifest.is_file()
         _assert_lists_hello(capsys, cli.main(["plugin", "list"]))
+
+
+def test_plugin_list_imported_without_root_manifest(tmp_path, capsys):
+    module = cli
+    try:
+        with _hide_source_manifest(tmp_path):
+            module = importlib.reload(cli)
+            manifest = resources.files("app") / "plugins.toml"
+            assert manifest.is_file()
+            packaged = module._plugin_base()
+            assert packaged is not None
+            assert packaged.is_file()
+            assert packaged.read_text(encoding="utf-8") == manifest.read_text(
+                encoding="utf-8"
+            )
+            _assert_lists_hello(capsys, module.main(["plugin", "list"]))
+    finally:
+        importlib.reload(module)
