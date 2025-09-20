@@ -395,13 +395,22 @@ def configure(*, sample_rate: float | None = None) -> None:
         logger.setLevel(logging.NOTSET)
         return
 
-    resource = resources.files("config") / "logging.yml"
-    try:
-        with resources.as_file(resource) as config_path:
-            _configure_from_path(
-                config_path, fallback_level=fallback_level, sample_rate=sample_rate
-            )
-    except FileNotFoundError:  # pragma: no cover - config resource missing
+    resource_package = resources.files("config")
+    resource_candidates = ("logging.yml", "logging.yaml", "logging.json")
+    for candidate in resource_candidates:
+        try:
+            resource = resource_package / candidate
+            with resources.as_file(resource) as config_path:
+                _configure_from_path(
+                    config_path,
+                    fallback_level=fallback_level,
+                    sample_rate=sample_rate,
+                )
+        except FileNotFoundError:  # pragma: no cover - config resource missing
+            continue
+        else:
+            break
+    else:  # pragma: no cover - config resource missing
         logging.basicConfig(level=fallback_level)
     # Ensure application logger does not filter messages on its own and relies
     # on the configured handlers of the root logger instead.

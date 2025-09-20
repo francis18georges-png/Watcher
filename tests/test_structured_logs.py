@@ -139,6 +139,26 @@ def test_configure_applies_sample_rate_to_formatter_class(
     assert data["sample_rate"] == 0.2
 
 
+def test_json_config_supports_sampling(monkeypatch, capfd):
+    monkeypatch.setenv("LOGGING_CONFIG_PATH", "config/logging.json")
+
+    _cleanup()
+    logging_setup.set_trace_context()
+
+    logging_setup.configure(sample_rate=0.3)
+    logger = logging_setup.get_logger("test")
+    monkeypatch.setattr(logging_setup.random, "random", lambda: 0.1)
+    logger.info("json config")
+
+    out, err = capfd.readouterr()
+    _cleanup()
+    logging_setup.set_trace_context()
+
+    assert err == ""
+    data = json.loads(out.strip())
+    assert data["sample_rate"] == 0.3
+
+
 def test_configure_supports_custom_field_names(tmp_path, capfd, monkeypatch):
     config = {
         "version": 1,

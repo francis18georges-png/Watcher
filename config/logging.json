@@ -1,55 +1,55 @@
 {
-  "version": 1,
-  "disable_existing_loggers": false,
-  "formatters": {
-    "json": {
-      "()": "app.core.logging_setup.JSONFormatter",
-      "request_id_field": "request_id",
-      "trace_id_field": "trace_id",
-      "sample_rate_field": "sample_rate",
-      "sample_rate": 1.0
-    }
-  },
-  "filters": {
-    "request_id": {
-      "()": "app.core.logging_setup.RequestIdFilter",
-      "request_id_field": "request_id",
-      "trace_id_field": "trace_id",
-      "sample_rate_field": "sample_rate"
+    "version": 1,
+    "disable_existing_loggers": false,
+    "formatters": {
+        "json": {
+            "()": "app.core.logging_setup.JSONFormatter",
+            "request_id_field": "request_id",
+            "trace_id_field": "trace_id",
+            "sample_rate_field": "sample_rate",
+            "sample_rate": 1.0
+        }
     },
-    "sampling": {
-      "()": "app.core.logging_setup.SamplingFilter",
-      "sample_rate": 1.0,
-      "sample_rate_field": "sample_rate"
-    }
-  },
-  "handlers": {
-    "console": {
-      "class": "logging.StreamHandler",
-      "level": "INFO",
-      "formatter": "json",
-      "filters": [
-        "request_id",
-        "sampling"
-      ],
-      "stream": "ext://sys.stdout"
+    "filters": {
+        "request_id": {
+            "()": "app.core.logging_setup.RequestIdFilter",
+            "request_id_field": "request_id",
+            "trace_id_field": "trace_id",
+            "sample_rate_field": "sample_rate"
+        },
+        "sampling": {
+            "()": "app.core.logging_setup.SamplingFilter",
+            "sample_rate": 1.0,
+            "sample_rate_field": "sample_rate"
+        }
     },
-    "file": {
-      "class": "logging.FileHandler",
-      "level": "INFO",
-      "formatter": "json",
-      "filters": [
-        "request_id",
-        "sampling"
-      ],
-      "filename": "watcher.log"
+    "handlers": {
+        "console": {
+            "class": "logging.StreamHandler",
+            "level": "INFO",
+            "formatter": "json",
+            "filters": [
+                "request_id",
+                "sampling"
+            ],
+            "stream": "ext://sys.stdout"
+        },
+        "file": {
+            "class": "logging.FileHandler",
+            "level": "INFO",
+            "formatter": "json",
+            "filters": [
+                "request_id",
+                "sampling"
+            ],
+            "filename": "watcher.log"
+        }
+    },
+    "root": {
+        "level": "INFO",
+        "handlers": [
+            "console",
+            "file"
+        ]
     }
-  },
-  "root": {
-    "level": "INFO",
-    "handlers": [
-      "console",
-      "file"
-    ]
-  }
 }

@@ -21,6 +21,15 @@ des champs sérialisés dans la sortie JSON tandis que `sample_rate` détermine 
 proportion de messages conservés.  Ajustez ces valeurs pour faire correspondre
 la structure de vos pipelines d'observabilité.
 
+### Échantillonnage
+
+Le module propose un filtrage probabiliste : en appelant
+`logging_setup.configure(sample_rate=0.2)`, tous les formatters et filtres
+compatibles reçoivent automatiquement la valeur `0.2`.  Les journaux émis via
+`SamplingFilter` incluront alors un champ `sample_rate` positionné sur la valeur
+effective utilisée, ce qui permet de tracer la proportion de messages conservés
+par rapport au flux complet.
+
 Les messages sont enrichis d'un identifiant de requête (`request_id`) ou de
 trace (`trace_id`) lorsqu'ils sont définis via
 `logging_setup.set_request_id()` et `logging_setup.set_trace_context()`.
