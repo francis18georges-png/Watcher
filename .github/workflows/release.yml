@@ -6,6 +6,12 @@ on:
       - 'v*.*.*'
   workflow_dispatch:
 
+env:
+  PYTHONHASHSEED: "42"
+  WATCHER_TRAINING__SEED: "42"
+  CUBLAS_WORKSPACE_CONFIG: ":4096:8"
+  TORCH_DETERMINISTIC: "1"
+
 jobs:
   build-windows-installer:
     name: Build and sign Windows installer
