@@ -196,7 +196,9 @@ et formattage) puis Black, et `make check` délègue dorénavant à Nox.
 ### Hooks pre-commit
 
 Le dépôt inclut une configuration `pre-commit` regroupant Ruff, Black, mypy,
-Bandit, Semgrep, Codespell ainsi que le correcteur `end-of-file-fixer`. Après avoir installé les dépendances de
+Bandit, Semgrep, Codespell ainsi que le correcteur `end-of-file-fixer` afin de
+garantir qu'une ligne de fin est toujours présente dans les fichiers texte.
+Après avoir installé les dépendances de
 développement, activez les hooks localement :
 
 ```bash
