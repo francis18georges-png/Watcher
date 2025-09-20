@@ -8,11 +8,19 @@ block_cipher = None
 
 project_root = pathlib.Path(__file__).resolve().parent.parent
 
-datas = [('app/plugins.toml', 'app')]
+datas = [("app/plugins.toml", "app")]
+for extra in ("LICENSE", "example.env"):
+    candidate = project_root / extra
+    if candidate.exists():
+        datas.append((str(candidate), "."))
 datas += collect_data_files(
     "config",
-    includes=["*.toml", "*.yml", "*.json"],
+    includes=["*.toml", "*.yml", "*.yaml", "*.json"],
 )
+prompt_dir = project_root / "app" / "llm" / "prompts"
+if prompt_dir.exists():
+    for prompt in prompt_dir.glob("*.md"):
+        datas.append((str(prompt), "app/llm/prompts"))
 
 
 a = Analysis(
