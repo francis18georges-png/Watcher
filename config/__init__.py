@@ -23,6 +23,7 @@ from app.configuration import (
     DataSettings,
     DatasetSettings,
     DevSettings,
+    DatabaseSettings,
     EmbeddingsSettings,
     LoggingSettings,
     IntelligenceSettings,
@@ -166,6 +167,7 @@ class Settings(BaseSettings):
     sandbox: SandboxSettings = Field(default_factory=SandboxSettings)
     logging: LoggingSettings = Field(default_factory=LoggingSettings)
     critic: CriticSettings = Field(default_factory=CriticSettings)
+    database: DatabaseSettings = Field(default_factory=DatabaseSettings)
 
     @classmethod
     def settings_customise_sources(

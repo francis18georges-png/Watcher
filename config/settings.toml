@@ -64,3 +64,10 @@ processed_dir = "datasets/processed"
 
 [embeddings]
 backend = "local_faiss"
+
+[database]
+url = "sqlite+aiosqlite:///./data/watcher.db"
+pool_size = 5
+pool_timeout = 30
+pool_recycle = 1800
+echo = false

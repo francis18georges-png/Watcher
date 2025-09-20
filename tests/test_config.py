@@ -1,6 +1,7 @@
 from pathlib import Path
 
 import pytest
+from pydantic import ValidationError
 
 import config as cfg_module
 from config import clear_settings_cache, get_settings
@@ -48,5 +49,46 @@ def test_env_file_override(monkeypatch, tmp_path: Path):
     try:
         settings = get_settings()
         assert settings.llm.model == "env-file"
+    finally:
+        clear_settings_cache()
+
+
+def test_database_defaults():
+    clear_settings_cache()
+    settings = get_settings()
+    assert (
+        settings.database.url
+        == "sqlite+aiosqlite:///./data/watcher.db"
+    )
+    assert settings.database.pool_size == 5
+    assert settings.database.echo is False
+
+
+def test_invalid_llm_backend_from_env(monkeypatch):
+    monkeypatch.setenv("WATCHER_LLM__BACKEND", "")
+    clear_settings_cache()
+    try:
+        with pytest.raises(ValidationError):
+            get_settings()
+    finally:
+        clear_settings_cache()
+
+
+def test_invalid_sandbox_timeout(monkeypatch):
+    monkeypatch.setenv("WATCHER_SANDBOX__TIMEOUT_SECONDS", "0")
+    clear_settings_cache()
+    try:
+        with pytest.raises(ValidationError):
+            get_settings()
+    finally:
+        clear_settings_cache()
+
+
+def test_invalid_database_pool_size(monkeypatch):
+    monkeypatch.setenv("WATCHER_DATABASE__POOL_SIZE", "0")
+    clear_settings_cache()
+    try:
+        with pytest.raises(ValidationError):
+            get_settings()
     finally:
         clear_settings_cache()
