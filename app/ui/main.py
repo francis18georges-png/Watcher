@@ -102,11 +102,17 @@ def start_metrics_server(
 
 
 class WatcherApp(ttk.Frame):
-    def __init__(self, master: tk.Tk):
+    def __init__(self, master: tk.Tk, *, offline: bool | None = None):
         super().__init__(master)
         self.settings = get_settings()
         self.engine = Engine()
+        if offline is not None:
+            self.engine.set_offline_mode(offline)
         self._plugin_process_cache: dict[str, psutil.Process] = {}
+        self._plugin_stats_snapshot: list[dict[str, Any]] = []
+        self._plugin_refresh_interval_ms = 2000
+        self._plugin_refresh_job: str | None = None
+        self.offline_var = tk.BooleanVar(master=self, value=self.engine.offline_mode)
         master.title(APP_NAME)
         master.geometry("1100x700")
         master.minsize(900, 600)
@@ -141,6 +147,13 @@ class WatcherApp(ttk.Frame):
         bottom.pack(fill="x", padx=8, pady=(0, 8))
         self.inp = tk.Text(bottom, height=4, wrap="word")
         self.inp.pack(side="left", fill="both", expand=True)
+        self.offline_toggle = ttk.Checkbutton(
+            bottom,
+            text="Mode offline",
+            variable=self.offline_var,
+            command=self._toggle_offline,
+        )
+        self.offline_toggle.pack(side="left", padx=8)
         self.send_btn = ttk.Button(bottom, text="Envoyer", command=self._send)
         self.send_btn.pack(side="left", padx=8)
         ttk.Label(bottom, text="Note (0.0 – 1.0)").pack(side="left")
@@ -155,15 +168,9 @@ class WatcherApp(ttk.Frame):
         )
         self.rate_input.pack(side="left", padx=4)
         ttk.Button(bottom, text="Noter", command=self._rate).pack(side="left")
-        self.status = ttk.Label(
-            self,
-            text=(
-                f"Mode: {self.settings.ui.mode} | "
-                f"Backend: {self.settings.llm.backend} | "
-                f"Modèle: {self.settings.llm.model}"
-            ),
-        )
+        self.status = ttk.Label(self)
         self.status.pack(fill="x")
+        self._refresh_status_label()
 
         # Briefing button
         ttk.Button(self.brief, text="Démarrer le Briefing", command=self._brief).pack(
@@ -182,6 +189,50 @@ class WatcherApp(ttk.Frame):
         ttk.Button(at, text="Améliorer (A/B)", command=self._improve).pack(
             side="left", padx=6
         )
+
+        monitor = ttk.LabelFrame(self.bench, text="Utilisation des plugins")
+        monitor.pack(fill="both", expand=True, padx=8, pady=8)
+        tree_container = ttk.Frame(monitor)
+        tree_container.pack(fill="both", expand=True)
+        columns = ("plugin", "pid", "cpu", "rss", "vms", "threads", "process")
+        self.plugin_tree = ttk.Treeview(
+            tree_container,
+            columns=columns,
+            show="headings",
+            height=12,
+        )
+        headings = {
+            "plugin": "Plugin",
+            "pid": "PID",
+            "cpu": "CPU (%)",
+            "rss": "RAM (MiB)",
+            "vms": "Virt (MiB)",
+            "threads": "Threads",
+            "process": "Processus",
+        }
+        for key, heading in headings.items():
+            self.plugin_tree.heading(key, text=heading)
+
+        widths = {
+            "plugin": 220,
+            "pid": 70,
+            "cpu": 80,
+            "rss": 110,
+            "vms": 110,
+            "threads": 90,
+            "process": 160,
+        }
+        for key, width in widths.items():
+            anchor = "w" if key in {"plugin", "process"} else "center"
+            self.plugin_tree.column(key, width=width, anchor=anchor, stretch=True)
+
+        yscroll = ttk.Scrollbar(tree_container, orient="vertical")
+        yscroll.config(command=self.plugin_tree.yview)
+        self.plugin_tree.configure(yscrollcommand=yscroll.set)
+        self.plugin_tree.pack(side="left", fill="both", expand=True)
+        yscroll.pack(side="right", fill="y")
+
+        self._update_plugin_monitor()
 
     def _collect_plugin_stats(
         self, entries: Iterable[object] | None = None
@@ -296,6 +347,89 @@ class WatcherApp(ttk.Frame):
         self._plugin_stats_snapshot = stats
         return stats
 
+    def _refresh_status_label(self) -> None:
+        """Update the footer label with the current connectivity status."""
+
+        backend = getattr(self.settings.llm, "backend", "?")
+        model = getattr(self.settings.llm, "model", "?")
+        mode = "Offline" if getattr(self.engine, "offline_mode", False) else "Online"
+        if hasattr(self, "status") and self.status is not None:
+            self.status.configure(
+                text=f"Mode: {mode} | Backend: {backend} | Modèle: {model}"
+            )
+
+    def _toggle_offline(self) -> None:
+        """Synchronise engine offline mode with the toggle state."""
+
+        offline = bool(self.offline_var.get())
+        self.engine.set_offline_mode(offline)
+        self._refresh_status_label()
+
+    @staticmethod
+    def _format_memory(value: Any) -> str:
+        try:
+            number = float(value)
+        except (TypeError, ValueError):
+            number = 0.0
+        return f"{number / (1024 ** 2):.1f}"
+
+    def _render_plugin_stats(self, stats: Iterable[dict[str, Any]]) -> None:
+        tree = getattr(self, "plugin_tree", None)
+        if tree is None:
+            return
+
+        for item in tree.get_children():
+            tree.delete(item)
+
+        for entry in stats:
+            plugin_label = (
+                entry.get("plugin_name")
+                or entry.get("import_path")
+                or str(entry.get("pid", ""))
+            )
+            values = (
+                plugin_label,
+                entry.get("pid", ""),
+                f"{float(entry.get('cpu_percent', 0.0)):.1f}",
+                self._format_memory(entry.get("rss", 0)),
+                self._format_memory(entry.get("vms", 0)),
+                entry.get("num_threads", 0),
+                entry.get("process_name", ""),
+            )
+            tree.insert("", "end", values=values)
+
+    def _schedule_plugin_refresh(self) -> None:
+        interval = getattr(self, "_plugin_refresh_interval_ms", 0) or 0
+        if interval <= 0:
+            return
+
+        job = getattr(self, "_plugin_refresh_job", None)
+        if job is not None:
+            try:
+                self.after_cancel(job)
+            except Exception:  # pragma: no cover - best effort cleanup
+                pass
+
+        winfo_exists = getattr(self, "winfo_exists", None)
+        if callable(winfo_exists) and not winfo_exists():
+            return
+
+        self._plugin_refresh_job = self.after(interval, self._update_plugin_monitor)
+
+    def _update_plugin_monitor(self) -> None:
+        stats = self._collect_plugin_stats()
+        self._render_plugin_stats(stats)
+        self._schedule_plugin_refresh()
+
+    def destroy(self) -> None:  # pragma: no cover - GUI teardown
+        job = getattr(self, "_plugin_refresh_job", None)
+        if job is not None:
+            try:
+                self.after_cancel(job)
+            except Exception:
+                pass
+        super().destroy()
+
     def _send(self) -> None:
         q = self.inp.get("1.0", "end").strip()
         if not q:
@@ -370,10 +504,21 @@ class WatcherApp(ttk.Frame):
         self.out.insert("end", f"\n[Feedback] {msg}\n")
         self.out.see("end")
 
+def launch_app(*, offline: bool | None = None) -> int:
+    """Launch the graphical interface or fall back to the CLI loop."""
 
-if __name__ == "__main__":
     logging_setup.configure()
     start_metrics_server()
+
+    def _start_gui() -> int:
+        root = tk.Tk()
+        try:
+            WatcherApp(root, offline=offline)
+            root.mainloop()
+        except Exception as exc:  # pragma: no cover - UI failures
+            messagebox.showerror(APP_NAME, str(exc))
+            return 1
+        return 0
 
     if not os.environ.get("DISPLAY"):
         if shutil.which("Xvfb"):
@@ -381,39 +526,39 @@ if __name__ == "__main__":
             xvfb = subprocess.Popen(["Xvfb", ":99"])
             os.environ["DISPLAY"] = ":99"
             try:
-                root = tk.Tk()
-                WatcherApp(root)
-                root.mainloop()
+                return _start_gui()
             finally:
                 xvfb.terminate()
-        else:
-            logger.warning("DISPLAY absent et Xvfb introuvable, mode CLI activé.")
-            eng = Engine()
-            logger.info("%s", eng.start_msg)
-            try:
-                while True:
-                    q = input("[You] ").strip()
-                    if q.lower() in {"exit", "quit"}:
-                        break
-                    if q.lower().startswith("rate "):
-                        try:
-                            score = float(q.split()[1])
-                            score = _validate_score(score)
-                        except (IndexError, ValueError):
-                            logger.warning(_SCORE_ERROR)
-                            continue
-                        logger.info("%s", eng.add_feedback(score))
-                        continue
-                    if not q:
-                        continue
-                    ans = eng.chat(q)
-                    logger.info("%s", ans)
-            except (EOFError, KeyboardInterrupt):
-                pass
-    else:
-        root = tk.Tk()
+
+        logger.warning("DISPLAY absent et Xvfb introuvable, mode CLI activé.")
+        eng = Engine()
+        if offline is not None:
+            eng.set_offline_mode(offline)
+        logger.info("%s", eng.start_msg)
         try:
-            WatcherApp(root)
-            root.mainloop()
-        except Exception as e:  # pragma: no cover - UI
-            messagebox.showerror("Watcher", str(e))
+            while True:
+                q = input("[You] ").strip()
+                if q.lower() in {"exit", "quit"}:
+                    break
+                if q.lower().startswith("rate "):
+                    try:
+                        score = float(q.split()[1])
+                        score = _validate_score(score)
+                    except (IndexError, ValueError):
+                        logger.warning(_SCORE_ERROR)
+                        continue
+                    logger.info("%s", eng.add_feedback(score))
+                    continue
+                if not q:
+                    continue
+                ans = eng.chat(q)
+                logger.info("%s", ans)
+        except (EOFError, KeyboardInterrupt):  # pragma: no cover - CLI loop
+            pass
+        return 0
+
+    return _start_gui()
+
+
+if __name__ == "__main__":  # pragma: no cover - script execution
+    raise SystemExit(launch_app())

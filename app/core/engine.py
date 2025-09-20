@@ -50,6 +50,13 @@ class Engine:
         settings = get_settings()
         self.settings = settings
         self.base = settings.paths.base_dir
+        intelligence_mode = getattr(settings, "intelligence", None)
+        default_offline = False
+        if intelligence_mode is not None:
+            default_offline = (
+                getattr(intelligence_mode, "mode", "").lower() == "offline"
+            )
+        self.offline_mode = default_offline
 
         db_path = settings.memory.db_path
         if not db_path.is_absolute():
@@ -60,7 +67,7 @@ class Engine:
         self.bench = Bench()
         self.learner = Learner(self.bench, self.base / "data")
         self.planner = Planner()
-        self.client = Client()
+        self.client = Client(offline=self.offline_mode)
         self.critic = Critic()
         # LRU cache for chat responses
         self._cache_size = int(settings.memory.cache_size)
@@ -72,6 +79,24 @@ class Engine:
         self.last_answer = ""
         if perform_maintenance:
             Thread(target=self.perform_maintenance, daemon=True).start()
+
+    # ------------------------------------------------------------------
+    # Offline mode helpers
+
+    def set_offline_mode(self, offline: bool) -> None:
+        """Toggle offline mode for the engine and its dependencies."""
+
+        self.offline_mode = bool(offline)
+        mode = "offline" if self.offline_mode else "online"
+        intelligence = getattr(self.settings, "intelligence", None)
+        if intelligence is not None:
+            try:
+                intelligence.mode = mode
+            except Exception:  # pragma: no cover - defensive assignment
+                pass
+        client = getattr(self, "client", None)
+        if client is not None and hasattr(client, "set_offline"):
+            client.set_offline(self.offline_mode)
 
     def _bootstrap(self) -> str:
         """Load context and set up an initial ready agent."""

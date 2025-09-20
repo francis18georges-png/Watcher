@@ -19,9 +19,12 @@ def _stub_cli_settings(monkeypatch):
     """Avoid loading full configuration when exercising the CLI."""
 
     settings = SimpleNamespace(
-        llm=SimpleNamespace(backend="stub-backend", model="stub-model")
+        llm=SimpleNamespace(backend="stub-backend", model="stub-model"),
+        training=SimpleNamespace(seed=123),
+        intelligence=SimpleNamespace(mode="offline"),
     )
     monkeypatch.setattr(cli, "get_settings", lambda: settings)
+    monkeypatch.setattr(cli, "set_seed", lambda seed: None)
     return settings
 
 
@@ -56,3 +59,29 @@ def test_plugin_list_installed_layout(tmp_path, capsys):
         manifest = resources.files("app") / "plugins.toml"
         assert manifest.is_file()
         _assert_lists_hello(capsys, cli.main(["plugin", "list"]))
+
+
+def test_run_command_defaults_to_offline(monkeypatch):
+    called: dict[str, bool] = {}
+
+    def fake_run(offline: bool) -> int:
+        called["offline"] = offline
+        return 0
+
+    monkeypatch.setattr(cli, "_run_watcher", fake_run)
+    exit_code = cli.main(["run"])
+    assert exit_code == 0
+    assert called["offline"] is True
+
+
+def test_run_command_explicit_online(monkeypatch):
+    called: dict[str, bool] = {}
+
+    def fake_run(offline: bool) -> int:
+        called["offline"] = offline
+        return 0
+
+    monkeypatch.setattr(cli, "_run_watcher", fake_run)
+    exit_code = cli.main(["run", "--online"])
+    assert exit_code == 0
+    assert called["offline"] is False

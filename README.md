@@ -141,11 +141,19 @@ $env:DISPLAY = ""
 ./run.ps1
 ```
 
+L'onglet **Bench** affiche un tableau actualisé toutes les deux secondes avec la consommation CPU/RAM
+de chaque plugin, calculée via `psutil`. L'onglet **Chat** dispose également d'une bascule *Mode offline*
+permettant de désactiver instantanément les appels réseau/LLM pour conserver un fonctionnement 100 % local.
+
 ### Ligne de commande
 
 ```bash
-python -m app.ui.main
+watcher run [--offline|--online]
 ```
+
+La commande `watcher run` lance l'interface graphique lorsque l'affichage est disponible ou bascule en mode CLI.
+L'option `--offline` force le fonctionnement sans accès réseau tandis que `--online` réactive le backend LLM.
+L'ancien raccourci `python -m app.ui.main` reste utilisable pour un démarrage direct.
 
 ### Générer une CLI Python
 
