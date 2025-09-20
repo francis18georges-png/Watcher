@@ -30,8 +30,9 @@ mode d'exploitation de la plate-forme.
 - Les feuilles de route et journaux historiques sont conservés dans [ROADMAP.md](ROADMAP.md),
   [CHANGELOG.md](CHANGELOG.md) et le [journal de conception](journal/).
 - Pour les règles de fusion et la gouvernance du dépôt, référez-vous à la [politique de merge](merge-policy.md).
-- Chaque release `vMAJOR.MINOR.PATCH` publie un installeur Windows signé, un SBOM CycloneDX (`Watcher-sbom.json`) et une
-  attestation SLSA (`Watcher-Setup.intoto.jsonl`). Ces artefacts facilitent l'audit de la chaîne de compilation.
+- Chaque release `vMAJOR.MINOR.PATCH` publie des exécutables Windows, Linux et macOS, les SBOM CycloneDX associés
+  (`Watcher-sbom.json`, `Watcher-linux-sbom.json`, `Watcher-macos-sbom.json`) ainsi qu'une attestation SLSA
+  (`Watcher-Setup.intoto.jsonl`). Ces artefacts facilitent l'audit de la chaîne de compilation et la conformité multi-plateformes.
 
 ## Accès à la documentation publiée
 

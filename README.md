@@ -25,17 +25,23 @@ avant de le publier sur l'environnement **GitHub Pages** à chaque push sur `mai
 ## Releases, SBOM et provenance
 
 Chaque tag SemVer (`vMAJOR.MINOR.PATCH`) déclenche le workflow [`release.yml`](.github/workflows/release.yml) qui produit
-un installeur Windows signé, un SBOM CycloneDX et une attestation de provenance SLSA niveau 3.
+des exécutables Windows, Linux et macOS, un SBOM CycloneDX par plateforme et une attestation de provenance SLSA niveau 3.
 
-- `Watcher-Setup.zip` : archive contenant l'installeur généré par PyInstaller.
-- `Watcher-Setup.zip.sigstore` : bundle Sigstore pour vérifier la signature du binaire (`sigstore verify identity --bundle ...`).
-- `Watcher-sbom.json` : inventaire CycloneDX des dépendances Python installées lors du build (`cyclonedx-bom` / `cyclonedx-py`).
+### Artefacts publiés
+
+- `Watcher-Setup.zip` : archive PyInstaller Windows signée et empaquetée.
+- `Watcher-Setup.zip.sigstore` : bundle Sigstore pour vérifier la signature du binaire Windows (`sigstore verify identity --bundle ...`).
+- `Watcher-sbom.json` : inventaire CycloneDX des dépendances installées pendant le build Windows (`cyclonedx-bom` / `cyclonedx-py`).
+- `Watcher-linux-x86_64.tar.gz` : tarball PyInstaller contenant le binaire autonome Linux.
+- `Watcher-linux-sbom.json` : SBOM CycloneDX généré lors du build Linux.
+- `Watcher-macos-x86_64.zip` : archive PyInstaller macOS signée (si certificat configuré) et soumise à la notarisation Apple lorsque les secrets sont fournis.
+- `Watcher-macos-sbom.json` : SBOM CycloneDX généré lors du build macOS.
 - `Watcher-Setup.intoto.jsonl` : provenance SLSA générée par [`slsa-github-generator`](https://github.com/slsa-framework/slsa-github-generator).
 
-Ces fichiers sont publiés en tant qu'artefacts de release. Téléchargez le SBOM pour auditer les composants et la provenance
-`*.intoto.jsonl` pour tracer la chaîne de build ou alimenter un vérificateur SLSA.
+Ces fichiers sont publiés en tant qu'artefacts de release. Téléchargez le SBOM correspondant pour auditer les composants de la
+plateforme visée et conservez la provenance `*.intoto.jsonl` pour tracer la chaîne de build ou alimenter un vérificateur SLSA.
 
-### Installer l'installeur Windows signé
+### Installer sur Windows
 
 1. Téléchargez `Watcher-Setup.zip` ainsi que `Watcher-Setup.zip.sigstore` depuis la page GitHub Releases
    correspondant au tag SemVer (`vMAJOR.MINOR.PATCH`) que vous souhaitez déployer.
@@ -63,6 +69,48 @@ Ces fichiers sont publiés en tant qu'artefacts de release. Téléchargez le SBO
 
 Le bundle Sigstore fournit également un horodatage de transparence et peut être vérifié hors-ligne grâce au
 [`rekor-cli`](https://github.com/sigstore/rekor) si vous devez archiver la preuve de signature.
+
+### Installer sur Linux
+
+1. Téléchargez `Watcher-linux-x86_64.tar.gz` depuis la page GitHub Releases correspondant à la version désirée.
+2. Extrayez l'archive dans un répertoire dédié :
+
+   ```bash
+   tar -xzf Watcher-linux-x86_64.tar.gz
+   ```
+
+3. Exécutez le binaire depuis le dossier extrait :
+
+   ```bash
+   cd Watcher
+   ./Watcher --help
+   ```
+
+   Le bundle contient la configuration et les prompts requis. Vous pouvez déplacer le dossier complet vers un emplacement
+   inclus dans votre `PATH` ou créer un lien symbolique vers `Watcher`.
+
+### Installer sur macOS
+
+1. Téléchargez `Watcher-macos-x86_64.zip` depuis la page GitHub Releases.
+2. Décompressez l'archive (Finder → *Décompresser* ou `ditto -x -k Watcher-macos-x86_64.zip Watcher`).
+3. Si un certificat de signature est configuré, le binaire est signé et le workflow soumet automatiquement l'archive à la
+   notarisation Apple à l'aide de `notarytool`. Vous pouvez vérifier l'intégrité locale :
+
+   ```bash
+   codesign --verify --deep --strict Watcher/Watcher
+   ```
+
+   et afficher le ticket de notarisation (si disponible) via l'artefact de workflow `Watcher-macos-notarization.json` ou en interrogeant
+   `xcrun notarytool history --apple-id <id> --team-id <team> --password <app-specific-password>`.
+4. Lancez l'exécutable depuis le Terminal :
+
+   ```bash
+   cd Watcher
+   ./Watcher --help
+   ```
+
+   Conservez l'ensemble du dossier, qui regroupe la configuration et les prompts nécessaires. Si aucun certificat n'est fourni,
+   macOS affichera un avertissement Gatekeeper ; autorisez l'exécution via *Préférences système → Sécurité et confidentialité*.
 
 ## Benchmarks
 
