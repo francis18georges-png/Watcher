@@ -8,7 +8,20 @@ body:
   - type: markdown
     attributes:
       value: |
-        Merci de détailler la valeur ajoutée pour les utilisateurs ainsi que les impacts potentiels.
+        Merci de détailler la valeur ajoutée pour les utilisateurs ainsi que les impacts potentiels. Consultez `docs/merge-policy.md` pour comprendre comment votre demande sera triée et labellisée.
+  - type: dropdown
+    id: scope
+    attributes:
+      label: Zone impactée
+      description: Sélectionnez la zone fonctionnelle principale liée à la demande.
+      options:
+        - scope:app — Interface ou API utilisateur
+        - scope:ml — Pipelines de données ou d'entraînement
+        - scope:docs — Documentation, guides ou métriques
+        - scope:ops — CI/CD, packaging ou scripts
+        - scope:quality — Tests automatisés et qualité
+        - scope:security — Configuration sensible, secrets, permissions
+        - Non déterminé / Autre
   - type: checkboxes
     id: impact
     attributes:

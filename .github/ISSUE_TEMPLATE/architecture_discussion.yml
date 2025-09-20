@@ -10,6 +10,20 @@ body:
     attributes:
       value: |
         Utilisez ce modèle pour recueillir l'avis de la communauté ou valider une approche avant d'ouvrir une Pull Request.
+        Consultez également `docs/merge-policy.md` pour connaître la signification des labels appliqués lors du tri.
+  - type: dropdown
+    id: scope
+    attributes:
+      label: Zone concernée
+      description: Identifier la zone de code ou de documentation concernée facilite l'assignation des CODEOWNERS.
+      options:
+        - scope:app — Interface ou API utilisateur
+        - scope:ml — Pipelines de données ou d'entraînement
+        - scope:docs — Documentation, guides ou métriques
+        - scope:ops — CI/CD, packaging ou scripts
+        - scope:quality — Tests automatisés et qualité
+        - scope:security — Configuration sensible, secrets, permissions
+        - Non déterminé / Autre
   - type: textarea
     id: question
     attributes:

@@ -1,2 +1,6 @@
 auto-merge:
   method: merge
+  required-labels:
+    - status:auto-merge
+  blocking-labels:
+    - status:blocked
