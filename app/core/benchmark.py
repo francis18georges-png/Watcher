@@ -152,6 +152,7 @@ class Bench:
             "planner_briefing": self._scenario_planner_briefing,
             "learner_update": self._scenario_learner_update,
             "metrics_tracking": self._scenario_metrics_tracking,
+            "memory_operations": self._scenario_memory_operations,
         }
 
     def _scenario_planner_briefing(self) -> None:
@@ -204,6 +205,39 @@ class Bench:
         if metrics.response_times:
             metrics.log_evaluation_score(statistics.fmean(metrics.response_times))
         metrics.log_error("synthetic benchmark error log")
+
+    def _scenario_memory_operations(self) -> None:
+        from app.core.memory import Memory
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            mem = Memory(Path(tmpdir) / "bench.db")
+            prompts = [
+                "réponse concise",
+                "résumer article",
+                "détailler plan",
+                "trouver bug",
+            ]
+            answers = [
+                "réponse générée",
+                "résumé prêt",
+                "plan détaillé",
+                "correction appliquée",
+            ]
+            for index in range(64):
+                prompt = prompts[index % len(prompts)]
+                answer = answers[index % len(answers)]
+                mem.add("chat_user", f"{prompt} #{index}")
+                mem.add("chat_ai", f"{answer} #{index}")
+            mem.summarize("chat_ai", max_items=20)
+            for rating, prompt, answer in zip(
+                [0.4, 0.7, 1.0], prompts, answers
+            ):
+                mem.add_feedback("chat", prompt, answer, rating)
+            # Force iteration over the feedback generator to touch batching logic
+            list(mem.iter_feedback(batch_size=2))
+            # Execute a couple of similarity searches to exercise the vector index
+            mem.search("plan détaillé", top_k=5)
+            mem.search("résumé", top_k=5)
 
     # ------------------------------------------------------------------
     # Helpers

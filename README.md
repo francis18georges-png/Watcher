@@ -35,11 +35,18 @@ Ces fichiers sont publiés en tant qu'artefacts de release. Téléchargez le SBO
 
 ## Benchmarks
 
-Le script `python -m app.core.benchmark run` exécute trois scénarios représentatifs
-(`planner_briefing`, `learner_update`, `metrics_tracking`) en mesurant le temps
-et l'utilisation mémoire via `tracemalloc`. Chaque exécution ajoute une entrée
-historique dans `metrics/benchmarks.jsonl`, met à jour le résumé courant dans
-`metrics/benchmarks-latest.json` et régénère le badge `metrics/performance_badge.svg`.
+Le script `python -m app.core.benchmark run` exécute quatre scénarios
+représentatifs en mesurant le temps et l'utilisation mémoire via `tracemalloc` :
+
+- `planner_briefing` : génère des briefs successifs avec le planificateur.
+- `learner_update` : applique plusieurs mises à jour du `Learner`.
+- `metrics_tracking` : exerce les context managers de `PerformanceMetrics`.
+- `memory_operations` : manipule la base SQLite de `Memory` (ajout, résumé,
+  feedback et recherche vectorielle).
+
+Chaque exécution ajoute une entrée historique dans `metrics/benchmarks.jsonl`,
+met à jour le résumé courant dans `metrics/benchmarks-latest.json` et régénère
+le badge `metrics/performance_badge.svg`.
 
 Les seuils de non-régression sont définis dans `metrics/bench_thresholds.json`.
 Pour vérifier qu'ils sont respectés, utilisez :
