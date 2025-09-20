@@ -7,7 +7,7 @@ import json
 import logging
 from urllib.parse import urlparse
 
-from config import load_config
+from config import get_settings
 
 
 def validate_prompt(prompt: str) -> str:
@@ -79,8 +79,8 @@ class Client:
         ctx: Context window size used by the LLM. Defaults to ``None`` which
             means the value is read from ``config/settings.toml``. Must be a
             positive integer.
-        fallback_phrase: Text prefix used when generation fails. Defaults to
-            ``"Echo"``.
+        fallback_phrase: Text prefix used when generation fails. When omitted
+            the value defined in the configuration is used.
     """
 
     def __init__(
@@ -89,24 +89,18 @@ class Client:
         host: str | None = None,
         *,
         ctx: int | None = None,
-        fallback_phrase: str = "Echo",
+        fallback_phrase: str | None = None,
     ) -> None:
-        cfg = load_config().get("llm", {})
+        settings = get_settings()
+        llm_cfg = settings.llm
 
-        if ctx is not None:
-            if ctx < 1:
-                raise ValueError("ctx must be a positive integer")
-            cfg["ctx"] = ctx
+        if ctx is not None and ctx < 1:
+            raise ValueError("ctx must be a positive integer")
 
-        if model is not None:
-            cfg["model"] = model
-        if host is not None:
-            cfg["host"] = host
-
-        self.model = cfg.get("model", "llama3.2:3b")
-        self.host = cfg.get("host", "127.0.0.1:11434")
-        self.ctx = cfg.get("ctx")
-        self.fallback_phrase = fallback_phrase
+        self.model = model or llm_cfg.model
+        self.host = host or llm_cfg.host
+        self.ctx = ctx if ctx is not None else llm_cfg.ctx
+        self.fallback_phrase = fallback_phrase or llm_cfg.fallback_phrase
 
     def generate(self, prompt: str, *, separator: str = "") -> tuple[str, str]:
         """Return a response and trace for *prompt*.

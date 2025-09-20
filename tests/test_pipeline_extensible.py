@@ -1,3 +1,6 @@
+from types import SimpleNamespace
+
+from app.configuration import DataSettings, PathsSettings
 from app.data import pipeline as dp
 
 
@@ -13,18 +16,18 @@ class AddB:
         return data
 
 
-def fake_config(section=None):
-    if section == "data":
-        return {
-            "steps": {
-                "first": "tests.test_pipeline_extensible.AddA",
-                "second": "tests.test_pipeline_extensible.AddB",
-            }
-        }
-    return {}
-
-
 def test_pipeline_extensible(monkeypatch):
-    monkeypatch.setattr(dp, "load_config", fake_config)
+    def fake_settings():
+        return SimpleNamespace(
+            data=DataSettings(
+                steps={
+                    "first": "tests.test_pipeline_extensible.AddA",
+                    "second": "tests.test_pipeline_extensible.AddB",
+                }
+            ),
+            paths=PathsSettings(),
+        )
+
+    monkeypatch.setattr(dp, "get_settings", fake_settings)
     result = dp.run_pipeline([])
     assert result == ["a", "b"]

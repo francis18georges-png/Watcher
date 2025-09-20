@@ -11,6 +11,7 @@ from threading import Thread
 from app.core import logging_setup
 from app.core.engine import Engine
 from app.utils.metrics import PerformanceMetrics, metrics
+from config import get_settings
 
 
 logger = logging.getLogger(__name__)
@@ -67,6 +68,7 @@ def start_metrics_server(
 class WatcherApp(ttk.Frame):
     def __init__(self, master: tk.Tk):
         super().__init__(master)
+        self.settings = get_settings()
         self.engine = Engine()
         master.title(APP_NAME)
         master.geometry("1100x700")
@@ -118,7 +120,11 @@ class WatcherApp(ttk.Frame):
         ttk.Button(bottom, text="Noter", command=self._rate).pack(side="left")
         self.status = ttk.Label(
             self,
-            text="Mode: Sur | Backend: ollama | Modèle: llama3.2:3b",
+            text=(
+                f"Mode: {self.settings.ui.mode} | "
+                f"Backend: {self.settings.llm.backend} | "
+                f"Modèle: {self.settings.llm.model}"
+            ),
         )
         self.status.pack(fill="x")
 

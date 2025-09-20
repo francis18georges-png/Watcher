@@ -1,7 +1,9 @@
 import logging
+from types import SimpleNamespace
 
+from app.configuration import MemorySettings
 from app.tools.embeddings import embed_ollama
-from config import load_config
+from config import clear_settings_cache, get_settings
 
 
 def test_embed_ollama_connection_error(monkeypatch):
@@ -44,9 +46,6 @@ def test_embed_ollama_host_argument(monkeypatch):
 
 
 def test_embed_ollama_host_from_config(monkeypatch):
-    def fake_config():
-        return {"memory": {"embed_host": "confighost:4242"}}
-
     called = {}
 
     def bad_conn(host, port, *args, **kwargs):
@@ -54,7 +53,10 @@ def test_embed_ollama_host_from_config(monkeypatch):
         called["port"] = port
         raise OSError("fail")
 
-    monkeypatch.setattr("app.tools.embeddings.load_config", fake_config)
+    stub_settings = SimpleNamespace(
+        memory=MemorySettings(embed_host="confighost:4242")
+    )
+    monkeypatch.setattr("app.tools.embeddings.get_settings", lambda: stub_settings)
     monkeypatch.setattr("http.client.HTTPConnection", bad_conn)
     embed_ollama(["hi"])
     assert called == {"host": "confighost", "port": 4242}
@@ -91,8 +93,8 @@ def test_embed_ollama_warning_logged(monkeypatch):
 def test_embed_ollama_does_not_mutate_config(monkeypatch):
     """Successive calls with overrides leave the cached config unchanged."""
 
-    load_config.cache_clear()
-    original_memory = load_config()["memory"].copy()
+    clear_settings_cache()
+    original_memory = get_settings().memory.model_copy()
 
     def bad_conn(*args, **kwargs):
         raise OSError("fail")
@@ -100,7 +102,8 @@ def test_embed_ollama_does_not_mutate_config(monkeypatch):
     monkeypatch.setattr("http.client.HTTPConnection", bad_conn)
 
     embed_ollama(["hi"], model="foo", host="example.com:1234")
-    assert load_config()["memory"] == original_memory
+    assert get_settings().memory.model_dump() == original_memory.model_dump()
 
     embed_ollama(["hi"], model="bar", host="another.com:5678")
-    assert load_config()["memory"] == original_memory
+    assert get_settings().memory.model_dump() == original_memory.model_dump()
+    clear_settings_cache()

@@ -11,13 +11,20 @@ from dataclasses import dataclass
 from importlib import import_module
 from typing import Any, Callable, Iterable, Protocol, runtime_checkable
 
-from app.config import load_config
+from config import get_settings
 
 logger = logging.getLogger(__name__)
 
-BASE_DIR = Path(__file__).resolve().parents[2]
-RAW_DIR = BASE_DIR / "datasets" / "raw"
-PROCESSED_DIR = BASE_DIR / "datasets" / "processed"
+
+
+def _raw_directory() -> Path:
+    settings = get_settings()
+    return settings.paths.resolve(settings.data.raw_dir)
+
+
+def _processed_directory() -> Path:
+    settings = get_settings()
+    return settings.paths.resolve(settings.data.processed_dir)
 
 
 def load_raw_data(path: Path | str | None = None) -> dict | list[dict]:
@@ -28,11 +35,12 @@ def load_raw_data(path: Path | str | None = None) -> dict | list[dict]:
     files inside are loaded and returned as a list of dictionaries.
     """
     p = Path(path) if path else Path("data.json")
+    raw_dir = _raw_directory()
     if not p.is_absolute():
-        p = RAW_DIR / p
+        p = raw_dir / p
     p = p.resolve()
     try:
-        p.relative_to(RAW_DIR)
+        p.relative_to(raw_dir)
     except ValueError:
         logger.error("raw data file '%s' escapes RAW_DIR", p)
         raise ValueError(f"path '{p}' escapes RAW_DIR")
@@ -141,7 +149,7 @@ def transform_data(
         The path(s) to the written file(s).
     """
 
-    dest_dir = PROCESSED_DIR
+    dest_dir = _processed_directory()
     dest_dir.mkdir(parents=True, exist_ok=True)
 
     def _safe_dest(name: str) -> Path:
@@ -151,7 +159,7 @@ def transform_data(
             raise ValueError(f"invalid filename: {name}")
         dest = (dest_dir / name).resolve()
         try:
-            dest.relative_to(PROCESSED_DIR)
+            dest.relative_to(dest_dir)
         except ValueError:
             raise ValueError(f"path '{name}' escapes PROCESSED_DIR")
         return dest
@@ -242,8 +250,8 @@ def run_pipeline(data: Any | None = None, hooks: list[Hook] | None = None) -> An
         The result returned by the last pipeline step.
     """
 
-    cfg = load_config("data")
-    steps_cfg = cfg.get("steps", {})
+    data_cfg = get_settings().data
+    steps_cfg = dict(data_cfg.steps)
 
     # Prefetch step callables to group module lookups and avoid repeated
     # resolution during execution.
