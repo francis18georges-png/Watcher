@@ -24,6 +24,7 @@ class Memory:
         self._embed_cache: dict[str, np.ndarray] = {}
         self._fts5_checked = False
         self._fts5_available = False
+        self._fts5_requires_extension = False
         self._sqlcipher_requested = self._is_sqlcipher_enabled()
         self._sqlcipher_password = os.getenv("WATCHER_MEMORY_SQLCIPHER_PASSWORD")
         self._sqlcipher_available = self._detect_sqlcipher()
@@ -225,21 +226,31 @@ class Memory:
         self._ensure_fts5(con)
 
     def _ensure_fts5(self, con: sqlite3.Connection) -> None:
-        if self._fts5_checked:
+        need_extension_load = self._fts5_requires_extension
+
+        if not self._fts5_checked:
+            self._fts5_checked = True
+            try:
+                options = [row[0] for row in con.execute("PRAGMA compile_options")]
+            except sqlite3.DatabaseError:
+                options = []
+            if any("FTS5" in str(option).upper() for option in options):
+                self._fts5_available = True
+                self._fts5_requires_extension = False
+                logger.debug("FTS5 support detected via compile options")
+                return
+            need_extension_load = True
+            self._fts5_requires_extension = True
+
+        if not need_extension_load:
             return
-        self._fts5_checked = True
-        try:
-            options = [row[0] for row in con.execute("PRAGMA compile_options")]
-        except sqlite3.DatabaseError:
-            options = []
-        if any("FTS5" in option.upper() for option in options):
-            self._fts5_available = True
-            logger.debug("FTS5 support detected via compile options")
-            return
+
         try:
             enable_load_extension = getattr(con, "enable_load_extension")
         except AttributeError:
-            logger.debug("FTS5 extension loading is not supported by this sqlite3 build")
+            logger.debug(
+                "FTS5 extension loading is not supported by this sqlite3 build"
+            )
             return
         try:
             enable_load_extension(True)
@@ -247,6 +258,7 @@ class Memory:
             self._fts5_available = True
             logger.debug("FTS5 extension successfully loaded")
         except (sqlite3.DatabaseError, sqlite3.OperationalError):
+            self._fts5_available = False
             logger.debug("FTS5 extension could not be loaded", exc_info=True)
         finally:
             try:
