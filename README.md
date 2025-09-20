@@ -191,6 +191,14 @@ NumPy et, si disponible, PyTorch. Le fichier de configuration `config/settings.t
 contient un paramètre `seed` dans la section `[training]` qui peut être adapté
 pour garantir des exécutions déterministes.
 
+La commande CLI `watcher` applique automatiquement cette graine dès son
+démarrage afin d'initialiser toutes les bibliothèques stochastiques. Une
+option `--seed` est disponible pour surcharger ponctuellement la valeur par
+défaut définie dans `config/settings.toml`. Pour les exécutions automatisées,
+exportez `PYTHONHASHSEED` ainsi que `WATCHER_TRAINING__SEED` avant de lancer
+Nox ou vos scripts afin d'aligner l'environnement avec la configuration
+versionnée.
+
 ## Données
 
 La pipeline [DVC](https://dvc.org/) décrite dans `dvc.yaml` prépare et valide le
