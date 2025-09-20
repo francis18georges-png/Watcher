@@ -74,5 +74,6 @@ def tests(session: nox.Session) -> None:
 @nox.session(python=PYTHON_VERSIONS)
 def build(session: nox.Session) -> None:
     """Build the project wheel and source distribution."""
-    install_project(session, "build")
-    session.run("python", "-m", "build")
+    session.install("--upgrade", "pip")
+    session.install("--constraint", "requirements-dev.txt", "build")
+    session.run("python", "-m", "build", "--wheel", "--sdist")

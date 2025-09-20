@@ -4,6 +4,14 @@ Bienvenue dans l'espace de référence du projet **Watcher**, l'atelier local d'
 Cette documentation complète le README en décrivant la structure logicielle, les mesures de sécurité et le
 mode d'exploitation de la plate-forme.
 
+## Installer Watcher
+
+- **pipx** : `pipx install watcher` déploie la CLI dans un environnement isolé et facilite les mises à jour
+  (`pipx upgrade watcher`).
+- **pip** : `python -m pip install watcher` installe le package dans l'environnement virtuel actif.
+- **Windows** : un installeur signé reste proposé via les releases GitHub pour ceux qui préfèrent un
+  exécutable autonome (voir la procédure détaillée dans le README).
+
 ## Parcours recommandé
 
 1. Comprendre la [vue d'ensemble de l'architecture](architecture.md) pour visualiser le dialogue entre
