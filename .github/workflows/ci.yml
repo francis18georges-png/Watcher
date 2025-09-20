@@ -51,3 +51,7 @@ jobs:
 
       - name: Run quality pipeline
         run: nox -s lint typecheck security tests build
+
+      - name: Run performance benchmarks
+        if: matrix.os == 'ubuntu-latest'
+        run: nox -s bench

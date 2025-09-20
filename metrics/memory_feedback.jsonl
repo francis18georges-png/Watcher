@@ -1,0 +1,2 @@
+{"batch_size": 150, "batch_time": 0.0027586090000113472, "mode": "batch", "naive_time": 0.009908827999993264, "rows": 1500, "scenario": "memory_feedback", "score": 362.5015360987681, "speedup": 3.5919653709360424, "timestamp": 1758374175.2419941, "variant": "memory-batch"}
+{"batch_size": 150, "batch_time": 0.0025593719999505993, "mode": "batch", "naive_time": 0.00927283000009993, "rows": 1500, "scenario": "memory_feedback", "score": 390.7208487157404, "speedup": 3.6230880076358236, "timestamp": 1758374309.7530382, "variant": "memory-batch"}

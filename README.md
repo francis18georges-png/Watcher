@@ -3,6 +3,11 @@
 Atelier local d'IA de programmation autonome (offline par défaut).
 Mémoire vectorielle, curriculum adaptatif, A/B + bench et quality gate sécurité.
 
+![Statut des benchmarks](metrics/performance_badge.svg)
+
+Le badge est généré à partir des fichiers JSON de la CLI et peut aussi être servi
+par Shields.io via l'URL : `https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/<owner>/<repo>/main/metrics/performance_badge.json`.
+
 ## Installation
 
 1. Cloner ce dépôt.
@@ -122,6 +127,26 @@ sdist.
 
 Pour automatiser les corrections, la cible `make format` applique Ruff (lint
 et formattage) puis Black, et `make check` délègue dorénavant à Nox.
+
+### Benchmarks de performance
+
+Trois scénarios couvrent le chargement des données, la lecture des feedbacks et
+la latence du client LLM. Ils peuvent être lancés via :
+
+```bash
+nox -s bench
+```
+
+La commande exécute `python -m app.core.benchmark run` puis `check` afin
+d'enregistrer les métriques dans `metrics/*.jsonl`, de mettre à jour le badge et
+de valider les seuils définis dans `config/benchmarks.toml`. Pour exécuter un
+scénario précis :
+
+```bash
+python -m app.core.benchmark run B
+```
+
+Les variantes configurées sont listées par `python -m app.core.benchmark list`.
 
 ### Hooks pre-commit
 

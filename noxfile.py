@@ -69,3 +69,12 @@ def build(session: nox.Session) -> None:
     """Build the project wheel and source distribution."""
     install_project(session, "build")
     session.run("python", "-m", "build")
+
+
+@nox.session(python=PYTHON_VERSIONS)
+def bench(session: nox.Session) -> None:
+    """Run performance benchmarks and enforce thresholds."""
+
+    install_project(session)
+    session.run("python", "-m", "app.core.benchmark", "run")
+    session.run("python", "-m", "app.core.benchmark", "check")
