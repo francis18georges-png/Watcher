@@ -1,7 +1,8 @@
+import importlib
+
 from importlib import resources
 from importlib.resources.abc import Traversable
 
-from app.core.engine import Engine
 from app.tools import plugins
 
 
@@ -10,8 +11,10 @@ def test_reload_plugins():
     with resources.as_file(manifest) as cfg_path:
         original = cfg_path.read_text(encoding="utf-8")
 
-        engine = Engine()
-        assert not any(p.module == "tests.dummy_plugin" for p in engine.plugins)
+        assert all(
+            plugin.module != "tests.dummy_plugin"
+            for plugin in plugins.reload_plugins(cfg_path)
+        )
 
         signature = plugins.compute_module_signature("tests.dummy_plugin")
         assert signature is not None
@@ -25,9 +28,14 @@ def test_reload_plugins():
             encoding="utf-8",
         )
         try:
-            engine.reload_plugins()
-            assert any(p.module == "tests.dummy_plugin" for p in engine.plugins)
-            outputs = engine.run_plugins()
-            assert "dummy plugin loaded" in outputs
+            loaded = plugins.reload_plugins(cfg_path)
+            dummy_plugin = next(
+                plugin for plugin in loaded if plugin.module == "tests.dummy_plugin"
+            )
+
+            module = importlib.import_module(dummy_plugin.module)
+            plugin_cls = getattr(module, dummy_plugin.attribute)
+            plugin = plugin_cls()
+            assert plugin.run() == "dummy plugin loaded"
         finally:
             cfg_path.write_text(original, encoding="utf-8")

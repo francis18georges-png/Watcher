@@ -242,6 +242,20 @@ def reload_plugins(base: Location | None = None) -> list[LoadedPlugin]:
     """
 
     manifest = _resolve_manifest(base)
+    if manifest is None:
+        try:
+            candidate = resources.files("app") / "plugins.toml"
+        except ModuleNotFoundError:
+            logging.debug(
+                "Unable to locate packaged plugin manifest; app package missing"
+            )
+        else:
+            if candidate.is_file():
+                manifest = candidate
+            else:
+                logging.debug(
+                    "Unable to locate packaged plugin manifest inside app package"
+                )
     plugins: list[LoadedPlugin] = []
     if manifest is not None:
         try:
