@@ -15,6 +15,9 @@ fallback_phrase = "Echo"
 logging = "debug"
 trace_requests = false
 
+[logging]
+fallback_level = "INFO"
+
 [planner]
 default_platform = "windows"
 default_license = "MIT"

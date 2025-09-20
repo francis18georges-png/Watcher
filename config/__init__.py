@@ -23,6 +23,7 @@ from app.configuration import (
     DatasetSettings,
     DevSettings,
     EmbeddingsSettings,
+    LoggingSettings,
     IntelligenceSettings,
     LLMSettings,
     LearningSettings,
@@ -122,6 +123,9 @@ class _TomlSettingsSource(PydanticBaseSettingsSource):
                 )
         return data
 
+    def get_field_value(self, field_name: str, field, value: Any) -> tuple[Any, bool]:
+        return value, False
+
 
 class Settings(BaseSettings):
     """Typed configuration object backed by ``pydantic-settings``."""
@@ -150,6 +154,7 @@ class Settings(BaseSettings):
     dataset: DatasetSettings = Field(default_factory=DatasetSettings)
     embeddings: EmbeddingsSettings = Field(default_factory=EmbeddingsSettings)
     sandbox: SandboxSettings = Field(default_factory=SandboxSettings)
+    logging: LoggingSettings = Field(default_factory=LoggingSettings)
     critic: CriticSettings = Field(default_factory=CriticSettings)
 
     @classmethod
