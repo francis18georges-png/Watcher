@@ -2,16 +2,24 @@
 
 import pathlib
 
+from PyInstaller.utils.hooks import collect_data_files
+
 block_cipher = None
 
 project_root = pathlib.Path(__file__).resolve().parent.parent
+
+datas = [('app/plugins.toml', 'app')]
+datas += collect_data_files(
+    "config",
+    includes=["*.toml", "*.yml", "*.json"],
+)
 
 
 a = Analysis(
     ['app/cli.py'],
     pathex=[project_root.as_posix()],
     binaries=[],
-    datas=[('app/plugins.toml', 'app')],
+    datas=datas,
     hiddenimports=[],
     hookspath=[],
     hooksconfig={},
