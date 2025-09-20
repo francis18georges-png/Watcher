@@ -82,22 +82,26 @@ def _resolve_manifest(base: Location | None) -> Location | None:
     """
 
     if base is None:
-        base = resources.files("app")
-
-    if isinstance(base, Traversable):
-        manifest = base if base.is_file() else base.joinpath("plugins.toml")
+        manifest: Location = resources.files("app") / "plugins.toml"
     else:
-        base_path = Path(base)
-        manifest = base_path if base_path.is_file() else base_path / "plugins.toml"
+        manifest = base
 
     if isinstance(manifest, Traversable):
-        if not manifest.is_file():
-            return None
-        return manifest
-
-    if not manifest.exists():
+        if manifest.is_file():
+            return manifest
+        candidate = manifest / "plugins.toml"
+        if candidate.is_file():
+            return candidate
         return None
-    return manifest
+
+    base_path = Path(manifest)
+    if base_path.is_file():
+        return base_path
+
+    candidate_path = base_path / "plugins.toml"
+    if candidate_path.exists():
+        return candidate_path
+    return None
 
 
 def _read_manifest(manifest: Location) -> str:
@@ -112,8 +116,8 @@ def reload_plugins(base: Location | None = None) -> list[Plugin]:
     Parameters
     ----------
     base:
-        Optional base directory containing the ``plugins.toml`` file.  When
-        ``None`` the manifest embedded in :mod:`app` is used.
+        Optional base directory or manifest file containing ``plugins.toml``.
+        When ``None`` the manifest embedded in :mod:`app` is used.
     """
 
     manifest = _resolve_manifest(base)

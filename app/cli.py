@@ -9,14 +9,14 @@ from typing import Sequence
 
 from app.tools import plugins
 
-#: Base location containing the plugin manifest bundled with the :mod:`app` package.
-_plugin_base: Traversable = resources.files("app")
+#: Manifest bundled with the :mod:`app` package.
+_PLUGIN_MANIFEST: Traversable = resources.files("app") / "plugins.toml"
 
 
 def _iter_plugins() -> list[plugins.Plugin]:
     """Return all configured plugin instances."""
 
-    return plugins.reload_plugins(_plugin_base)
+    return plugins.reload_plugins(_PLUGIN_MANIFEST)
 
 
 def main(argv: Sequence[str] | None = None) -> int:
