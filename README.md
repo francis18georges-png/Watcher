@@ -145,6 +145,12 @@ Les sessions peuvent également être exécutées individuellement (`nox -s lint
 `nox -s tests`, etc.) et une étape `nox -s build` génère les artefacts wheel et
 sdist.
 
+Sur la CI, la matrice Windows exécute `pwsh ./installer.ps1 -SkipOllama` pour
+valider que l'installeur prépare bien l'environnement PowerShell. Le workflow
+relance ensuite `pwsh ./run.ps1` en mode headless (variable `DISPLAY` vidée) et
+alimente la CLI avec la commande `exit`. Tout code de retour non nul provoque
+explicitement l'échec du job.
+
 Pour automatiser les corrections, la cible `make format` applique Ruff (lint
 et formattage) puis Black, et `make check` délègue dorénavant à Nox.
 
