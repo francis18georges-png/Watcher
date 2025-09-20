@@ -1,0 +1,47 @@
+# VCS metadata
+.git
+.gitignore
+
+# CI and GitHub configuration
+.github
+
+# Python cache and build artifacts
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.so
+*.whl
+*.egg-info/
+*.dist-info/
+
+# Virtual environments and tooling caches
+.venv/
+.nox/
+.pytest_cache/
+.mypy_cache/
+.cache/
+.tox/
+.pdm-build/
+
+# Build outputs
+build/
+dist/
+*.log
+
+# Documentation and local assets not required at runtime
+docs/
+metrics/
+
+# Development containers and DVC metadata
+.devcontainer/
+.dvc/
+
+# Tests not needed inside the runtime image
+tests/
+
+# Miscellaneous
+datasets/.gitignore
+*.env
+*.example
+*.bak

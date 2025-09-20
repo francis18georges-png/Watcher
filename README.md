@@ -169,6 +169,50 @@ et mettez à jour la configuration d'authentification associée.
 
 Les fichiers d'environnement (`*.env`), les journaux (`*.log`) et les environnements virtuels (`.venv/`) sont ignorés par Git afin d'éviter la mise en version de données sensibles ou temporaires.
 
+## Exécution via Docker
+
+Une image container officielle est construite par le workflow [`docker.yml`](.github/workflows/docker.yml)
+et publiée sur le registre GitHub Container Registry sous `ghcr.io/<owner>/watcher`.
+
+### Utiliser l'image publiée
+
+Les points de montage suivants permettent de persister les fichiers générés par Watcher entre deux
+exécutions :
+
+- `/app/data` : base de données principale (`WATCHER_DATABASE__URL`).
+- `/app/memory` : cache vectoriel et fichiers de mémoire (`memory/mem.db`).
+- `/app/logs` : journaux d'exécution.
+- `/app/config` *(optionnel)* : configuration TOML et fichiers `plugins.toml` personnalisés.
+
+```bash
+docker run --rm -it \
+  -v watcher-data:/app/data \
+  -v watcher-memory:/app/memory \
+  -v watcher-logs:/app/logs \
+  ghcr.io/<owner>/watcher:latest --help
+```
+
+Copiez le dossier `config/` du dépôt si vous souhaitez le personnaliser avant de le monter en lecture
+(`-v "$(pwd)/config:/app/config:ro"`).  Les variables d'environnement peuvent être fournies avec
+`--env-file` (par exemple `--env-file ./example.env`).
+
+Pour exécuter une commande CLI, passez-la directement après l'image :
+
+```bash
+docker run --rm -it ghcr.io/<owner>/watcher:latest plugin list
+```
+
+### Construire l'image en local
+
+Si vous ne souhaitez pas attendre la publication GitHub Actions, construisez et testez l'image avec Docker :
+
+```bash
+docker build -t watcher:local .
+docker run --rm -it watcher:local mode offline
+```
+
+Les volumes présentés ci-dessus fonctionnent également avec l'image locale (`watcher:local`).
+
 ## Environnement de développement
 
 Un dossier `.devcontainer/` est fourni pour disposer d'un environnement prêt à l'emploi
