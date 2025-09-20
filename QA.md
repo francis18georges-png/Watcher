@@ -19,10 +19,10 @@
 
 ## Continuous Integration
 
-* The Windows job invokes `pwsh ./installer.ps1 -SkipOllama` to validate that the PowerShell installer
-  succeeds without the Ollama models.
-* The same job launches `pwsh ./run.ps1` with an empty `DISPLAY` variable to emulate headless mode. Any
-  startup failure or premature exit fails the build.
+* The Windows job invokes `./installer.ps1 -SkipOllama` to validate that the PowerShell installer succeeds
+  without the Ollama models.
+* Immediately afterwards the workflow launches `./run.ps1` with an empty `DISPLAY` variable to emulate
+  headless mode. Any startup failure or premature exit fails the build.
 
 ## Static Analysis
 

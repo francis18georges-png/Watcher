@@ -56,7 +56,7 @@ jobs:
       - name: Validate Windows installer
         if: runner.os == 'Windows'
         shell: pwsh
-        run: pwsh ./installer.ps1 -SkipOllama
+        run: ./installer.ps1 -SkipOllama
 
       - name: Run micro benchmarks
         if: runner.os == 'Linux'
@@ -76,7 +76,7 @@ jobs:
           $job = Start-Job -ScriptBlock {
             param($path)
             $env:DISPLAY = ""
-            pwsh -NoLogo -NoProfile -File $path
+            & $path
           } -ArgumentList $script
 
           try {
