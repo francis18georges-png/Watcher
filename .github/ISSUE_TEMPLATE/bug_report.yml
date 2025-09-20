@@ -1,0 +1,54 @@
+name: Rapport de bug
+description: Signaler un comportement inattendu ou une régression.
+title: "[Bug]: "
+labels:
+  - bug
+  - needs-triage
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Merci de décrire clairement le bug rencontré. Consultez la documentation QA pour vérifier les étapes de reproduction.
+  - type: checkboxes
+    id: prerequisites
+    attributes:
+      label: Prérequis
+      description: Vérifiez ces points avant de soumettre un bug.
+      options:
+        - label: J'ai vérifié qu'une issue similaire n'existe pas déjà.
+          required: true
+        - label: J'ai exécuté `make check` (ou `nox -s lint typecheck security tests`) et fourni les journaux pertinents.
+          required: false
+        - label: J'ai inclus les informations de version/environnement nécessaires.
+          required: true
+  - type: textarea
+    id: description
+    attributes:
+      label: Description du bug
+      description: Résumez le comportement observé et le comportement attendu.
+      placeholder: "Le bouton X reste désactivé après..."
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Étapes de reproduction
+      description: Listez les étapes pour reproduire le bug.
+      placeholder: |
+        1. Aller sur...
+        2. Cliquer sur...
+        3. Observer...
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs et sorties
+      description: Collez les logs, traces ou captures d'écran utiles.
+      render: shell
+  - type: input
+    id: environment
+    attributes:
+      label: Environnement
+      description: Système d'exploitation, version Python, commit, etc.
+      placeholder: ex. Ubuntu 22.04, Python 3.12, commit abc1234
+    validations:
+      required: true

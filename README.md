@@ -143,6 +143,22 @@ La configuration `bandit.yml` exclut notamment les répertoires `.git`, `dataset
 `.venv`, `build`, `dist` et `*.egg-info` afin d'éviter l'analyse de contenus
 non pertinents.
 
+## Gouvernance des contributions
+
+- Les modèles disponibles dans `.github/ISSUE_TEMPLATE/` ajoutent automatiquement
+  les labels `needs-triage` et `bug`/`enhancement` selon le type d'issue. Le
+  modèle de discussion sous `.github/DISCUSSION_TEMPLATE/` applique le label
+  `discussion`.
+- Le fichier `.github/CODEOWNERS` assigne les revues aux équipes responsables.
+  Adaptez les alias (`@WatcherOrg/...`) à votre organisation GitHub.
+- Avant toute fusion, assurez-vous que `nox -s lint typecheck security tests
+  build` est vert sur la CI et qu'au moins un CODEOWNER a approuvé la PR. Un
+  mainteneur peut ensuite poser le label `automerge` qui déclenchera la fusion
+  automatique.
+
+Pour plus de détails (priorités, gestion du label `blocked`, etc.), consultez
+`docs/merge-policy.md`.
+
 ## Reproductibilité
 
 Un utilitaire `set_seed` permet de fixer la graine aléatoire pour Python,
