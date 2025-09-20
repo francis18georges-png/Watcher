@@ -52,10 +52,10 @@ jobs:
         run: dvc pull
         continue-on-error: true
 
-      - name: Run Windows installer
+      - name: Validate Windows installer
         if: runner.os == 'Windows'
         shell: pwsh
-        run: ./installer.ps1 -SkipOllama
+        run: pwsh ./installer.ps1 -SkipOllama
 
       - name: Run micro benchmarks
         if: runner.os == 'Linux'
@@ -72,20 +72,39 @@ jobs:
           DISPLAY: ""
         run: |
           $script = Join-Path $PWD.Path 'run.ps1'
-          $job = Start-Job -ScriptBlock { param($path) & $path } -ArgumentList $script
-          Start-Sleep -Seconds 5
-          if ($job.State -eq 'Failed') {
-            Receive-Job -Job $job | Out-String | Write-Host
-            throw 'run.ps1 failed to start.'
+          $job = Start-Job -ScriptBlock {
+            param($path)
+            $env:DISPLAY = ""
+            pwsh -NoLogo -NoProfile -File $path
+          } -ArgumentList $script
+
+          try {
+            Start-Sleep -Seconds 5
+
+            switch ($job.State) {
+              'Failed' {
+                $errors = Receive-Job -Job $job -ErrorAction SilentlyContinue | Out-String
+                if (-not $errors) {
+                  $errors = ($job.ChildJobs | ForEach-Object { $_.JobStateInfo.Reason } | Out-String)
+                }
+                throw "run.ps1 failed to start.`n$errors"
+              }
+              'Completed' {
+                $output = Receive-Job -Job $job | Out-String
+                throw "run.ps1 exited prematurely.`n$output"
+              }
+            }
           }
-          if ($job.State -eq 'Completed') {
-            $output = Receive-Job -Job $job | Out-String
-            Write-Host $output
-            throw 'run.ps1 exited prematurely.'
+          finally {
+            if ($job.State -eq 'Running') {
+              Stop-Job -Job $job | Out-Null
+            }
+            $logs = Receive-Job -Job $job -ErrorAction SilentlyContinue | Out-String
+            if ($logs) {
+              Write-Host $logs
+            }
+            Remove-Job -Job $job
           }
-          Stop-Job -Job $job | Out-Null
-          Receive-Job -Job $job | Out-String | Write-Host
-          Remove-Job -Job $job
 
       - name: Run quality pipeline
         run: nox -s lint typecheck security tests build

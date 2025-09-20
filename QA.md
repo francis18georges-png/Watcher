@@ -17,6 +17,13 @@
 3. The button disables while the response is generated.
 4. The interface remains responsive and the button re-enables once the reply appears.
 
+## Continuous Integration
+
+* The Windows job invokes `pwsh ./installer.ps1 -SkipOllama` to validate that the PowerShell installer
+  succeeds without the Ollama models.
+* The same job launches `pwsh ./run.ps1` with an empty `DISPLAY` variable to emulate headless mode. Any
+  startup failure or premature exit fails the build.
+
 ## Static Analysis
 
 Install the development dependencies:
