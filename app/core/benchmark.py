@@ -168,15 +168,23 @@ class Bench:
             "documentation a jour",
             "deploiement sans regression",
         ]
+        briefs: list[str] = []
         for i in range(15):
-            planner.briefing(
-                f"moderniser module {i}",
-                inputs=base_inputs,
-                outputs=base_outputs,
-                constraints=constraints,
-                deliverables=deliverables,
-                success=success,
+            briefs.append(
+                planner.briefing(
+                    f"moderniser module {i}",
+                    inputs=base_inputs,
+                    outputs=base_outputs,
+                    constraints=constraints,
+                    deliverables=deliverables,
+                    success=success,
+                )
             )
+        # Sanity check to ensure the planner produced meaningful output and
+        # exercise a bit more string processing work for the benchmark.
+        total_length = sum(len(brief) for brief in briefs)
+        if total_length <= 0:  # pragma: no cover - defensive guard
+            raise RuntimeError("planner briefing returned empty output")
 
     def _scenario_learner_update(self) -> None:
         from app.core.learner import Learner
@@ -187,7 +195,12 @@ class Bench:
             rewards = [0.2, 0.6, -0.1, 1.0, 0.8, 0.4]
             for reward in rewards:
                 learner.step(state, reward)
-            learner.compare("variant_alpha", "variant_beta")
+            comparison = learner.compare("variant_alpha", "variant_beta")
+            saved_best = learner._load_best()
+            if not saved_best or "score" not in saved_best:
+                raise RuntimeError("learner failed to persist best variant")
+            if comparison.get("best") != saved_best:
+                raise RuntimeError("learner best result mismatch")
 
     def _scenario_metrics_tracking(self) -> None:
         from app.utils.metrics import PerformanceMetrics
@@ -205,6 +218,9 @@ class Bench:
         if metrics.response_times:
             metrics.log_evaluation_score(statistics.fmean(metrics.response_times))
         metrics.log_error("synthetic benchmark error log")
+        total_calls = metrics.engine_calls + metrics.db_calls + metrics.plugin_calls
+        if total_calls <= 0:  # pragma: no cover - defensive guard
+            raise RuntimeError("metrics tracking scenarios executed no calls")
 
     def _scenario_memory_operations(self) -> None:
         from app.core.memory import Memory
@@ -238,6 +254,9 @@ class Bench:
             # Execute a couple of similarity searches to exercise the vector index
             mem.search("plan détaillé", top_k=5)
             mem.search("résumé", top_k=5)
+            feedback_rows = mem.all_feedback()
+            if len(feedback_rows) < 3:  # pragma: no cover - defensive guard
+                raise RuntimeError("memory feedback storage incomplete")
 
     # ------------------------------------------------------------------
     # Helpers
