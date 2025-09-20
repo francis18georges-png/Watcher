@@ -1,7 +1,8 @@
 # Modèle de menaces
 
-Cette analyse synthétise les actifs critiques de Watcher, les vecteurs d'attaque plausibles et les
-contre-mesures disponibles. Elle complète la charte publiée dans [ETHICS.md](ethics.md).
+Cette analyse synthétise les actifs critiques de Watcher, les vecteurs d'attaque plausibles et les contrôles
+opérationnels disponibles. Elle complète la charte publiée dans [ETHICS.md](ethics.md) et s'appuie sur les diagrammes
+Mermaid/PlantUML rendus nativement par MkDocs Material.
 
 ## Actifs protégés
 
@@ -12,7 +13,7 @@ contre-mesures disponibles. Elle complète la charte publiée dans [ETHICS.md](e
 | Chaîne d'exécution | Scripts Python, plugins et automatisations. | Moyenne |
 | Journal d'audit | Traces JSON (`watcher.log`) et historiques d'évaluations. | Moyenne |
 
-## Cartographie des risques
+## Cartographie des risques (Mermaid)
 
 ```mermaid
 flowchart LR
@@ -53,8 +54,8 @@ flowchart LR
     T4 --> C4
 ```
 
-Ce diagramme relie chaque actif aux principaux vecteurs d'attaque puis aux contrôles mis en place. Il sert de
-référence rapide pour vérifier que chaque risque bénéficie d'au moins une mitigation.
+Ce diagramme relie chaque actif aux principaux vecteurs d'attaque puis aux contrôles mis en place. Il sert de référence
+rapide pour vérifier que chaque risque bénéficie d'au moins une mitigation.
 
 ## Surfaces d'attaque
 
@@ -65,17 +66,15 @@ référence rapide pour vérifier que chaque risque bénéficie d'au moins une m
 
 ## Mesures de mitigation
 
-- **Isolation des dépendances** : utilisation d'environnements virtuels (`.venv/`) et contrôle des versions
-  via `requirements*.txt`.
-- **Revue de code** : hooks `pre-commit`, linting (Ruff), analyse statique (mypy) et audits de sécurité
-  (Bandit, Semgrep) exécutés par Nox et CI.
+- **Isolation des dépendances** : environnements virtuels (`.venv/`) et contrôle des versions via `requirements*.txt`.
+- **Revue de code** : hooks `pre-commit`, linting (Ruff), analyse statique (mypy) et audits de sécurité (Bandit, Semgrep)
+  exécutés par Nox et la CI.
 - **Surveillance** : journalisation JSON centralisée et rotation configurable pour tracer chaque action.
-- **Gouvernance des données** : DVC impose un suivi précis des jeux de données et facilite les vérifications
-  d'intégrité.
-- **Contrôles utilisateurs** : la charte [ETHICS.md](ethics.md) rappelle les bonnes pratiques de gestion des
-  retours et des données sensibles.
+- **Gouvernance des données** : DVC impose un suivi précis des jeux de données et facilite les vérifications d'intégrité.
+- **Contrôles utilisateurs** : la charte [ETHICS.md](ethics.md) rappelle les bonnes pratiques de gestion des retours et des
+  données sensibles.
 
-## Séquence de réponse à incident
+## Réponse à incident (PlantUML)
 
 ```plantuml
 @startuml
@@ -99,15 +98,14 @@ FollowUp -> Detection : Mise à jour des seuils
 @enduml
 ```
 
-Cette séquence illustre la boucle de réponse opérationnelle : les journaux déclenchent la détection, une analyse
-évalue l'impact, la remédiation applique les correctifs puis le suivi met à jour la surveillance pour éviter la
-récurrence.
+Cette séquence illustre la boucle de réponse opérationnelle : les journaux déclenchent la détection, l'analyse évalue
+l'impact, la remédiation applique les correctifs puis le suivi ajuste la surveillance pour éviter la récurrence.
 
 ## Recommandations opérationnelles
 
 !!! warning "Limiter la surface réseau"
-    Le projet est conçu pour fonctionner hors ligne. Désactiver ou auditer toute communication externe
-    ajoutée par des plugins tiers.
+    Le projet est conçu pour fonctionner hors ligne. Désactiver ou auditer toute communication externe ajoutée par des
+    plugins tiers.
 
 !!! note "Scénarios d'incident"
     - Maintenir des sauvegardes chiffrées de la mémoire vectorielle et des datasets.
