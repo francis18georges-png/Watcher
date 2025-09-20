@@ -7,6 +7,7 @@ from importlib.resources.abc import Traversable
 from typing import Sequence
 
 from config import get_settings
+from app.core.reproducibility import set_seed
 from app.tools import plugins
 
 #: Manifest bundled with the :mod:`app` package.
@@ -30,6 +31,16 @@ def main(argv: Sequence[str] | None = None) -> int:
             f"{settings.llm.backend} / model: {settings.llm.model})"
         ),
     )
+    parser.add_argument(
+        "--seed",
+        type=int,
+        default=settings.training.seed,
+        help=(
+            "Graine aléatoire utilisée pour toutes les composantes stochastiques. "
+            "Par défaut, celle définie dans config/settings.toml."
+        ),
+    )
+
     sub = parser.add_subparsers(dest="command", required=True)
 
     plugin_parser = sub.add_parser("plugin", help="Plugin related commands")
@@ -37,6 +48,8 @@ def main(argv: Sequence[str] | None = None) -> int:
     plugin_sub.add_parser("list", help="List available plugins")
 
     args = parser.parse_args(argv)
+
+    set_seed(args.seed)
 
     if args.command == "plugin" and args.plugin_command == "list":
         for plugin in _iter_plugins():

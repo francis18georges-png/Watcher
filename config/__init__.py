@@ -11,6 +11,7 @@ import os
 import tomllib
 
 from pydantic import Field
+from pydantic.fields import FieldInfo
 from pydantic_settings import (
     BaseSettings,
     PydanticBaseSettingsSource,
@@ -106,6 +107,18 @@ class _TomlSettingsSource(PydanticBaseSettingsSource):
 
     def __init__(self, settings_cls: type[BaseSettings]) -> None:
         super().__init__(settings_cls)
+        self._data: dict[str, Any] | None = None
+
+    def get_field_value(
+        self, field: FieldInfo, field_name: str
+    ) -> tuple[Any, str, bool]:
+        """Return stored TOML values for a specific field."""
+
+        if self._data is None:
+            return None, field_name, False
+        value = self._data.get(field_name)
+        is_complex = isinstance(value, (dict, list))
+        return value, field_name, is_complex
 
     def __call__(self) -> dict[str, Any]:
         base_path = _CONFIG_DIR / "settings.toml"
@@ -121,6 +134,7 @@ class _TomlSettingsSource(PydanticBaseSettingsSource):
                 logger.warning(
                     "Profile configuration file not found: %s", profile_path
                 )
+        self._data = data
         return data
 
     def get_field_value(self, field_name: str, field, value: Any) -> tuple[Any, bool]:

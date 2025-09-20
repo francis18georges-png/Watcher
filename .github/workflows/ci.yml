@@ -14,7 +14,8 @@ jobs:
         os: [ubuntu-latest, macos-latest, windows-latest]
         python-version: ["3.12"]
     env:
-      PYTHONHASHSEED: "0"
+      PYTHONHASHSEED: "42"
+      WATCHER_TRAINING__SEED: "42"
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
