@@ -15,10 +15,10 @@ logger = get_logger(__name__)
 def set_seed(seed: int) -> None:
     """Seed Python, NumPy and other libraries for reproducibility.
 
-    The function configures the :mod:`random` module, ``PYTHONHASHSEED``
-    environment variable and, when available, NumPy and PyTorch. It ignores
-    missing optional dependencies so that callers can always invoke it without
-    guarding import errors.
+    The function configures the :mod:`random` module, ``PYTHONHASHSEED`` and
+    ``WATCHER_TRAINING__SEED`` environment variables and, when available, NumPy
+    and PyTorch. It ignores missing optional dependencies so that callers can
+    always invoke it without guarding import errors.
 
     Parameters
     ----------
@@ -27,6 +27,7 @@ def set_seed(seed: int) -> None:
     """
 
     os.environ["PYTHONHASHSEED"] = str(seed)
+    os.environ["WATCHER_TRAINING__SEED"] = str(seed)
     random.seed(seed)
     if hasattr(np, "random") and hasattr(np.random, "seed"):
         np.random.seed(seed)  # type: ignore[attr-defined]
@@ -37,6 +38,8 @@ def set_seed(seed: int) -> None:
         torch.cuda.manual_seed_all(seed)
         torch.backends.cudnn.deterministic = True
         torch.backends.cudnn.benchmark = False
+        if hasattr(torch, "use_deterministic_algorithms"):
+            torch.use_deterministic_algorithms(True, warn_only=True)
     except ImportError:  # pragma: no cover - optional dependency
         pass
     except Exception as exc:  # pragma: no cover - optional dependency
