@@ -7,6 +7,7 @@ from importlib.resources.abc import Traversable
 from typing import Sequence
 
 from config import get_settings
+from app.core.engine import Engine
 from app.tools import plugins
 
 #: Manifest bundled with the :mod:`app` package.
@@ -35,12 +36,46 @@ def main(argv: Sequence[str] | None = None) -> int:
     plugin_parser = sub.add_parser("plugin", help="Plugin related commands")
     plugin_sub = plugin_parser.add_subparsers(dest="plugin_command", required=True)
     plugin_sub.add_parser("list", help="List available plugins")
+    run_parser = sub.add_parser("run", help="Start Watcher in CLI mode")
+    mode_group = run_parser.add_mutually_exclusive_group()
+    mode_group.add_argument(
+        "--offline",
+        action="store_true",
+        help="Force offline mode for the session",
+    )
+    mode_group.add_argument(
+        "--online",
+        action="store_true",
+        help="Force online mode for the session",
+    )
+    run_parser.add_argument(
+        "--prompt",
+        help=(
+            "Prompt to submit once before exiting. Without this option the "
+            "command only reports the current mode."
+        ),
+    )
 
     args = parser.parse_args(argv)
 
     if args.command == "plugin" and args.plugin_command == "list":
         for plugin in _iter_plugins():
             print(plugin.name)
+        return 0
+
+    if args.command == "run":
+        engine = Engine()
+        offline = engine.is_offline()
+        if getattr(args, "offline", False):
+            offline = True
+        elif getattr(args, "online", False):
+            offline = False
+        engine.set_offline_mode(offline)
+        state = "activé" if engine.is_offline() else "désactivé"
+        print(f"Mode offline {state}")
+        prompt = getattr(args, "prompt", None)
+        if prompt:
+            print(engine.chat(prompt))
         return 0
 
     parser.error("unknown command")

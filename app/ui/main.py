@@ -1,3 +1,5 @@
+import importlib
+import importlib.util
 import json
 import logging
 import os
@@ -12,6 +14,13 @@ from app.core import logging_setup
 from app.core.engine import Engine
 from app.utils.metrics import PerformanceMetrics, metrics
 from config import get_settings
+
+
+_psutil_spec = importlib.util.find_spec("psutil")
+if _psutil_spec is not None:
+    psutil = importlib.import_module("psutil")
+else:
+    from app.utils import psutil_stub as psutil
 
 
 logger = logging.getLogger(__name__)
@@ -70,11 +79,14 @@ class WatcherApp(ttk.Frame):
         super().__init__(master)
         self.settings = get_settings()
         self.engine = Engine()
+        self.status_var = tk.StringVar(master=master, value="")
+        self._plugin_refresh_ms = 2000
         master.title(APP_NAME)
         master.geometry("1100x700")
         master.minsize(900, 600)
         self.pack(fill="both", expand=True)
         self._build()
+        self._update_status_label()
         self.out.insert("end", f"[Watcher] {self.engine.start_msg}\n")
         self.out.see("end")
 
@@ -118,15 +130,40 @@ class WatcherApp(ttk.Frame):
         )
         self.rate_input.pack(side="left", padx=4)
         ttk.Button(bottom, text="Noter", command=self._rate).pack(side="left")
-        self.status = ttk.Label(
-            self,
-            text=(
-                f"Mode: {self.settings.ui.mode} | "
-                f"Backend: {self.settings.llm.backend} | "
-                f"Modèle: {self.settings.llm.model}"
-            ),
+        self.offline_var = tk.BooleanVar(value=self.engine.is_offline())
+        self.offline_toggle = ttk.Checkbutton(
+            bottom,
+            text="Mode offline",
+            variable=self.offline_var,
+            command=self._toggle_offline_mode,
         )
+        self.offline_toggle.pack(side="left", padx=8)
+        stats_frame = ttk.LabelFrame(self.chat, text="Utilisation plugins")
+        stats_frame.pack(fill="x", padx=8, pady=(0, 8))
+        columns = ("plugin", "cpu", "memory")
+        self.plugin_stats = ttk.Treeview(
+            stats_frame,
+            columns=columns,
+            show="headings",
+            height=max(len(self.engine.plugins), 1),
+        )
+        self.plugin_stats.heading("plugin", text="Plugin")
+        self.plugin_stats.heading("cpu", text="CPU (%)")
+        self.plugin_stats.heading("memory", text="Mémoire (MiB)")
+        self.plugin_stats.column("plugin", width=160, anchor="w")
+        self.plugin_stats.column("cpu", width=100, anchor="center")
+        self.plugin_stats.column("memory", width=140, anchor="center")
+        for plugin in self.engine.plugins:
+            self.plugin_stats.insert(
+                "",
+                "end",
+                iid=plugin.name,
+                values=(plugin.name, "0.0", "0.0"),
+            )
+        self.plugin_stats.pack(fill="both", expand=True)
+        self.status = ttk.Label(self, textvariable=self.status_var)
         self.status.pack(fill="x")
+        self.after(self._plugin_refresh_ms, self._refresh_plugin_stats)
 
         # Briefing button
         ttk.Button(self.brief, text="Démarrer le Briefing", command=self._brief).pack(
@@ -219,6 +256,115 @@ class WatcherApp(ttk.Frame):
         msg = self.engine.add_feedback(score)
         self.out.insert("end", f"\n[Feedback] {msg}\n")
         self.out.see("end")
+
+    def _toggle_offline_mode(self) -> None:
+        offline = bool(self.offline_var.get())
+        self.engine.set_offline_mode(offline)
+        self._update_status_label()
+
+    def _update_status_label(self) -> None:
+        offline_state = "activé" if self.engine.is_offline() else "désactivé"
+        status_text = (
+            f"Mode interface: {self.settings.ui.mode} | "
+            f"Offline: {offline_state} | "
+            f"Backend: {self.settings.llm.backend} | "
+            f"Modèle: {self.settings.llm.model}"
+        )
+        self.status_var.set(status_text)
+
+    def _collect_plugin_stats(self) -> dict[str, dict[str, float]]:
+        plugin_entries = getattr(self.engine, "plugins", [])
+        stats: dict[str, dict[str, float]] = {
+            plugin.name: {"cpu": 0.0, "memory": 0.0} for plugin in plugin_entries
+        }
+        if not plugin_entries:
+            return stats
+
+        path_to_name = {plugin.import_path: plugin.name for plugin in plugin_entries}
+
+        for proc in psutil.process_iter():
+            try:
+                cmdline = self._safe_cmdline(proc)
+            except Exception:
+                continue
+            if not cmdline:
+                continue
+
+            matched_name: str | None = None
+            for import_path, plugin_name in path_to_name.items():
+                if any(import_path in part for part in cmdline):
+                    matched_name = plugin_name
+                    break
+            if matched_name is None:
+                continue
+
+            stats[matched_name]["cpu"] += self._safe_cpu_percent(proc)
+            stats[matched_name]["memory"] += self._safe_memory_mb(proc)
+
+        return stats
+
+    @staticmethod
+    def _safe_cmdline(proc) -> list[str]:
+        info = getattr(proc, "info", None)
+        if isinstance(info, dict):
+            cmdline = info.get("cmdline")
+            if cmdline:
+                return [str(part) for part in cmdline]
+        if hasattr(proc, "cmdline"):
+            try:
+                cmdline = proc.cmdline()
+            except Exception:
+                return []
+            if not cmdline:
+                return []
+            return [str(part) for part in cmdline]
+        return []
+
+    @staticmethod
+    def _safe_cpu_percent(proc) -> float:
+        try:
+            return float(proc.cpu_percent(interval=None))
+        except Exception:
+            return 0.0
+
+    @staticmethod
+    def _safe_memory_mb(proc) -> float:
+        try:
+            info = proc.memory_info()
+        except Exception:
+            return 0.0
+        rss = getattr(info, "rss", 0.0)
+        try:
+            rss_value = float(rss)
+        except (TypeError, ValueError):
+            rss_value = 0.0
+        return rss_value / (1024 * 1024)
+
+    def _refresh_plugin_stats(self) -> None:
+        tree = getattr(self, "plugin_stats", None)
+        if tree is None or not tree.winfo_exists():
+            return
+
+        stats = self._collect_plugin_stats()
+        expected = set(stats.keys())
+        current = set(tree.get_children(""))
+
+        for orphan in current - expected:
+            tree.delete(orphan)
+
+        for plugin_name, data in stats.items():
+            values = (
+                plugin_name,
+                f"{data['cpu']:.1f}",
+                f"{data['memory']:.1f}",
+            )
+            if tree.exists(plugin_name):
+                tree.item(plugin_name, values=values)
+            else:
+                tree.insert("", "end", iid=plugin_name, values=values)
+
+        if self._plugin_refresh_ms:
+            self.after(self._plugin_refresh_ms, self._refresh_plugin_stats)
 
 
 if __name__ == "__main__":

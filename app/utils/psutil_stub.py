@@ -67,6 +67,9 @@ class Process:
     def name(self) -> str:
         return "watcher"
 
+    def cmdline(self) -> list[str]:
+        return ["python", "watcher"]
+
 
 def cpu_percent(interval: float | None = None) -> float:
     """Return the deterministic CPU percentage used by tests."""
