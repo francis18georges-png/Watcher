@@ -333,8 +333,11 @@ jeu de données linéaire utilisé par `train.py` :
 - `prepare-data` lit `datasets/raw/simple_linear.csv`, applique les paramètres
   définis dans `params.yaml` (graine, taille d'échantillon) et génère
   `datasets/processed/simple_linear.csv`.
-- `validate-data` enchaîne trois scripts de validation (`scripts/validate_*`)
-  pour vérifier le schéma, la taille et le hachage du fichier produit.
+- `validate-data` utilise `foreach` pour produire trois sous-étapes
+  (`validate-data@schema`, `validate-data@size`, `validate-data@hash`).
+  Chacune exécute un script dédié dans `scripts/validate_*.py` pour
+  vérifier respectivement le schéma, la taille et le hachage du fichier
+  produit.
 
 Les hyperparamètres d'entraînement ainsi que les contraintes de validation sont
 centralisés dans `params.yaml` (syntaxe JSON valide YAML pour éviter d'ajouter
@@ -348,8 +351,8 @@ dvc repro validate-data
 Un remote S3 nommé `storage` est configuré dans `.dvc/config` (URL
 `s3://watcher-artifacts`). Renseignez vos identifiants AWS via les variables
 d'environnement standard (`AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`,
-éventuellement `AWS_SESSION_TOKEN`) ou un profil configuré, puis synchronisez
-les artefacts DVC avec :
+éventuellement `AWS_SESSION_TOKEN` ou `AWS_PROFILE`) puis synchronisez les
+artefacts DVC avec :
 
 ```bash
 # envoyer les données préparées sur le bucket
@@ -364,6 +367,17 @@ remote :
 ```bash
 dvc remote modify storage url s3://votre-bucket
 ```
+
+Pour cibler un autre fournisseur, créez un remote dédié et rendez-le
+par défaut. Exemple avec Azure Blob Storage :
+
+```bash
+dvc remote add -d azure azure://mon-container/datasets
+dvc remote modify azure connection_string "DefaultEndpointsProtocol=..."
+```
+
+Consultez la [documentation DVC](https://dvc.org/doc/command-reference/remote)
+pour les paramètres spécifiques (S3, Azure, GCS, etc.).
 
 ### Collecte
 

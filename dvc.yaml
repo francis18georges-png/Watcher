@@ -1,5 +1,6 @@
 stages:
   prepare-data:
+    desc: "Nettoie le dataset brut et génère la version préparée."
     cmd: python scripts/prepare_data.py --input datasets/raw/simple_linear.csv --output datasets/processed/simple_linear.csv --params params.yaml
     deps:
       - datasets/raw/simple_linear.csv
@@ -11,19 +12,19 @@ stages:
     outs:
       - datasets/processed/simple_linear.csv
   validate-data:
-    cmd: |
-      set -e
-      python scripts/validate_schema.py --file datasets/processed/simple_linear.csv --params params.yaml --dataset-key simple_linear
-      python scripts/validate_size.py --file datasets/processed/simple_linear.csv --params params.yaml --dataset-key simple_linear
-      python scripts/validate_hash.py --file datasets/processed/simple_linear.csv --params params.yaml --dataset-key simple_linear
-    deps:
-      - datasets/processed/simple_linear.csv
-      - scripts/common.py
-      - scripts/validate_hash.py
-      - scripts/validate_schema.py
-      - scripts/validate_size.py
-    params:
-      - validate.simple_linear.columns
-      - validate.simple_linear.min_rows
-      - validate.simple_linear.expected_size
-      - validate.simple_linear.expected_hash
+    desc: "Valide le fichier préparé via trois contrôles indépendants."
+    foreach:
+      - schema
+      - size
+      - hash
+    do:
+      cmd: python scripts/validate_${item}.py --file datasets/processed/simple_linear.csv --params params.yaml --dataset-key simple_linear
+      deps:
+        - datasets/processed/simple_linear.csv
+        - scripts/common.py
+        - scripts/validate_${item}.py
+      params:
+        - validate.simple_linear.columns
+        - validate.simple_linear.min_rows
+        - validate.simple_linear.expected_size
+        - validate.simple_linear.expected_hash
