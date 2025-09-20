@@ -27,7 +27,36 @@ système, son modèle de sécurité et les pratiques d'exploitation.
   [politique de merge](merge-policy.md).
 - Chaque release `vMAJOR.MINOR.PATCH` publie un installeur Windows signé, un SBOM CycloneDX (`Watcher-sbom.json`) et une
   provenance SLSA (`Watcher-Setup.intoto.jsonl`). Ces artefacts permettent de vérifier l'intégrité du binaire et d'auditer
-  la liste des dépendances Python utilisées lors du build.
+  la liste des dépendances Python utilisées lors du build. Le workflow de release dépose également un artefact
+  `release-verification` dans l'onglet **Artifacts** de GitHub Actions pour télécharger rapidement le SBOM et la
+  provenance depuis un run donné.
+
+### Vérifier une release
+
+1. Récupérez `Watcher-Setup.zip`, `Watcher-sbom.json` et `Watcher-Setup.intoto.jsonl` depuis la page de release GitHub
+   ou l'artefact `release-verification` associé au run.
+2. Installez `cyclonedx-bom` pour valider ou convertir le SBOM au format désiré, puis inspectez son contenu :
+
+   ```powershell
+   python -m pip install cyclonedx-bom
+   jq '.components[] | {name, version}' Watcher-sbom.json
+   ```
+
+   Les sous-commandes exposées par `cyclonedx-bom --help` permettent de valider la structure du fichier ou de le convertir
+   vers d'autres formats CycloneDX.
+
+3. Vérifiez la provenance SLSA et la signature du binaire :
+
+   ```bash
+   slsa-verifier verify-artifact Watcher-Setup.zip \
+     --provenance Watcher-Setup.intoto.jsonl \
+     --source-uri github.com/<organisation>/Watcher \
+     --source-tag vMAJOR.MINOR.PATCH
+   cosign verify-blob --bundle Watcher-Setup.zip.sigstore Watcher-Setup.zip
+   ```
+
+   Les commandes ci-dessus garantissent que l'installeur provient du dépôt officiel et qu'il a été généré par le
+   pipeline automatisé attendu.
 
 ## Prévisualiser la documentation localement
 
