@@ -217,7 +217,7 @@ fi
 
 # 5) List workflows and recent runs
 echo
-echo "5) Listing workflows and recent runs (ready-to-merge/auto-label)"
+echo "5) Listing workflows and recent runs (merge queue labels)"
 if [[ "$DRY_RUN" -eq 0 ]]; then
   if [[ "$USE_GH" -eq 1 ]]; then
     gh workflow list --repo "$OWNER/$REPO" || true
@@ -232,20 +232,20 @@ else
   echo "(dry-run) would list workflows and runs"
 fi
 
-# 6) Optionally label a PR to test ready-to-merge workflow
+# 6) Optionally label a PR to test merge queue workflow
 if [[ -n "$PR_TO_LABEL" ]]; then
   echo
-  echo "6) Adding label 'status:ready-to-merge' to PR #$PR_TO_LABEL (test trigger)"
-  confirm_or_exit "Proceed to add label 'status:ready-to-merge' to PR #$PR_TO_LABEL?"
+  echo "6) Adding labels 'status:maintainer-approved' + 'status:queued-for-merge' to PR #$PR_TO_LABEL (test trigger)"
+  confirm_or_exit "Proceed to add labels 'status:maintainer-approved' and 'status:queued-for-merge' to PR #$PR_TO_LABEL?"
   if [[ "$DRY_RUN" -eq 0 ]]; then
     if [[ "$USE_GH" -eq 1 ]]; then
-      gh pr edit "$PR_TO_LABEL" --add-label "status:ready-to-merge" --repo "$OWNER/$REPO"
+      gh pr edit "$PR_TO_LABEL" --add-label "status:maintainer-approved,status:queued-for-merge" --repo "$OWNER/$REPO"
     else
-      curl -sS -X POST -H "Authorization: token $TOKEN" -H "Accept: application/vnd.github+json" "https://api.github.com/repos/$OWNER/$REPO/issues/$PR_TO_LABEL/labels" -d '["status:ready-to-merge"]'
+      curl -sS -X POST -H "Authorization: token $TOKEN" -H "Accept: application/vnd.github+json" "https://api.github.com/repos/$OWNER/$REPO/issues/$PR_TO_LABEL/labels" -d '["status:maintainer-approved","status:queued-for-merge"]'
     fi
     echo "Label added (check Actions tab / PR checks)"
   else
-    echo "(dry-run) would add label status:ready-to-merge to PR #$PR_TO_LABEL"
+    echo "(dry-run) would add labels status:maintainer-approved + status:queued-for-merge to PR #$PR_TO_LABEL"
   fi
 fi
 

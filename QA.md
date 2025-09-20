@@ -7,8 +7,9 @@
 3. `git push` puis ouverture d'une Pull Request
 4. Revue externe et fusion après `make check`
 5. Laisser le label par défaut `status:needs-triage` sur la PR ; un mainteneur le
-   retirera après revue. Une fois la CI verte, seul un mainteneur pose
-   `status:ready-to-merge` pour déclencher la fusion automatique.
+   retirera après revue. Une fois la CI verte, faites valider le scope par la QA
+   (`status:qa-approved`), puis un mainteneur pose `status:maintainer-approved`
+   et `status:queued-for-merge` pour déclencher la fusion automatique.
 
 ## Manual Verification
 

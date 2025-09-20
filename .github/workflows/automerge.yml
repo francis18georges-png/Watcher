@@ -6,8 +6,9 @@ on:
 jobs:
   automerge:
     if: >-
-      contains(github.event.pull_request.labels.*.name, 'status:auto-merge')
-      && contains(github.event.pull_request.labels.*.name, 'status:ready-to-merge')
+      contains(github.event.pull_request.labels.*.name, 'status:queued-for-merge')
+      && contains(github.event.pull_request.labels.*.name, 'status:maintainer-approved')
+      && contains(github.event.pull_request.labels.*.name, 'status:qa-approved')
       && !contains(github.event.pull_request.labels.*.name, 'status:blocked')
     name: Merge PR when label is ready
     runs-on: ubuntu-latest
@@ -26,4 +27,4 @@ jobs:
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           merge_method: merge
-          label: status:auto-merge
+          label: status:queued-for-merge

@@ -282,13 +282,14 @@ non pertinents.
 
 - Les formulaires présents dans `.github/ISSUE_TEMPLATE/` ajoutent
   systématiquement `status:needs-triage` ainsi qu'un label `type:*`
-  (`type:bug`, `type:feature`, `type:discussion`).
+  (`type:bug`, `type:feature`, `type:maintenance`, `type:discussion`).
 - Le fichier `.github/CODEOWNERS` assigne les revues aux équipes responsables.
   Adaptez les alias (`@WatcherOrg/...`) à votre organisation GitHub.
 - Avant toute fusion, assurez-vous que `nox -s lint typecheck security tests
   build` est vert sur la CI et qu'au moins un CODEOWNER a approuvé la PR. Un
-  mainteneur peut ensuite poser `status:ready-to-merge` qui déclenchera la
-  fusion automatique.
+  mainteneur ajoute ensuite `status:maintainer-approved` (après validation
+  QA via `status:qa-approved`) puis `status:queued-for-merge` pour déclencher
+  la fusion automatique.
 
 Pour plus de détails (priorités, gestion du label `blocked`, etc.), consultez
 `docs/merge-policy.md`.

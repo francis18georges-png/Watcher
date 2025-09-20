@@ -16,10 +16,10 @@ body:
       label: Zone impactée
       description: Identifiez la zone qui bénéficiera de la maintenance pour guider les CODEOWNERS.
       options:
-        - scope:app — Interface ou API utilisateur
-        - scope:ml — Pipelines de données ou d'entraînement
-        - scope:docs — Documentation, guides ou métriques
-        - scope:ops — CI/CD, packaging ou scripts
+        - scope:app-experience — Interface ou API utilisateur, packaging client
+        - scope:data-insights — Pipelines de données, entraînement ou modèles ML
+        - scope:documentation — Documentation, guides ou métriques
+        - scope:platform — CI/CD, infrastructure développeur ou scripts
         - scope:quality — Tests automatisés et qualité
         - scope:security — Configuration sensible, secrets, permissions
         - Non déterminé / Autre

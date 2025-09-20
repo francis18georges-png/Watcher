@@ -1,6 +1,6 @@
 <#
-PowerShell script to push current branch, create "status:ready-to-merge" label if needed,
-and add the label to a PR to trigger auto-label/auto-merge workflows.
+PowerShell script to push current branch, create "status:queued-for-merge" label if needed,
+and add the label to a PR to trigger the merge queue workflow once QA and maintainer approvals are present.
 
 Usage:
   # from repo root
@@ -39,9 +39,9 @@ if ($LASTEXITCODE -ne 0) {
 }
 Write-Info "Push OK."
 
-$labelName = "status:ready-to-merge"
-$labelColor = "2ECC71"
-$labelDesc = "Auto-merge when CI is green and approvals obtained"
+$labelName = "status:queued-for-merge"
+$labelColor = "6F42C1"
+$labelDesc = "Queue PR for auto-merge when QA & maintainer approvals are done"
 
 # Try GitHub CLI first
 $ghPath = Get-Command gh -ErrorAction SilentlyContinue
@@ -71,7 +71,7 @@ if ($ghPath) {
     Write-Info "Adding label to PR #$Pr..."
     gh pr edit $Pr --add-label $labelName --repo $Repo
     if ($LASTEXITCODE -eq 0) {
-      Write-Info "Label '$labelName' added to PR #$Pr."
+      Write-Info "Label '$labelName' added to PR #$Pr. Ensure `status:maintainer-approved` and `status:qa-approved` are also present."
       exit 0
     } else {
       Write-Err "Failed to add label to PR via gh. Fall back to API if token present."
@@ -114,7 +114,7 @@ try {
   $resp = Invoke-RestMethod -Method Post -Uri "$apiBase/repos/$owner/$repoName/labels" -Headers @{
     Authorization = "token $token"
     Accept = "application/vnd.github+json"
-    "User-Agent" = "ready-to-merge-script"
+    "User-Agent" = "queued-for-merge-script"
   } -Body $labelBody -ErrorAction Stop
   Write-Info "Label created."
 } catch {
@@ -135,9 +135,9 @@ try {
   $resp2 = Invoke-RestMethod -Method Post -Uri "$apiBase/repos/$owner/$repoName/issues/$Pr/labels" -Headers @{
     Authorization = "token $token"
     Accept = "application/vnd.github+json"
-    "User-Agent" = "ready-to-merge-script"
+    "User-Agent" = "queued-for-merge-script"
   } -Body $labelAddBody -ErrorAction Stop
-  Write-Info "Label added to PR #$Pr."
+  Write-Info "Label added to PR #$Pr. Ensure `status:maintainer-approved` and `status:qa-approved` are also present."
   exit 0
 } catch {
   Write-Err "Failed to add label to PR #$Pr via API: $($_.Exception.Message)"

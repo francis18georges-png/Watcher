@@ -8,17 +8,17 @@ body:
   - type: markdown
     attributes:
       value: |
-        Merci de décrire clairement le bug rencontré. Consultez la documentation QA ainsi que `docs/merge-policy.md` pour comprendre comment les labels `status:*` et `scope:*` seront appliqués.
+        Merci de décrire clairement le bug rencontré. Consultez la documentation QA ainsi que `docs/merge-policy.md` pour comprendre comment les labels `status:*` (dont `status:maintainer-approved` / `status:queued-for-merge`) et `scope:*` seront appliqués.
   - type: dropdown
     id: scope
     attributes:
       label: Zone impactée
       description: Sélectionnez la zone qui semble la plus concernée pour aider le tri initial.
       options:
-        - scope:app — Interface ou API utilisateur
-        - scope:ml — Pipelines de données ou d'entraînement
-        - scope:docs — Documentation, guides ou métriques
-        - scope:ops — CI/CD, packaging ou scripts
+        - scope:app-experience — Interface ou API utilisateur, packaging client
+        - scope:data-insights — Pipelines de données, entraînement ou modèles ML
+        - scope:documentation — Documentation, guides ou métriques
+        - scope:platform — CI/CD, infrastructure développeur ou scripts
         - scope:quality — Tests automatisés et qualité
         - scope:security — Configuration sensible, secrets, permissions
         - Non déterminé / Autre
