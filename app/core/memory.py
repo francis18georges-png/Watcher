@@ -1,8 +1,9 @@
+import os
 import sqlite3
 import time
 import math
 from pathlib import Path
-from typing import Iterator
+from typing import Iterator, Mapping
 
 from app.utils import np
 
@@ -14,24 +15,185 @@ logger = get_logger(__name__)
 
 
 class Memory:
-    def __init__(self, db_path: Path):
+    def __init__(self, db_path: Path, *, sqlcipher: Mapping[str, object] | None = None):
         self.db_path = Path(db_path)
         self.db_path.parent.mkdir(parents=True, exist_ok=True)
+        self._sqlcipher_config = dict(sqlcipher or {})
+        self._sqlcipher_enabled = bool(self._sqlcipher_config.get("enabled"))
+        self._sqlcipher_password = (
+            self._resolve_sqlcipher_password() if self._sqlcipher_enabled else None
+        )
+        if self._sqlcipher_enabled and not self._sqlcipher_password:
+            raise ValueError("SQLCipher is enabled but no password was provided")
+        self._sqlcipher_verified = False
+        self._embed_cache: dict[str, np.ndarray] = {}
+        self._fts5_checked = False
         self._init()
 
     def _init(self) -> None:
-        self._embed_cache: dict[str, np.ndarray] = {}
-        with sqlite3.connect(self.db_path) as con:
+        self._run_migrations()
+
+    def _resolve_sqlcipher_password(self) -> str | None:
+        password: str | None = None
+        env_var = self._sqlcipher_config.get("password_env")
+        if isinstance(env_var, str) and env_var:
+            password = os.getenv(env_var) or None
+        if not password:
+            raw = self._sqlcipher_config.get("password")
+            if isinstance(raw, str) and raw:
+                password = raw
+        return password
+
+    def _connect(self) -> sqlite3.Connection:
+        con = sqlite3.connect(str(self.db_path), timeout=5.0)
+        try:
+            self._configure_connection(con)
+        except Exception:
+            con.close()
+            raise
+        return con
+
+    def _configure_connection(self, con: sqlite3.Connection) -> None:
+        self._configure_sqlcipher(con)
+        pragmas = (
+            "PRAGMA journal_mode=WAL",
+            "PRAGMA foreign_keys=ON",
+            "PRAGMA busy_timeout=5000",
+            "PRAGMA secure_delete=ON",
+        )
+        for pragma in pragmas:
+            try:
+                con.execute(pragma)
+            except sqlite3.DatabaseError:
+                logger.warning(
+                    "Failed to apply %s on %s", pragma, self.db_path, exc_info=True
+                )
+        self._register_fts5(con)
+
+    def _configure_sqlcipher(self, con: sqlite3.Connection) -> None:
+        if not self._sqlcipher_enabled:
+            return
+        assert self._sqlcipher_password is not None
+        try:
+            con.execute("PRAGMA key = ?", (self._sqlcipher_password,))
+        except sqlite3.DatabaseError as exc:
+            raise RuntimeError(
+                f"Failed to configure SQLCipher key for database {self.db_path}"
+            ) from exc
+        if self._sqlcipher_verified:
+            return
+        try:
+            row = con.execute("PRAGMA cipher_version").fetchone()
+        except sqlite3.DatabaseError as exc:
+            raise RuntimeError(
+                f"SQLCipher support is not available for database {self.db_path}"
+            ) from exc
+        if not row or row[0] is None:
+            raise RuntimeError(
+                f"SQLCipher support is not available for database {self.db_path}"
+            )
+        self._sqlcipher_verified = True
+
+    def _register_fts5(self, con: sqlite3.Connection) -> None:
+        if self._fts5_checked:
+            return
+        self._fts5_checked = True
+        try:
+            row = con.execute(
+                "SELECT 1 FROM pragma_module_list WHERE name='fts5'"
+            ).fetchone()
+            if row:
+                return
+        except sqlite3.DatabaseError:
+            logger.debug(
+                "Unable to query pragma_module_list for fts5 on %s", self.db_path,
+                exc_info=True,
+            )
+        try:
+            con.enable_load_extension(True)
+            try:
+                con.execute("SELECT load_extension('fts5')")
+            finally:
+                con.enable_load_extension(False)
+        except (AttributeError, sqlite3.DatabaseError):
+            logger.info(
+                "FTS5 module could not be registered for %s", self.db_path
+            )
+
+    def _run_migrations(self) -> None:
+        try:
+            from alembic import command
+            from alembic.config import Config
+            from sqlalchemy import create_engine
+            from sqlalchemy.pool import StaticPool
+        except ModuleNotFoundError as exc:
+            logger.warning(
+                "Alembic or SQLAlchemy missing (%s); applying schema manually.", exc
+            )
+            self._ensure_schema()
+            return
+
+        base_dir = Path(__file__).resolve().parents[2]
+        alembic_ini = base_dir / "alembic.ini"
+        if not alembic_ini.exists():
+            logger.warning("Alembic configuration not found at %s", alembic_ini)
+            self._ensure_schema()
+            return
+
+        cfg = Config(str(alembic_ini))
+        cfg.set_main_option("script_location", str(base_dir / "migrations"))
+        db_uri = self.db_path.resolve().as_posix()
+        cfg.set_main_option("sqlalchemy.url", f"sqlite:///{db_uri}")
+        cfg.attributes["sqlcipher"] = {
+            "enabled": self._sqlcipher_enabled,
+            "password": self._sqlcipher_password,
+        }
+
+        engine = create_engine(
+            "sqlite://",
+            creator=self._connect,
+            poolclass=StaticPool,
+        )
+
+        try:
+            with engine.connect() as connection:
+                cfg.attributes["connection"] = connection
+                command.upgrade(cfg, "head")
+        except Exception:
+            logger.exception("Failed to apply Alembic migrations; falling back to SQL")
+            self._ensure_schema()
+        finally:
+            engine.dispose()
+
+    def _ensure_schema(self) -> None:
+        with self._connect() as con:
             c = con.cursor()
             c.execute(
-                "CREATE TABLE IF NOT EXISTS items("  # noqa: E501
-                "id INTEGER PRIMARY KEY, kind TEXT, text TEXT, vec BLOB, ts REAL)"
+                """
+                CREATE TABLE IF NOT EXISTS items(
+                    id INTEGER PRIMARY KEY,
+                    kind TEXT,
+                    text TEXT,
+                    vec BLOB,
+                    ts REAL
+                )
+                """
             )
             c.execute(
-                "CREATE TABLE IF NOT EXISTS feedback("  # noqa: E501
-                "id INTEGER PRIMARY KEY, kind TEXT, prompt TEXT, answer TEXT, rating REAL, ts REAL)"
+                "CREATE INDEX IF NOT EXISTS idx_items_kind_ts ON items(kind, ts)"
             )
-            c.execute("CREATE INDEX IF NOT EXISTS idx_items_kind_ts ON items(kind, ts)")
+            c.execute(
+                """
+                CREATE TABLE IF NOT EXISTS feedback(
+                    id INTEGER PRIMARY KEY,
+                    kind TEXT,
+                    prompt TEXT,
+                    answer TEXT,
+                    rating REAL,
+                    ts REAL
+                )
+                """
+            )
 
     def add(self, kind: str, text: str) -> None:
         try:
@@ -40,7 +202,7 @@ class Memory:
         except Exception:
             logger.exception("Failed to embed text for kind '%s'", kind)
             vec = np.array([], dtype=np.float32).tobytes()
-        with sqlite3.connect(self.db_path) as con:
+        with self._connect() as con:
             c = con.cursor()
             c.execute(
                 "INSERT INTO items(kind,text,vec,ts) VALUES(?,?,?,?)",
@@ -48,7 +210,7 @@ class Memory:
             )
 
     def summarize(self, kind: str, max_items: int) -> None:
-        with sqlite3.connect(self.db_path) as con:
+        with self._connect() as con:
             c = con.cursor()
             rows = c.execute(
                 "SELECT id,text FROM items WHERE kind=? ORDER BY ts ASC",
@@ -72,7 +234,7 @@ class Memory:
 
     def add_feedback(self, kind: str, prompt: str, answer: str, rating: float) -> None:
         """Persist a rated question/answer pair."""
-        with sqlite3.connect(self.db_path) as con:
+        with self._connect() as con:
             c = con.cursor()
             c.execute(
                 "INSERT INTO feedback(kind,prompt,answer,rating,ts) VALUES(?,?,?,?,?)",
@@ -81,7 +243,7 @@ class Memory:
 
     def all_feedback(self) -> list[tuple[str, str, str, float]]:
         """Return all stored feedback entries."""
-        with sqlite3.connect(self.db_path) as con:
+        with self._connect() as con:
             c = con.cursor()
             rows = c.execute(
                 "SELECT kind,prompt,answer,rating FROM feedback"
@@ -105,7 +267,7 @@ class Memory:
             ``feedback`` table.
         """
 
-        with sqlite3.connect(self.db_path) as con:
+        with self._connect() as con:
             c = con.cursor()
             c.execute("SELECT kind,prompt,answer,rating FROM feedback")
             while True:
@@ -158,7 +320,7 @@ class Memory:
             logger.exception("Failed to embed search query")
             return []
         q_bytes = q.tobytes()
-        with sqlite3.connect(self.db_path) as con:
+        with self._connect() as con:
             con.create_function("cosine_sim", 2, self._cosine_similarity)
             c = con.cursor()
             rows = c.execute(

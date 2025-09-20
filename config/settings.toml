@@ -26,6 +26,10 @@ embed_model = "nomic-embed-text"
 embed_host = "127.0.0.1:11434"
 summary_max_tokens = 512
 
+[memory.sqlcipher]
+enabled = false
+password_env = "WATCHER_SQLCIPHER_PASSWORD"
+
 [learn]
 optimizer = "adam"
 learning_rate = 0.1
