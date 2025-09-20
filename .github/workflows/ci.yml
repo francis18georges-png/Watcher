@@ -9,6 +9,7 @@ env:
   WATCHER_TRAINING__SEED: "42"
   CUBLAS_WORKSPACE_CONFIG: ":4096:8"
   TORCH_DETERMINISTIC: "1"
+  TRIVY_CACHE_DIR: .trivy
 
 jobs:
   quality:
@@ -33,7 +34,7 @@ jobs:
             requirements-dev.txt
 
       - name: Prepare cache directories
-        run: mkdir -p .dvc/cache
+        run: mkdir -p .dvc/cache "$TRIVY_CACHE_DIR"
         shell: bash
 
       - name: Cache DVC artifacts
@@ -43,6 +44,14 @@ jobs:
           key: dvc-${{ runner.os }}-${{ hashFiles('dvc.lock', 'dvc.yaml', '.dvc/config') }}
           restore-keys: |
             dvc-${{ runner.os }}-
+
+      - name: Cache Trivy database
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.TRIVY_CACHE_DIR }}
+          key: trivy-${{ runner.os }}-${{ hashFiles('requirements-dev.txt') }}
+          restore-keys: |
+            trivy-${{ runner.os }}-
 
       - name: Install tooling
         run: |
@@ -108,7 +117,15 @@ jobs:
           }
 
       - name: Run quality pipeline
-        run: nox -s lint typecheck security tests build
+        run: nox -s lint typecheck tests build security
+
+      - name: Upload CycloneDX SBOM
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: Watcher-sbom-${{ runner.os }}
+          path: dist/Watcher-sbom.json
+          if-no-files-found: ignore
 
   windows-installer:
     name: Build Windows installer
