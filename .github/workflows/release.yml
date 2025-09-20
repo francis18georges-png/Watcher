@@ -7,12 +7,14 @@ on:
   workflow_dispatch:
 
 jobs:
-  publish-windows-installer:
-    name: Publish signed Windows installer
+  build-windows-installer:
+    name: Build and sign Windows installer
     runs-on: windows-latest
     permissions:
       contents: write
       id-token: write
+    outputs:
+      artifact-sha256: ${{ steps.artifact-digest.outputs.sha256 }}
     steps:
       - name: Validate SemVer tag
         shell: pwsh
@@ -42,9 +44,19 @@ jobs:
           python -m pip install -r requirements.txt
           python -m pip install pyinstaller
 
+      - name: Install SBOM tooling
+        shell: pwsh
+        run: python -m pip install cyclonedx-bom cyclonedx-py
+
       - name: Build Windows executable
         shell: pwsh
         run: pyinstaller packaging/watcher.spec --noconfirm
+
+      - name: Generate SBOM
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path dist | Out-Null
+          cyclonedx-py environment --format json --output-file dist/Watcher-sbom.json
 
       - name: Package installer archive
         shell: pwsh
@@ -61,6 +73,61 @@ jobs:
           artifact: dist/Watcher-Setup.zip
           bundle: dist/Watcher-Setup.zip.sigstore
 
+      - name: Compute artifact digest
+        id: artifact-digest
+        shell: pwsh
+        run: |
+          $hash = Get-FileHash dist/Watcher-Setup.zip -Algorithm SHA256
+          "sha256=sha256:$($hash.Hash.ToLower())" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
+
+      - name: Upload release artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-assets
+          if-no-files-found: error
+          path: |
+            dist/Watcher-Setup.zip
+            dist/Watcher-Setup.zip.sigstore
+            dist/Watcher-sbom.json
+
+  generate-provenance:
+    name: Generate SLSA provenance
+    needs: build-windows-installer
+    permissions:
+      actions: read
+      id-token: write
+      contents: write
+    uses: slsa-framework/slsa-github-generator/.github/workflows/generator_generic_slsa3.yml@v1.10.0
+    with:
+      build-artifacts: release-assets
+      provenance-subject-name: Watcher-Setup.zip
+      provenance-subject-digest: ${{ needs.build-windows-installer.outputs.artifact-sha256 }}
+
+  publish-release:
+    name: Publish GitHub release
+    needs:
+      - build-windows-installer
+      - generate-provenance
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Download build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+
+      - name: Normalize provenance filename
+        run: |
+          set -euo pipefail
+          PROVENANCE=$(find dist -name "*.intoto.jsonl" -print -quit)
+          if [ -z "$PROVENANCE" ]; then
+            echo "Provenance file not found" >&2
+            exit 1
+          fi
+          mv "$PROVENANCE" dist/Watcher-Setup.intoto.jsonl
+
       - name: Publish GitHub release
         uses: softprops/action-gh-release@v1
         with:
@@ -73,5 +140,7 @@ jobs:
           files: |
             dist/Watcher-Setup.zip
             dist/Watcher-Setup.zip.sigstore
+            dist/Watcher-sbom.json
+            dist/Watcher-Setup.intoto.jsonl
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
