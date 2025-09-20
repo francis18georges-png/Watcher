@@ -4,20 +4,27 @@ Bienvenue dans l'espace de référence du projet **Watcher**, l'atelier local d'
 Cette documentation complète le README et les guides techniques du dépôt en présentant la structure du
 système, son modèle de sécurité et les pratiques d'exploitation.
 
-## Organisation
+## Parcours recommandé
 
-- Une vue d'ensemble de l'[architecture](architecture.md) décrit comment les composants principaux
-  coopèrent (agents, curriculum adaptatif, mémoire vectorielle, bancs d'essais et journalisation).
-- Le [modèle de menaces](threat-model.md) recense les actifs critiques, les risques majeurs et les
-  mesures de mitigation mises en place.
+1. Découvrir la [vue d'ensemble de l'architecture](architecture.md) pour comprendre comment l'orchestrateur,
+   les agents spécialisés, la mémoire vectorielle et les garde-fous qualité coopèrent.
+2. Lire le [modèle de menaces](threat-model.md) afin d'identifier les actifs critiques, les attaques possibles
+   et les contre-mesures.
+3. Consulter la [charte éthique officielle](ethics.md) (extraite de [`ETHICS.md`](https://github.com/<github-username>/Watcher/blob/main/ETHICS.md)) qui encadre la
+   gouvernance des données et l'utilisation responsable de Watcher.
+
+!!! tip "Navigation rapide"
+    Les onglets en haut de page regroupent l'architecture, la sécurité et l'exploitation. Utilisez la barre de
+    recherche pour accéder rapidement aux journaux de conception ou aux conventions spécifiques.
+
+## Ressources complémentaires
+
 - Les conventions de [journalisation](logging.md) détaillent la configuration du logger JSON et les bons
   réflexes pour instrumenter le code.
 - Les feuilles de route et journaux historiques sont conservés dans
   [ROADMAP.md](ROADMAP.md), [CHANGELOG.md](CHANGELOG.md) et le [journal de conception](journal/).
-
-!!! tip "Charte éthique"
-    La charte éthique du projet est publiée avec la documentation : consultez la page
-    [Engagements éthiques](ethics.md) pour la parcourir ou la télécharger.
+- Pour les règles de fusion et la gouvernance de projet, référez-vous à la
+  [politique de merge](merge-policy.md).
 
 ## Prévisualiser la documentation localement
 

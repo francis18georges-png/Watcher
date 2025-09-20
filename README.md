@@ -8,7 +8,7 @@ Mémoire vectorielle, curriculum adaptatif, A/B + bench et quality gate sécurit
 ## Documentation
 
 La documentation technique est générée avec [MkDocs Material](https://squidfunk.github.io/mkdocs-material/)
-et déployée automatiquement sur GitHub Pages : https://<github-username>.github.io/Watcher/.
+et déployée automatiquement via GitHub Pages : https://<github-username>.github.io/Watcher/.
 
 Pour la prévisualiser localement :
 
@@ -17,7 +17,8 @@ pip install -r requirements-dev.txt
 mkdocs serve
 ```
 
-Le workflow GitHub Actions `deploy-docs.yml` publie le site statique à chaque push sur `main`.
+Le workflow GitHub Actions [`deploy-docs.yml`](.github/workflows/deploy-docs.yml) construit le site avec `mkdocs build --strict`
+avant de le publier sur l'environnement **GitHub Pages** à chaque push sur `main`.
 
 ## Benchmarks
 
