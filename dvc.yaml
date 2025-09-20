@@ -1,0 +1,28 @@
+stages:
+  prepare-data:
+    cmd: python scripts/prepare_data.py --input datasets/raw/simple_linear.csv --output datasets/processed/simple_linear.csv --params params.yaml
+    deps:
+      - datasets/raw/simple_linear.csv
+      - scripts/common.py
+      - scripts/prepare_data.py
+    params:
+      - prepare.sample_size
+      - prepare.random_seed
+    outs:
+      - datasets/processed/simple_linear.csv
+  validate-data:
+    cmd: >-
+      python scripts/validate_schema.py --file datasets/processed/simple_linear.csv --params params.yaml &&
+      python scripts/validate_size.py --file datasets/processed/simple_linear.csv --params params.yaml &&
+      python scripts/validate_hash.py --file datasets/processed/simple_linear.csv --params params.yaml
+    deps:
+      - datasets/processed/simple_linear.csv
+      - scripts/common.py
+      - scripts/validate_hash.py
+      - scripts/validate_schema.py
+      - scripts/validate_size.py
+    params:
+      - validate.simple_linear.columns
+      - validate.simple_linear.min_rows
+      - validate.simple_linear.expected_size
+      - validate.simple_linear.expected_hash

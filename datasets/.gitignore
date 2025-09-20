@@ -1,2 +1,4 @@
-/raw
-/processed
+/raw/*
+/processed/*
+!/raw/simple_linear.csv
+!/processed/simple_linear.csv

@@ -152,16 +152,42 @@ pour garantir des exécutions déterministes.
 
 ## Données
 
-Les jeux de données localisés dans `datasets/raw` et `datasets/processed` sont
-gérés avec [DVC](https://dvc.org/). Exemple de cycle de travail :
+La pipeline [DVC](https://dvc.org/) décrite dans `dvc.yaml` prépare et valide le
+jeu de données linéaire utilisé par `train.py` :
+
+- `prepare-data` lit `datasets/raw/simple_linear.csv`, applique les paramètres
+  définis dans `params.yaml` (graine, taille d'échantillon) et génère
+  `datasets/processed/simple_linear.csv`.
+- `validate-data` enchaîne trois scripts de validation (`scripts/validate_*`)
+  pour vérifier le schéma, la taille et le hachage du fichier produit.
+
+Les hyperparamètres d'entraînement ainsi que les contraintes de validation sont
+centralisés dans `params.yaml` (syntaxe JSON valide YAML pour éviter d'ajouter
+une dépendance d'analyse). Pour exécuter la pipeline complète et garantir
+que les validations passent, lancez :
 
 ```bash
-# enregistrer les modifications locales
-dvc add datasets/raw datasets/processed
-# sauvegarder dans le cache DVC
-dvc commit
-# récupérer les données depuis le stockage distant
+dvc repro validate-data
+```
+
+Un remote S3 nommé `storage` est configuré dans `.dvc/config` (URL
+`s3://watcher-artifacts`). Renseignez vos identifiants AWS via les variables
+d'environnement standard (`AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`,
+éventuellement `AWS_SESSION_TOKEN`) ou un profil configuré, puis synchronisez
+les artefacts DVC avec :
+
+```bash
+# envoyer les données préparées sur le bucket
+dvc push
+# récupérer les dernières versions depuis le stockage
 dvc pull
+```
+
+Vous pouvez remplacer le bucket par un autre en adaptant la configuration du
+remote :
+
+```bash
+dvc remote modify storage url s3://votre-bucket
 ```
 
 ### Collecte
