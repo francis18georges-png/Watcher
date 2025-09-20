@@ -1,34 +1,51 @@
-# Consultez README.md et docs/merge-policy.md pour la gouvernance des revues et
-# la signification des labels.
-# Les équipes référencées doivent exister dans l'organisation GitHub hébergeant
-# ce dépôt et être autorisées à relire les zones assignées.
+# Consultez docs/merge-policy.md pour comprendre la gouvernance des revues,
+# la cartographie des labels `scope:*` et la procédure d'automatisation.
+# Chaque équipe référencée doit exister dans l'organisation GitHub hébergeant
+# ce dépôt et être autorisée à relire les zones assignées.
 
+# Couverture par défaut : toute modification doit être validée par les mainteneurs.
 *                         @WatcherOrg/maintainers
 
-# Front et API utilisateur
+# scope:app — Application Watcher (API, UI, packaging client)
 app/                      @WatcherOrg/app-core
+app/api/                  @WatcherOrg/app-core
 app/ui/                   @WatcherOrg/design-system
+packaging/                @WatcherOrg/app-core
 
-# Expérience développeur et automatisation
+# scope:ops — Automatisation, CI/CD et outillage développeur
 .github/workflows/        @WatcherOrg/release-engineering
+.github/auto_merge.yml    @WatcherOrg/release-engineering
 automation-playbook.sh    @WatcherOrg/release-engineering
+auto_flow.sh              @WatcherOrg/release-engineering
+noxfile.py                @WatcherOrg/release-engineering
 scripts/                  @WatcherOrg/release-engineering
+Makefile                  @WatcherOrg/release-engineering
+requirements*.txt         @WatcherOrg/release-engineering
 
-# Données et pipeline ML
+# scope:ml — Données, entraînement et pipelines ML
 datasets/                 @WatcherOrg/ml-research
+metrics/                  @WatcherOrg/ml-research
 train.py                  @WatcherOrg/ml-research
+dvc.yaml                  @WatcherOrg/ml-research
+params.yaml               @WatcherOrg/ml-research
 
-# Documentation et gouvernance
+# scope:docs — Documentation produit et gouvernance
+README.md                 @WatcherOrg/documentation
+CHANGELOG.md              @WatcherOrg/documentation
+ETHICS.md                 @WatcherOrg/documentation
 docs/                     @WatcherOrg/documentation
+METRICS.md                @WatcherOrg/documentation
+QA.md                     @WatcherOrg/documentation
 
-# Sécurité et configuration sensible
+# scope:security — Configuration sensible et secrets
 config/                   @WatcherOrg/security-team
 plugins.toml              @WatcherOrg/security-team
+example.env               @WatcherOrg/security-team
 
-# Qualité et tests
+# scope:quality — Tests, contrôle qualité et couverture
+pytest.ini                @WatcherOrg/qa
 tests/                    @WatcherOrg/qa
-QA.md                     @WatcherOrg/qa
 
-# Infrastructure GitHub
+# Infrastructure GitHub (templates, CODEOWNERS, règles)
 .github/ISSUE_TEMPLATE/   @WatcherOrg/maintainers
 .github/CODEOWNERS        @WatcherOrg/maintainers

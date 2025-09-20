@@ -1,0 +1,43 @@
+name: Tâche de maintenance
+description: Documenter une dette technique, une mise à jour de dépendance ou un travail de refactoring.
+title: "[Maintenance]: "
+labels:
+  - status:needs-triage
+  - type:maintenance
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Utilisez ce modèle pour les changements internes (refactoring, mise à jour de dépendances, amélioration de tooling).
+        Pensez à mentionner les risques éventuels pour la production et les vérifications attendues.
+  - type: dropdown
+    id: scope
+    attributes:
+      label: Zone impactée
+      description: Identifiez la zone qui bénéficiera de la maintenance pour guider les CODEOWNERS.
+      options:
+        - scope:app — Interface ou API utilisateur
+        - scope:ml — Pipelines de données ou d'entraînement
+        - scope:docs — Documentation, guides ou métriques
+        - scope:ops — CI/CD, packaging ou scripts
+        - scope:quality — Tests automatisés et qualité
+        - scope:security — Configuration sensible, secrets, permissions
+        - Non déterminé / Autre
+  - type: textarea
+    id: motivation
+    attributes:
+      label: Contexte et objectif
+      description: Pourquoi cette maintenance est-elle nécessaire maintenant ? Quels sont les objectifs de qualité/performance ?
+      placeholder: "Mettre à jour la bibliothèque XYZ pour corriger..."
+    validations:
+      required: true
+  - type: textarea
+    id: plan
+    attributes:
+      label: Plan de travail
+      description: Décrivez les étapes prévues, les risques et les plans de rollback éventuels.
+  - type: textarea
+    id: validation
+    attributes:
+      label: Vérifications prévues
+      description: Tests, revues supplémentaires, validations manuelles à prévoir.

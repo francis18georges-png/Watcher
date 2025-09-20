@@ -1,55 +1,99 @@
 # Gouvernance des issues et des Pull Requests
 
-Ce document complète le README en décrivant la façon dont les labels, les
-CODEOWNERS et les automatisations GitHub sont utilisés pour assurer un cycle de
-revue cohérent.
+Ce document décrit la façon dont les labels, les CODEOWNERS et les
+workflows GitHub sont utilisés pour assurer un cycle de contribution
+cohérent. Il complète les informations générales du `README.md` et les
+check-lists qualité documentées dans `QA.md`.
 
-## Triage et labels
+## Typologie des labels
 
-Les formulaires présents dans `.github/ISSUE_TEMPLATE/` appliquent deux familles
-de labels :
+Trois familles de labels sont utilisées pour classifier les issues et les
+Pull Requests. Elles peuvent être combinées entre elles.
 
-| Label                        | Usage | Responsable |
-| ---------------------------- | ----- | ----------- |
-| `status:needs-triage`        | Ajouté automatiquement tant que la demande n'a pas été classée. | Mainteneurs |
-| `status:blocked`             | Indique qu'une PR est en attente d'une dépendance externe ou d'une décision. | Mainteneurs |
-| `status:ready-to-merge`      | Déclenche la fusion automatique une fois la CI verte et les revues obtenues. | Mainteneurs |
-| `type:bug`                   | Rapport de bug créé via le template dédié. | Demandeur |
-| `type:feature`               | Demande de fonctionnalité. | Demandeur |
-| `type:discussion`            | Discussion d'architecture ou de support. | Demandeur |
-| `type:maintenance` (option)  | Changement purement technique (refactoring, dépendances). | Mainteneur |
+### Labels `status:*`
 
-Lors du tri, un mainteneur :
+| Label                   | Usage principal | Responsable |
+| ----------------------- | --------------- | ----------- |
+| `status:needs-triage`   | Ajouté par défaut par les templates d'issue. À retirer une fois l'analyse effectuée. | Mainteneurs |
+| `status:in-progress`    | Indique qu'une personne travaille activement sur le sujet. | Mainteneur / assigné |
+| `status:ready-for-review` | Pour les PR prêtes à être relues après la phase de développement. | Auteur de la PR |
+| `status:changes-requested` | Utilisé lorsqu'une revue demande des modifications majeures. | Reviewer |
+| `status:blocked`        | Suspend la fusion en attendant une action externe (décision produit, dépendance amont, incident…). | Mainteneurs |
+| `status:ready-to-merge` | Toutes les revues requises sont obtenues et la CI est verte. | Mainteneurs |
+| `status:auto-merge`     | Autorise le workflow d'automatisation à fusionner la PR (voir ci-dessous). | Mainteneurs |
 
-1. Assigne un propriétaire fonctionnel et ajoute les labels de composant
-   nécessaires (`scope:docs`, `scope:security`, etc.).
-2. Retire `status:needs-triage` une fois la demande classée.
-3. Ajoute `status:blocked` si une action externe est requise.
+> ⚠️ L'ajout de `status:auto-merge` implique que `status:ready-to-merge` est
+> déjà présent et qu'aucun label bloquant n'est appliqué. Si l'un de ces
+> prérequis n'est plus respecté, retirez `status:auto-merge`.
 
-## CODEOWNERS et revues
+### Labels `type:*`
 
-Le fichier `.github/CODEOWNERS` enregistre les équipes responsables des
-composants. Toute Pull Request modifiant un chemin listé déclenche
-automatiquement une demande de revue auprès de l'équipe correspondante.
+| Label             | Usage |
+| ----------------- | ----- |
+| `type:bug`        | Rapport de bug créé via le template dédié. |
+| `type:feature`    | Demande de fonctionnalité ou d'amélioration UX. |
+| `type:maintenance`| Dette technique, refactoring, mise à jour de dépendance. |
+| `type:discussion` | Question, RFC ou support via les discussions GitHub. |
 
-- Les équipes renseignées doivent exister dans l'organisation GitHub du dépôt
-  (ex. `@WatcherOrg/release-engineering`).
-- Ajoutez une entrée dédiée pour tout sous-répertoire non couvert afin
-  d'expliciter le propriétaire.
-- Les mainteneurs peuvent surclasser une demande en ajoutant des réviseurs
-  supplémentaires au besoin (sécurité, performance, UX…).
+### Labels `scope:*`
+
+Les labels de portée permettent d'identifier rapidement les équipes
+concernées. Ils sont alignés sur la configuration de
+`.github/CODEOWNERS` :
+
+| Label        | Équipes CODEOWNERS impliquées | Dossiers principaux |
+| ------------ | ----------------------------- | ------------------- |
+| `scope:app`  | `@WatcherOrg/app-core`, `@WatcherOrg/design-system` | `app/`, `packaging/` |
+| `scope:ml`   | `@WatcherOrg/ml-research` | `datasets/`, `metrics/`, `train.py` |
+| `scope:docs` | `@WatcherOrg/documentation` | `docs/`, `README.md`, `CHANGELOG.md`, `ETHICS.md`, `QA.md`, `METRICS.md` |
+| `scope:ops`  | `@WatcherOrg/release-engineering` | `.github/workflows/`, `scripts/`, `noxfile.py` |
+| `scope:quality` | `@WatcherOrg/qa` | `tests/`, `pytest.ini` |
+| `scope:security` | `@WatcherOrg/security-team` | `config/`, `plugins.toml`, `example.env` |
+
+Lors du tri, les mainteneurs ajoutent au moins un label `scope:*` pour
+chaque issue/PR, idéalement sur la base des indications fournies dans les
+formulaires.
+
+## Processus de tri et de revue
+
+1. **Création** : les templates d'issue appliquent `status:needs-triage`
+   et un label `type:*`. Les reporters sont invités à préciser la zone
+   concernée via le champ « Zone impactée ».
+2. **Triage** : un mainteneur assigne la demande, ajoute les labels
+   `scope:*` pertinents et retire `status:needs-triage`. Si nécessaire,
+   ajoutez `status:blocked` en attendant une action externe.
+3. **Développement** : l'auteur de la PR passe le ticket en
+   `status:in-progress`, puis positionne `status:ready-for-review` lorsque
+   le code est prêt.
+4. **Revue CODEOWNER** : GitHub demande automatiquement la revue des
+   équipes définies dans `.github/CODEOWNERS`. Chaque équipe concernée
+   doit approuver la PR.
+5. **Validation finale** : une fois la CI verte et les revues obtenues,
+   un mainteneur ajoute `status:ready-to-merge`. Ajoutez `status:auto-merge`
+   pour déléguer la fusion au workflow ou fusionnez manuellement.
+
+## CODEOWNERS
+
+Le fichier `.github/CODEOWNERS` décrit les zones de responsabilité et
+assure que les équipes adéquates sont sollicitées. Quelques principes :
+
+- Toute modification non couverte hérite des mainteneurs (`*`).
+- Les entrées sont organisées par label `scope:*` pour faciliter le tri.
+- Ajoutez une nouvelle ligne si un sous-répertoire n'est pas déjà couvert
+  par le propriétaire attendu.
 
 ## Conditions de fusion
 
-1. Les jobs `nox -s lint typecheck security tests build` déclenchés par la CI
-   doivent réussir sur les plateformes supportées.
-2. Au moins un membre de chaque équipe CODEOWNER concernée approuve la PR.
-3. Une fois les points 1 et 2 remplis, un mainteneur peut ajouter le label
-   `status:ready-to-merge`. Le workflow `.github/workflows/automerge.yml` fusionne
-   alors la PR avec la méthode `merge`.
-4. En cas de fusion manuelle, retirez `status:ready-to-merge` si la fusion doit
-   être différée ou si de nouveaux commits sont poussés avant validation.
+1. Les jobs de CI (lint, typecheck, sécurité, tests, build) doivent être
+   verts sur les branches supportées.
+2. Chaque équipe CODEOWNER impactée doit avoir approuvé la PR.
+3. Les labels `status:ready-to-merge` **et** `status:auto-merge` permettent
+   au workflow `.github/workflows/automerge.yml` de fusionner la PR via la
+   méthode `merge`. La présence de `status:blocked` empêche
+   l'automatisation.
+4. Retirez `status:auto-merge` si de nouveaux commits sont poussés ou si
+   une investigation supplémentaire est nécessaire.
 
-Pour des modifications sensibles (sécurité, configuration), laissez `status:blocked`
-jusqu'à la validation explicite du plan d'action ou la mise à jour des tests de
-régression.
+Les modifications sensibles (sécurité, configuration, opérations) doivent
+rester en `status:blocked` tant que le plan d'action n'est pas validé par
+l'équipe responsable.
