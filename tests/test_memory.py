@@ -90,3 +90,46 @@ def test_cosine_similarity_regular():
     vec = np.array([1.0], dtype=np.float32)
     blob = vec.tobytes()
     assert math.isclose(Memory._cosine_similarity(blob, blob), 1.0, rel_tol=1e-6)
+
+
+def test_sqlcipher_configuration_executes_key_pragma(tmp_path, monkeypatch):
+    monkeypatch.setenv("WATCHER_MEMORY_ENABLE_SQLCIPHER", "1")
+    monkeypatch.setenv("WATCHER_MEMORY_SQLCIPHER_PASSWORD", "pa'ss")
+
+    mem = Memory(tmp_path / "mem.db")
+
+    executed: list[str] = []
+
+    class FakeSQLCipherConnection:
+        def execute(self, sql, params=None):
+            if params is not None:
+                raise AssertionError("SQLCipher PRAGMA should not use parameter binding")
+            executed.append(sql)
+            if sql == "PRAGMA cipher_version":
+                return self
+            if sql.startswith("PRAGMA key ="):
+                return self
+            raise AssertionError(f"Unexpected SQL: {sql}")
+
+        def cursor(self):  # pragma: no cover - not used but mimics sqlite interface
+            return self
+
+        def fetchall(self):  # pragma: no cover - compatibility shim
+            return []
+
+        def fetchmany(self, *_args, **_kwargs):  # pragma: no cover - compatibility shim
+            return []
+
+        def __enter__(self):  # pragma: no cover - allow use as context manager if needed
+            return self
+
+        def __exit__(self, exc_type, exc, tb):  # pragma: no cover - context manager protocol
+            return False
+
+    fake_con = FakeSQLCipherConnection()
+    monkeypatch.setattr(sqlite3, "connect", lambda *args, **kwargs: fake_con)
+
+    con = sqlite3.connect("ignored.db")
+    mem._configure_sqlcipher(con)
+
+    assert executed == ["PRAGMA cipher_version", "PRAGMA key = 'pa''ss'"]

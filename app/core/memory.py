@@ -1,3 +1,4 @@
+import os
 import sqlite3
 import time
 import math
@@ -17,11 +18,14 @@ class Memory:
     def __init__(self, db_path: Path):
         self.db_path = Path(db_path)
         self.db_path.parent.mkdir(parents=True, exist_ok=True)
+        self._sqlcipher_enabled = self._is_sqlcipher_enabled()
+        self._sqlcipher_password = os.getenv("WATCHER_MEMORY_SQLCIPHER_PASSWORD")
         self._init()
 
     def _init(self) -> None:
         self._embed_cache: dict[str, np.ndarray] = {}
         with sqlite3.connect(self.db_path) as con:
+            self._configure_sqlcipher(con)
             c = con.cursor()
             c.execute(
                 "CREATE TABLE IF NOT EXISTS items("  # noqa: E501
@@ -41,6 +45,7 @@ class Memory:
             logger.exception("Failed to embed text for kind '%s'", kind)
             vec = np.array([], dtype=np.float32).tobytes()
         with sqlite3.connect(self.db_path) as con:
+            self._configure_sqlcipher(con)
             c = con.cursor()
             c.execute(
                 "INSERT INTO items(kind,text,vec,ts) VALUES(?,?,?,?)",
@@ -49,6 +54,7 @@ class Memory:
 
     def summarize(self, kind: str, max_items: int) -> None:
         with sqlite3.connect(self.db_path) as con:
+            self._configure_sqlcipher(con)
             c = con.cursor()
             rows = c.execute(
                 "SELECT id,text FROM items WHERE kind=? ORDER BY ts ASC",
@@ -73,6 +79,7 @@ class Memory:
     def add_feedback(self, kind: str, prompt: str, answer: str, rating: float) -> None:
         """Persist a rated question/answer pair."""
         with sqlite3.connect(self.db_path) as con:
+            self._configure_sqlcipher(con)
             c = con.cursor()
             c.execute(
                 "INSERT INTO feedback(kind,prompt,answer,rating,ts) VALUES(?,?,?,?,?)",
@@ -82,6 +89,7 @@ class Memory:
     def all_feedback(self) -> list[tuple[str, str, str, float]]:
         """Return all stored feedback entries."""
         with sqlite3.connect(self.db_path) as con:
+            self._configure_sqlcipher(con)
             c = con.cursor()
             rows = c.execute(
                 "SELECT kind,prompt,answer,rating FROM feedback"
@@ -106,6 +114,7 @@ class Memory:
         """
 
         with sqlite3.connect(self.db_path) as con:
+            self._configure_sqlcipher(con)
             c = con.cursor()
             c.execute("SELECT kind,prompt,answer,rating FROM feedback")
             while True:
@@ -159,6 +168,7 @@ class Memory:
             return []
         q_bytes = q.tobytes()
         with sqlite3.connect(self.db_path) as con:
+            self._configure_sqlcipher(con)
             con.create_function("cosine_sim", 2, self._cosine_similarity)
             c = con.cursor()
             rows = c.execute(
@@ -176,6 +186,26 @@ class Memory:
         return scored
 
     # Internal helpers -------------------------------------------------
+
+    @staticmethod
+    def _is_sqlcipher_enabled() -> bool:
+        value = os.getenv("WATCHER_MEMORY_ENABLE_SQLCIPHER", "")
+        return value.lower() in {"1", "true", "yes", "on"}
+
+    def _configure_sqlcipher(self, con: sqlite3.Connection) -> None:
+        if not self._sqlcipher_enabled:
+            return
+        password = self._sqlcipher_password
+        if not password:
+            logger.warning("SQLCipher enabled but no password provided; skipping configuration")
+            return
+        try:
+            con.execute("PRAGMA cipher_version")
+        except sqlite3.DatabaseError:
+            logger.warning("SQLCipher is not available in the current sqlite3 build; skipping")
+            return
+        escaped = password.replace("'", "''")
+        con.execute(f"PRAGMA key = '{escaped}'")
 
     def _embed(self, text: str, use_cache: bool = True) -> np.ndarray:
         """Return embedding for ``text`` using a simple in-memory cache."""
