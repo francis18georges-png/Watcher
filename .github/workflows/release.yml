@@ -1,0 +1,83 @@
+name: Release
+
+on:
+  release:
+    types:
+      - published
+
+permissions:
+  contents: write
+  actions: read
+  id-token: write
+
+jobs:
+  sbom:
+    name: Publish SBOM asset
+    runs-on: ubuntu-latest
+    outputs:
+      subjects-base64: ${{ steps.metadata.outputs.subjects_base64 }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: |
+            requirements.txt
+            requirements-dev.txt
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements.txt -r requirements-dev.txt cyclonedx-bom
+
+      - name: Generate SBOM
+        run: cyclonedx-py --resolve-env --format json --output sbom.json
+
+      - name: Capture SBOM metadata
+        id: metadata
+        run: |
+          python <<'PY'
+          import base64
+          import hashlib
+          import json
+          import os
+          from pathlib import Path
+
+          sbom_path = Path("sbom.json")
+          digest = hashlib.sha256(sbom_path.read_bytes()).hexdigest()
+          subjects = json.dumps([
+              {
+                  "name": sbom_path.name,
+                  "digest": {"sha256": digest},
+              }
+          ])
+          encoded_subjects = base64.b64encode(subjects.encode()).decode()
+          with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as fh:
+              fh.write(f"subjects_base64={encoded_subjects}\n")
+          PY
+
+      - name: Upload SBOM artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-sbom
+          path: sbom.json
+
+      - name: Attach SBOM to release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: sbom.json
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  provenance:
+    name: Publish provenance
+    needs: sbom
+    uses: slsa-framework/slsa-github-generator/.github/workflows/generator_generic_slsa3.yml@v2.0.1
+    with:
+      base64-subjects: ${{ needs.sbom.outputs.subjects-base64 }}
+      provenance-name: sbom.provenance.intoto.jsonl
+      upload-release-assets: true
