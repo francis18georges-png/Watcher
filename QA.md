@@ -19,6 +19,9 @@
 
 ## Continuous Integration
 
+* Le job `Scorecard gate` rejoue l'analyse OpenSSF Scorecard pour chaque Pull Request via
+  `ossf/scorecard-action@v2`. La CI échoue dès que le score global descend sous `7` afin de
+  bloquer la fusion tant que les recommandations critiques ne sont pas appliquées.
 * The Windows job invokes `./installer.ps1 -SkipOllama` to validate that the PowerShell installer succeeds
   without the Ollama models.
 * Immediately afterwards the workflow launches `./run.ps1` with an empty `DISPLAY` variable to emulate

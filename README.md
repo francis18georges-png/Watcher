@@ -1,6 +1,7 @@
 # Watcher
 
 ![Benchmark status badge](metrics/performance_badge.svg)
+[![OpenSSF Scorecard](https://api.securityscorecards.dev/projects/github.com/<owner>/Watcher/badge)](https://securityscorecards.dev/viewer/?uri=github.com/<owner>/Watcher)
 
 Atelier local d'IA de programmation autonome (offline par défaut).
 Mémoire vectorielle, curriculum adaptatif, A/B + bench et quality gate sécurité.
@@ -21,6 +22,20 @@ mkdocs serve
 
 Le workflow GitHub Actions [`deploy-docs.yml`](.github/workflows/deploy-docs.yml) construit le site avec `mkdocs build --strict`
 avant de le publier sur l'environnement **GitHub Pages** à chaque push sur `main`.
+
+## Sécurité et qualité automatisées
+
+Le badge OpenSSF Scorecard reflète en continu l'état de la posture de sécurité du dépôt
+(`.github/workflows/scorecard.yml`). Il est généré à partir de l'API publique
+<https://api.securityscorecards.dev/projects/github.com/<owner>/Watcher> et renvoie vers le
+rapport détaillé sur <https://securityscorecards.dev>. Un run planifié hebdomadaire publie les
+résultats sur le tableau de bord OpenSSF, tandis que chaque Pull Request bénéficie d'une analyse
+à jour dans GitHub Actions.
+
+La CI inclut désormais un garde-fou `Scorecard gate` dans [`ci.yml`](.github/workflows/ci.yml)
+qui rejoue l'analyse Scorecard à chaque Pull Request. Le job échoue si le score global
+redescend sous `7`, empêchant ainsi le reste du pipeline et la fusion tant que les bonnes
+pratiques identifiées par Scorecard ne sont pas rétablies.
 
 ## Releases, SBOM et provenance
 
