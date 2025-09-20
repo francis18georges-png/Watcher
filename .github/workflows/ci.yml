@@ -51,3 +51,42 @@ jobs:
 
       - name: Run quality pipeline
         run: nox -s lint typecheck security tests build
+
+  windows-installer:
+    name: Build Windows installer
+    needs: quality
+    runs-on: windows-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install build dependencies
+        shell: pwsh
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements.txt
+          python -m pip install pyinstaller
+
+      - name: Build Windows executable
+        shell: pwsh
+        run: pyinstaller packaging/watcher.spec --noconfirm
+
+      - name: Create installer archive
+        shell: pwsh
+        run: |
+          $archive = "dist/Watcher-Setup.zip"
+          if (Test-Path $archive) {
+            Remove-Item $archive
+          }
+          Compress-Archive -Path "dist/Watcher/*" -DestinationPath $archive
+
+      - name: Upload Windows installer artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Watcher-Setup
+          path: dist/Watcher-Setup.zip
