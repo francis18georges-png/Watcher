@@ -264,7 +264,7 @@ def reload_plugins(base: Location | None = None) -> list[LoadedPlugin]:
 
     manifest = _resolve_manifest(base)
     if manifest is None:
-        manifest = _packaged_manifest()
+        manifest = _resolve_manifest(DEFAULT_MANIFEST)
     plugins: list[LoadedPlugin] = []
     if manifest is not None:
         try:

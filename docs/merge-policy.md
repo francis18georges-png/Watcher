@@ -48,7 +48,7 @@ concernées. Ils sont alignés sur la configuration de
 | `scope:docs` | `@WatcherOrg/documentation` | `docs/`, `README.md`, `CHANGELOG.md`, `ETHICS.md`, `QA.md`, `METRICS.md` |
 | `scope:ops`  | `@WatcherOrg/release-engineering` | `.github/workflows/`, `scripts/`, `noxfile.py` |
 | `scope:quality` | `@WatcherOrg/qa` | `tests/`, `pytest.ini` |
-| `scope:security` | `@WatcherOrg/security-team` | `config/`, `plugins.toml`, `example.env` |
+| `scope:security` | `@WatcherOrg/security-team` | `config/`, `app/plugins.toml`, `example.env` |
 
 Lors du tri, les mainteneurs ajoutent au moins un label `scope:*` pour
 chaque issue/PR, idéalement sur la base des indications fournies dans les

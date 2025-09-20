@@ -19,6 +19,10 @@ def _plugin_base() -> plugins.Location | None:
     if manifest.is_file():
         return manifest
 
+    app_manifest = Path("app") / "plugins.toml"
+    if app_manifest.is_file():
+        return app_manifest
+
     try:
         candidate = resources.files("app") / "plugins.toml"
     except ModuleNotFoundError:

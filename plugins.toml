@@ -1,4 +1,0 @@
-[[plugins]]
-path = "app.tools.plugins.hello:HelloPlugin"
-api_version = "1.0"
-signature = "d6d873ad0d7585b890b67786d0c3b4f366a9642b724cbfdbc6752a5c9aee46e5"
