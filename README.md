@@ -189,13 +189,33 @@ Les journaux comme les contenus mémorisés restent sur l'environnement local et
 
 ## Configuration des logs
 
-Watcher peut charger une configuration de journalisation personnalisée depuis un fichier YAML. Définissez la variable d'environnement `LOGGING_CONFIG_PATH` pour indiquer le chemin du fichier :
+Watcher peut charger une configuration de journalisation personnalisée depuis un fichier YAML **ou** JSON. Définissez la
+variable d'environnement `LOGGING_CONFIG_PATH` pour indiquer le chemin du fichier :
 
 ```bash
-export LOGGING_CONFIG_PATH=/chemin/vers/logging.yml
+# YAML par défaut
+export LOGGING_CONFIG_PATH=./config/logging.yml
+
+# Variante JSON équivalente
+export LOGGING_CONFIG_PATH=./config/logging.json
 ```
 
-Si cette variable est absente ou que le fichier fourni est introuvable, le fichier `config/logging.yml` inclus dans le projet est utilisé. En dernier recours, Watcher applique la configuration basique de Python (`logging.basicConfig`) avec le niveau `INFO`.
+Les deux fichiers décrivent un pipeline avec un formatter JSON et un filtre d'échantillonnage (`SamplingFilter`). Adaptez le
+paramètre `sample_rate` pour contrôler la proportion de messages conservés :
+
+```yaml
+filters:
+  sampling:
+    (): app.core.logging_setup.SamplingFilter
+    sample_rate: 0.1  # ne journalise qu'environ 10 % des messages
+```
+
+Le module `app.core.logging_setup` expose également `set_trace_context(trace_id, sample_rate)` pour propager dynamiquement ces
+valeurs dans les journaux structurés.
+
+Si `LOGGING_CONFIG_PATH` est absent ou que le fichier fourni est introuvable, le fichier `config/logging.yml` inclus dans le
+projet est utilisé. En dernier recours, Watcher applique la configuration basique de Python (`logging.basicConfig`) avec le
+niveau `INFO`.
 
 ## Éthique et traçabilité
 
