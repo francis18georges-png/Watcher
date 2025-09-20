@@ -1,8 +1,12 @@
 """Core orchestration engine for the Watcher project."""
 
-from pathlib import Path
 import json
+import os
+import sys
+import tempfile
 import time
+import hmac
+from pathlib import Path
 from collections import OrderedDict
 from itertools import chain
 from threading import Thread
@@ -26,6 +30,12 @@ from app.data.validation import validate_feedback_schema
 from app.tools import plugins
 from app.utils.metrics import metrics
 from app.core.logging_setup import get_logger
+from app.core import sandbox
+
+
+_PLUGIN_CPU_LIMIT_SECONDS = 10
+_PLUGIN_MEMORY_LIMIT_BYTES = 256 * 1024 * 1024
+_PLUGIN_TIMEOUT_SECONDS = 30
 
 
 class Engine:
@@ -51,7 +61,7 @@ class Engine:
         # LRU cache for chat responses
         self._cache_size = int(cfg.get("cache_size", 128))
         self._cache: OrderedDict[str, str] = OrderedDict()
-        self.plugins: list[plugins.Plugin] = []
+        self.plugins: list[plugins.LoadedPlugin] = []
         self._load_plugins()
         self.start_msg = self._bootstrap()
         self.last_prompt = ""
@@ -355,21 +365,72 @@ class Engine:
         return f"{len(self.plugins)} plugins rechargés"
 
     def run_plugins(self) -> list[str]:
-        """Execute all loaded plugins and return their outputs.
-
-        Each plugin is executed in isolation so a failure in one does not
-        prevent others from running.  Errors are logged and the failing plugin
-        is skipped.
-        """
+        """Execute all loaded plugins in isolated sandboxes."""
 
         outputs: list[str] = []
-        for p in self.plugins:
-            try:
-                outputs.append(p.run())
-            except Exception:  # pragma: no cover - best effort logging
-                logger.exception(
-                    "Plugin %s failed", getattr(p, "name", p.__class__.__name__)
+        pythonpath = os.pathsep.join(
+            filter(None, [str(self.base), os.environ.get("PYTHONPATH")])
+        )
+
+        for plugin in self.plugins:
+            actual_signature = plugins.compute_module_signature(plugin.module)
+            if actual_signature is None or not hmac.compare_digest(
+                actual_signature, plugin.signature
+            ):
+                logger.error(
+                    "Plugin %s signature mismatch; skipping", plugin.import_path
                 )
+                continue
+
+            cmd = [
+                sys.executable,
+                "-m",
+                "app.tools.plugins.runner",
+                "--path",
+                plugin.import_path,
+                "--signature",
+                plugin.signature,
+                "--api-version",
+                plugin.api_version,
+            ]
+
+            env = {"PYTHONPATH": pythonpath} if pythonpath else {}
+
+            try:
+                with tempfile.TemporaryDirectory(
+                    prefix=f"watcher-plugin-{plugin.name}-"
+                ) as tmpdir:
+                    result = sandbox.run(
+                        cmd,
+                        cpu_seconds=_PLUGIN_CPU_LIMIT_SECONDS,
+                        memory_bytes=_PLUGIN_MEMORY_LIMIT_BYTES,
+                        timeout=_PLUGIN_TIMEOUT_SECONDS,
+                        cwd=tmpdir,
+                        env=env,
+                        allow_network=False,
+                    )
+            except Exception:  # pragma: no cover - best effort logging
+                logger.exception("Plugin %s failed to start", plugin.import_path)
+                continue
+
+            if result.code == 0 and not result.timeout:
+                outputs.append(result.out.strip())
+                continue
+
+            details: list[str] = []
+            if result.timeout:
+                details.append("timeout")
+            if result.cpu_exceeded:
+                details.append("cpu limit")
+            if result.memory_exceeded:
+                details.append("memory limit")
+            logger.error(
+                "Plugin %s failed with code %s: %s (%s)",
+                plugin.import_path,
+                result.code,
+                result.err.strip(),
+                ", ".join(details) if details else "no additional info",
+            )
         return outputs
 
 
