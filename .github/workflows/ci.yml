@@ -49,5 +49,32 @@ jobs:
         run: dvc pull
         continue-on-error: true
 
+      - name: Run Windows installer
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: ./installer.ps1 -SkipOllama
+
+      - name: Smoke test launcher in headless mode
+        if: runner.os == 'Windows'
+        shell: pwsh
+        env:
+          DISPLAY: ""
+        run: |
+          $script = Join-Path $PWD.Path 'run.ps1'
+          $job = Start-Job -ScriptBlock { param($path) & $path } -ArgumentList $script
+          Start-Sleep -Seconds 5
+          if ($job.State -eq 'Failed') {
+            Receive-Job -Job $job | Out-String | Write-Host
+            throw 'run.ps1 failed to start.'
+          }
+          if ($job.State -eq 'Completed') {
+            $output = Receive-Job -Job $job | Out-String
+            Write-Host $output
+            throw 'run.ps1 exited prematurely.'
+          }
+          Stop-Job -Job $job | Out-Null
+          Receive-Job -Job $job | Out-String | Write-Host
+          Remove-Job -Job $job
+
       - name: Run quality pipeline
         run: nox -s lint typecheck security tests build

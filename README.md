@@ -68,8 +68,17 @@ pour bénéficier automatiquement de ce mécanisme.
 
 Sous Windows :
 
-1. `./installer.ps1`
+1. `./installer.ps1 -SkipOllama` pour installer l'environnement local sans télécharger les modèles Ollama.
+   Omettez l'option `-SkipOllama` pour déclencher l'installation complète lorsque vous avez besoin des modèles.
 2. `./run.ps1`
+
+Dans un environnement sans serveur d'affichage (CI, sessions distantes), forcez le mode headless en vidant `DISPLAY`
+avant d'exécuter le lanceur :
+
+```powershell
+$env:DISPLAY = ""
+./run.ps1
+```
 
 ### Ligne de commande
 
