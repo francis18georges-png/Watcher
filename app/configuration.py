@@ -137,6 +137,42 @@ class MemorySettings(SectionSettings):
         return value
 
 
+class DatabaseSettings(SectionSettings):
+    """Primary database connection configuration."""
+
+    url: str = Field(
+        default="sqlite+aiosqlite:///./data/watcher.db",
+        description="URL de connexion SQLAlchemy sécurisée par défaut.",
+    )
+    pool_size: int = Field(
+        default=5,
+        description="Taille minimale du pool de connexions.",
+    )
+    pool_timeout: int = Field(
+        default=30,
+        description="Timeout (s) d'obtention d'une connexion.",
+    )
+    pool_recycle: int = Field(
+        default=1800,
+        description="Durée (s) avant recyclage d'une connexion.",
+    )
+    echo: bool = Field(default=False, description="Active les traces SQL détaillées.")
+
+    @field_validator("url")
+    @classmethod
+    def _non_empty_url(cls, value: str) -> str:
+        if not value:
+            raise ValueError("url must not be empty")
+        return value
+
+    @field_validator("pool_size", "pool_timeout", "pool_recycle")
+    @classmethod
+    def _positive_pool_values(cls, value: int) -> int:
+        if value < 1:
+            raise ValueError("pool settings must be positive integers")
+        return value
+
+
 class LearningSettings(SectionSettings):
     """Hyper-parameters for the learning loop."""
 
@@ -287,6 +323,7 @@ __all__ = [
     "DataSettings",
     "DatasetSettings",
     "DevSettings",
+    "DatabaseSettings",
     "EmbeddingsSettings",
     "LoggingSettings",
     "IntelligenceSettings",
