@@ -35,3 +35,11 @@ def _hide_source_manifest(tmp_path: Path):
 def test_plugin_list_installed_layout(tmp_path, capsys):
     with _hide_source_manifest(tmp_path):
         _assert_lists_hello(capsys, cli.main(["plugin", "list"]))
+
+
+def test_run_status_only_reports_offline(capsys):
+    exit_code = cli.main(["run", "--offline", "--status-only"])
+    captured = capsys.readouterr()
+
+    assert exit_code == 0
+    assert "hors ligne" in captured.out.lower()

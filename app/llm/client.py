@@ -107,6 +107,12 @@ class Client:
         self.host = cfg.get("host", "127.0.0.1:11434")
         self.ctx = cfg.get("ctx")
         self.fallback_phrase = fallback_phrase
+        self.offline = False
+
+    def set_offline(self, offline: bool) -> None:
+        """Enable or disable offline mode."""
+
+        self.offline = offline
 
     def generate(self, prompt: str, *, separator: str = "") -> tuple[str, str]:
         """Return a response and trace for *prompt*.
@@ -122,6 +128,9 @@ class Client:
         """
 
         trace: list[str] = []
+        if self.offline:
+            trace.append("offline")
+            return f"{self.fallback_phrase}: {prompt}", " -> ".join(trace)
         try:  # pragma: no cover - network path
             responses: list[str] = []
             for idx, chunk in enumerate(chunk_prompt(prompt)):

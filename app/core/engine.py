@@ -8,6 +8,8 @@ from itertools import chain
 from threading import Thread
 from typing import Any
 
+import psutil
+
 from config import load_config
 
 from app.core import autograder as AG
@@ -52,6 +54,8 @@ class Engine:
         self._cache_size = int(cfg.get("cache_size", 128))
         self._cache: OrderedDict[str, str] = OrderedDict()
         self.plugins: list[plugins.Plugin] = []
+        self._plugin_process_cache: dict[str, psutil.Process] = {}
+        self.offline_mode = False
         self._load_plugins()
         self.start_msg = self._bootstrap()
         self.last_prompt = ""
@@ -371,6 +375,86 @@ class Engine:
                     "Plugin %s failed", getattr(p, "name", p.__class__.__name__)
                 )
         return outputs
+
+    def set_offline_mode(self, enabled: bool) -> str:
+        """Toggle offline mode for the engine and LLM client."""
+
+        self.offline_mode = enabled
+        if hasattr(self.client, "set_offline"):
+            self.client.set_offline(enabled)
+        state = "activé" if enabled else "désactivé"
+        return f"mode offline {state}"
+
+    def _resolve_plugin_process(self, plugin: plugins.Plugin) -> psutil.Process | None:
+        name = getattr(plugin, "name", plugin.__class__.__name__)
+        cached = self._plugin_process_cache.get(name)
+        if cached is not None:
+            try:
+                if cached.is_running():
+                    return cached
+            except psutil.Error:
+                pass
+            self._plugin_process_cache.pop(name, None)
+
+        pid = getattr(plugin, "pid", None)
+        if pid is None:
+            handle = getattr(plugin, "process", None)
+            if isinstance(handle, psutil.Process):
+                pid = handle.pid
+            elif hasattr(handle, "pid"):
+                pid = getattr(handle, "pid", None)
+
+        if pid is not None:
+            try:
+                proc = psutil.Process(int(pid))
+            except (psutil.Error, ValueError):
+                return None
+            else:
+                try:
+                    proc.cpu_percent(interval=None)
+                except psutil.Error:
+                    return None
+                self._plugin_process_cache[name] = proc
+                return proc
+
+        name_hint = getattr(plugin, "process_name", None)
+        if name_hint:
+            try:
+                for candidate in psutil.process_iter(["name"]):
+                    if candidate.info.get("name") == name_hint:
+                        try:
+                            candidate.cpu_percent(interval=None)
+                        except psutil.Error:
+                            continue
+                        self._plugin_process_cache[name] = candidate
+                        return candidate
+            except psutil.Error:
+                return None
+
+        return None
+
+    def plugin_metrics(self) -> list[dict[str, float | None]]:
+        """Return CPU and RAM usage for each loaded plugin."""
+
+        metrics: list[dict[str, float | None]] = []
+        for plugin in self.plugins:
+            name = getattr(plugin, "name", plugin.__class__.__name__)
+            proc = self._resolve_plugin_process(plugin)
+            if proc is None:
+                metrics.append({"name": name, "cpu": None, "memory": None})
+                continue
+
+            cpu: float | None
+            mem: float | None
+            try:
+                cpu = proc.cpu_percent(interval=None)
+                mem = proc.memory_info().rss / (1024 * 1024)
+            except psutil.Error:
+                cpu = None
+                mem = None
+                self._plugin_process_cache.pop(name, None)
+            metrics.append({"name": name, "cpu": cpu, "memory": mem})
+        return metrics
 
 
 logger = get_logger(__name__)

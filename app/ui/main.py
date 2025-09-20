@@ -65,16 +65,25 @@ def start_metrics_server(
 
 
 class WatcherApp(ttk.Frame):
-    def __init__(self, master: tk.Tk):
+    _PLUGIN_REFRESH_MS = 2000
+
+    def __init__(self, master: tk.Tk, *, offline: bool = False):
         super().__init__(master)
         self.engine = Engine()
         master.title(APP_NAME)
         master.geometry("1100x700")
         master.minsize(900, 600)
         self.pack(fill="both", expand=True)
+        self._plugin_rows: dict[str, str] = {}
+        self._plugin_refresh_job: str | None = None
         self._build()
+        if offline:
+            self.engine.set_offline_mode(True)
+        self._update_status_label()
         self.out.insert("end", f"[Watcher] {self.engine.start_msg}\n")
         self.out.see("end")
+        self.bind("<Destroy>", self._on_destroy)
+        self._refresh_plugin_metrics()
 
     def _build(self) -> None:
         nb = ttk.Notebook(self)
@@ -84,12 +93,14 @@ class WatcherApp(ttk.Frame):
         self.atelier = ttk.Frame(nb)
         self.bench = ttk.Frame(nb)
         self.docs = ttk.Frame(nb)
+        self.plugins_panel = ttk.Frame(nb)
         for t, frm in [
             ("Chat", self.chat),
             ("Briefing", self.brief),
             ("Atelier", self.atelier),
             ("Bench", self.bench),
             ("Docs", self.docs),
+            ("Plugins", self.plugins_panel),
         ]:
             nb.add(frm, text=t)
 
@@ -116,11 +127,33 @@ class WatcherApp(ttk.Frame):
         )
         self.rate_input.pack(side="left", padx=4)
         ttk.Button(bottom, text="Noter", command=self._rate).pack(side="left")
-        self.status = ttk.Label(
-            self,
-            text="Mode: Sur | Backend: ollama | Modèle: llama3.2:3b",
+        status_bar = ttk.Frame(self)
+        status_bar.pack(fill="x", padx=8, pady=(0, 8))
+        self.status_var = tk.StringVar(value="")
+        self.status = ttk.Label(status_bar, textvariable=self.status_var)
+        self.status.pack(side="left", fill="x", expand=True)
+        self.offline_btn = ttk.Button(status_bar, text="Mode offline: désactivé", command=self._toggle_offline)
+        self.offline_btn.pack(side="right")
+
+        plugins_frame = ttk.Frame(self.plugins_panel)
+        plugins_frame.pack(fill="both", expand=True, padx=8, pady=8)
+        columns = ("plugin", "cpu", "memory")
+        self.plugin_tree = ttk.Treeview(
+            plugins_frame,
+            columns=columns,
+            show="headings",
+            height=8,
         )
-        self.status.pack(fill="x")
+        headings = {
+            "plugin": "Plugin",
+            "cpu": "CPU (%)",
+            "memory": "RAM (MiB)",
+        }
+        for col, title in headings.items():
+            self.plugin_tree.heading(col, text=title)
+            anchor = "w" if col == "plugin" else "center"
+            self.plugin_tree.column(col, anchor=anchor, width=120 if col != "plugin" else 200)
+        self.plugin_tree.pack(fill="both", expand=True)
 
         # Briefing button
         ttk.Button(self.brief, text="Démarrer le Briefing", command=self._brief).pack(
@@ -214,9 +247,65 @@ class WatcherApp(ttk.Frame):
         self.out.insert("end", f"\n[Feedback] {msg}\n")
         self.out.see("end")
 
+    def _update_status_label(self) -> None:
+        mode = "Hors ligne" if self.engine.offline_mode else "Sur"
+        backend = getattr(self.engine.client, "host", "ollama")
+        model = getattr(self.engine.client, "model", "llama3.2:3b")
+        self.status_var.set(f"Mode: {mode} | Backend: {backend} | Modèle: {model}")
+        state = "activé" if self.engine.offline_mode else "désactivé"
+        self.offline_btn.config(text=f"Mode offline: {state}")
 
-if __name__ == "__main__":
+    def _toggle_offline(self) -> None:
+        new_state = not self.engine.offline_mode
+        msg = self.engine.set_offline_mode(new_state)
+        self._update_status_label()
+        self.out.insert("end", f"\n[Mode] {msg}\n")
+        self.out.see("end")
+
+    def _refresh_plugin_metrics(self) -> None:
+        data = self.engine.plugin_metrics()
+        known = set(self._plugin_rows)
+        for entry in data:
+            name = entry["name"]
+            cpu = entry["cpu"]
+            mem = entry["memory"]
+            cpu_txt = "—" if cpu is None else f"{cpu:.1f} %"
+            mem_txt = "—" if mem is None else f"{mem:.1f} MiB"
+            item_id = self._plugin_rows.get(name)
+            values = (name, cpu_txt, mem_txt)
+            if item_id is None:
+                item_id = self.plugin_tree.insert("", "end", values=values)
+                self._plugin_rows[name] = item_id
+            else:
+                self.plugin_tree.item(item_id, values=values)
+            known.discard(name)
+
+        for stale in known:
+            item_id = self._plugin_rows.pop(stale, None)
+            if item_id is not None:
+                self.plugin_tree.delete(item_id)
+
+        self._plugin_refresh_job = self.after(self._PLUGIN_REFRESH_MS, self._refresh_plugin_metrics)
+
+    def _on_destroy(self, event: tk.Event) -> None:  # pragma: no cover - Tk cleanup
+        if event.widget is self and self._plugin_refresh_job is not None:
+            self.after_cancel(self._plugin_refresh_job)
+            self._plugin_refresh_job = None
+
+
+def run_app(*, offline: bool = False, status_only: bool = False) -> int:
+    """Run the graphical or CLI version of Watcher."""
+
     logging_setup.configure()
+    if status_only:
+        mode = "hors ligne" if offline else "en ligne"
+        print(
+            "Watcher prêt (mode "
+            f"{mode}). Lancez `python -m app.ui.main` pour l'interface graphique "
+            "et utilisez le bouton Mode offline pour couper l'LLM."
+        )
+        return 0
+
     start_metrics_server()
 
     if not os.environ.get("DISPLAY"):
@@ -226,13 +315,15 @@ if __name__ == "__main__":
             os.environ["DISPLAY"] = ":99"
             try:
                 root = tk.Tk()
-                WatcherApp(root)
+                WatcherApp(root, offline=offline)
                 root.mainloop()
             finally:
                 xvfb.terminate()
         else:
             logger.warning("DISPLAY absent et Xvfb introuvable, mode CLI activé.")
             eng = Engine()
+            if offline:
+                eng.set_offline_mode(True)
             logger.info("%s", eng.start_msg)
             try:
                 while True:
@@ -257,7 +348,12 @@ if __name__ == "__main__":
     else:
         root = tk.Tk()
         try:
-            WatcherApp(root)
+            WatcherApp(root, offline=offline)
             root.mainloop()
         except Exception as e:  # pragma: no cover - UI
             messagebox.showerror("Watcher", str(e))
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(run_app())

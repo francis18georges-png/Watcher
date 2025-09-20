@@ -26,6 +26,41 @@ class _DummyEngine:
         return "feedback enregistré"
 
 
+class _DummyButton:
+    def __init__(self) -> None:
+        self.kwargs: dict[str, str] = {}
+
+    def config(self, **kwargs) -> None:
+        self.kwargs.update(kwargs)
+
+
+class _DummyOfflineClient:
+    def __init__(self) -> None:
+        self.host = "mock-backend"
+        self.model = "mock-model"
+        self.offline = False
+
+    def set_offline(self, value: bool) -> None:
+        self.offline = value
+
+
+class _DummyOfflineEngine:
+    def __init__(self) -> None:
+        self.offline_mode = False
+        self.client = _DummyOfflineClient()
+
+    def add_feedback(self, rating: float) -> str:  # pragma: no cover - compat
+        return ""
+
+    def set_offline_mode(self, enabled: bool) -> str:
+        self.offline_mode = enabled
+        self.client.set_offline(enabled)
+        return f"mode offline {'activé' if enabled else 'désactivé'}"
+
+    def plugin_metrics(self) -> list[dict[str, float | None]]:  # pragma: no cover
+        return []
+
+
 def test_rate_records_high_value(monkeypatch):
     errors: list[tuple[str, str]] = []
 
@@ -46,3 +81,24 @@ def test_rate_records_high_value(monkeypatch):
     assert any(
         entry.strip().endswith("feedback enregistré") for _, entry in app.out.buffer
     )
+
+
+def test_toggle_offline_updates_status(monkeypatch):
+    monkeypatch.setattr(main.WatcherApp, "_refresh_plugin_metrics", lambda self: None)
+
+    app = main.WatcherApp.__new__(main.WatcherApp)
+    app.engine = _DummyOfflineEngine()
+    app.status_var = tk.StringVar(master=tk.Tcl())
+    app.offline_btn = _DummyButton()
+    app.out = _DummyText()
+    app._plugin_rows = {}
+
+    main.WatcherApp._update_status_label(app)
+    assert "Mode: Sur" in app.status_var.get()
+
+    app._toggle_offline()
+
+    assert app.engine.offline_mode is True
+    assert "activé" in app.offline_btn.kwargs.get("text", "")
+    assert "Hors ligne" in app.status_var.get()
+    assert any("mode offline" in text.lower() for _, text in app.out.buffer)
