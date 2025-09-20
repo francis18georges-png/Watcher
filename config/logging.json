@@ -3,7 +3,8 @@
   "disable_existing_loggers": false,
   "formatters": {
     "json": {
-      "()": "app.core.logging_setup.JSONFormatter"
+      "()": "app.core.logging_setup.JSONFormatter",
+      "sample_rate": 1.0
     }
   },
   "filters": {

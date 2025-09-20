@@ -277,6 +277,10 @@ filters:
     sample_rate: 0.1  # ne journalise qu'environ 10 % des messages
 ```
 
+Pour imposer un taux global sans modifier les fichiers, passez `sample_rate`
+à `logging_setup.configure(sample_rate=0.25)`. La valeur sera injectée dans le
+formatter JSON et dans le filtre d'échantillonnage.
+
 Le module `app.core.logging_setup` expose également `set_trace_context(trace_id, sample_rate)` pour propager dynamiquement ces
 valeurs dans les journaux structurés.
 
