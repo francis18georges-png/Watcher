@@ -94,6 +94,9 @@ jobs:
           python -m pip install --upgrade pip
           python -m pip install nox dvc
 
+      - name: Install security CLIs
+        run: python scripts/install_cli_tools.py --install-dir ./.tools --add-to-path
+
       - name: Pull data artifacts
         run: dvc pull
         continue-on-error: true
