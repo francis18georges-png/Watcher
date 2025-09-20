@@ -4,6 +4,12 @@ on:
   push:
   pull_request:
 
+env:
+  PYTHONHASHSEED: "42"
+  WATCHER_TRAINING__SEED: "42"
+  CUBLAS_WORKSPACE_CONFIG: ":4096:8"
+  TORCH_DETERMINISTIC: "1"
+
 jobs:
   quality:
     name: Quality checks
@@ -13,11 +19,6 @@ jobs:
       matrix:
         os: [ubuntu-latest, macos-latest, windows-latest]
         python-version: ["3.12"]
-    env:
-      PYTHONHASHSEED: "42"
-      WATCHER_TRAINING__SEED: "42"
-      CUBLAS_WORKSPACE_CONFIG: ":4096:8"
-      TORCH_DETERMINISTIC: "1"
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
