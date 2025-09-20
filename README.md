@@ -83,6 +83,44 @@ Un utilitaire `create_python_cli` (dans `app.tools.scaffold`) permet de
 générer un squelette de projet sous `app/projects/<nom>`. Passer
 `force=True` écrase les fichiers existants sans demande de confirmation.
 
+## Base de données
+
+Watcher persiste ses souvenirs dans une base SQLite configurée automatiquement en
+mode `WAL`, avec les clés étrangères, un délai d'attente de 5 secondes et
+`secure_delete`. Le module FTS5 est enregistré lors de la première connexion pour
+préparer les futures recherches plein texte.
+
+Le schéma est piloté par [Alembic](https://alembic.sqlalchemy.org/). Les
+migrations présentes dans le dossier `migrations/` sont appliquées au démarrage
+de l'application (`alembic upgrade head`). Vous pouvez également les exécuter
+manuellement :
+
+```bash
+alembic upgrade head
+```
+
+### SQLCipher
+
+La base peut être chiffrée avec [SQLCipher](https://www.zetetic.net/sqlcipher/)
+si la bibliothèque est disponible sur votre système. Pour l'activer :
+
+1. Installer SQLite/SQLCipher compatible (par exemple via les paquets de votre
+   distribution ou les binaires officiels).
+2. Activer la section `[memory.sqlcipher]` dans `config/settings.toml` :
+
+   ```toml
+   [memory.sqlcipher]
+   enabled = true
+   password_env = "WATCHER_SQLCIPHER_PASSWORD"
+   ```
+
+3. Fournir un mot de passe soit via la variable d'environnement indiquée,
+   soit directement avec la clé `password`.
+
+Watcher vérifie automatiquement la présence de SQLCipher ; si la fonctionnalité
+est activée mais que la bibliothèque n'est pas détectée, l'initialisation
+échoue explicitement afin d'éviter d'utiliser une base non chiffrée.
+
 ## Plugins
 
 Watcher peut être étendu par des plugins implémentant l'interface

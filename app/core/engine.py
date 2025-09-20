@@ -41,7 +41,7 @@ class Engine:
         if not path.is_absolute():
             path = self.base / path
 
-        self.mem = Memory(path)
+        self.mem = Memory(path, sqlcipher=cfg.get("sqlcipher"))
         self.qg = QualityGate()
         self.bench = Bench()
         self.learner = Learner(self.bench, self.base / "data")
