@@ -71,10 +71,17 @@ Sous Windows :
 1. `./installer.ps1`
 2. `./run.ps1`
 
+L'onglet **Plugins** affiche maintenant en continu la consommation CPU/RAM de
+chaque extension détectée via `psutil`. Le bouton **Mode offline** (en bas de
+l'écran) coupe instantanément les appels réseau/LLM et met à jour la barre de
+statut pour confirmer l'état hors-ligne.
+
 ### Ligne de commande
 
 ```bash
-python -m app.ui.main
+watcher run --offline            # lance l'UI directement en mode offline
+watcher run --status-only        # affiche l'état sans lancer l'interface
+python -m app.ui.main            # démarrage manuel traditionnel
 ```
 
 ### Générer une CLI Python
