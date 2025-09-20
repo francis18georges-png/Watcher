@@ -258,9 +258,16 @@ et formattage) puis Black, et `make check` délègue dorénavant à Nox.
 
 ### Hooks pre-commit
 
-Le dépôt inclut une configuration `pre-commit` regroupant Ruff, Black, mypy,
-Bandit, Semgrep, Codespell ainsi que le correcteur `end-of-file-fixer` afin de
-garantir qu'une ligne de fin est toujours présente dans les fichiers texte.
+Le dépôt inclut une configuration `pre-commit` regroupant les hooks suivants :
+
+* Ruff (`ruff` et `ruff-format`) pour le linting et le formatage.
+* Black pour garantir un style Python cohérent.
+* mypy (avec `types-requests`) pour la vérification de types statique.
+* Bandit pour l'analyse de sécurité.
+* Semgrep basé sur `config/semgrep.yml`.
+* Codespell pour détecter les fautes de frappe courantes.
+* `end-of-file-fixer` qui s'assure que chaque fichier texte se termine par une
+  nouvelle ligne.
 Après avoir installé les dépendances de
 développement, activez les hooks localement :
 
