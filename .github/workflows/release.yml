@@ -67,11 +67,16 @@ jobs:
       - name: Package installer archive
         shell: pwsh
         run: |
-          $archive = "dist/Watcher-Setup.zip"
-          if (Test-Path $archive) {
-            Remove-Item $archive
+          $source = Join-Path 'dist' 'Watcher'
+          if (-not (Test-Path $source)) {
+            throw "Expected PyInstaller output '$source' was not found."
           }
-          Compress-Archive -Path "dist/Watcher/*" -DestinationPath $archive
+          $exe = Join-Path $source 'Watcher.exe'
+          if (-not (Test-Path $exe)) {
+            throw "Executable '$exe' is missing from the PyInstaller directory."
+          }
+          $archive = Join-Path 'dist' 'Watcher-Setup.zip'
+          Compress-Archive -Path $source -DestinationPath $archive -Force
 
       - name: Sign release artifact
         uses: sigstore/gh-action@v2.1.1

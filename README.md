@@ -28,12 +28,41 @@ Chaque tag SemVer (`vMAJOR.MINOR.PATCH`) déclenche le workflow [`release.yml`](
 un installeur Windows signé, un SBOM CycloneDX et une attestation de provenance SLSA niveau 3.
 
 - `Watcher-Setup.zip` : archive contenant l'installeur généré par PyInstaller.
-- `Watcher-Setup.zip.sigstore` : bundle Sigstore pour vérifier la signature du binaire (`sigstore verify --bundle ...`).
+- `Watcher-Setup.zip.sigstore` : bundle Sigstore pour vérifier la signature du binaire (`sigstore verify identity --bundle ...`).
 - `Watcher-sbom.json` : inventaire CycloneDX des dépendances Python installées lors du build (`cyclonedx-bom` / `cyclonedx-py`).
 - `Watcher-Setup.intoto.jsonl` : provenance SLSA générée par [`slsa-github-generator`](https://github.com/slsa-framework/slsa-github-generator).
 
 Ces fichiers sont publiés en tant qu'artefacts de release. Téléchargez le SBOM pour auditer les composants et la provenance
 `*.intoto.jsonl` pour tracer la chaîne de build ou alimenter un vérificateur SLSA.
+
+### Installer l'installeur Windows signé
+
+1. Téléchargez `Watcher-Setup.zip` ainsi que `Watcher-Setup.zip.sigstore` depuis la page GitHub Releases
+   correspondant au tag SemVer (`vMAJOR.MINOR.PATCH`) que vous souhaitez déployer.
+2. Installez le CLI [Sigstore](https://www.sigstore.dev/) si nécessaire :
+
+   ```bash
+   pip install sigstore
+   ```
+
+3. Vérifiez la signature à l'aide du bundle publié par le workflow `release.yml` :
+
+   ```powershell
+   sigstore verify identity `
+     --bundle Watcher-Setup.zip.sigstore `
+     --certificate-identity "https://github.com/<owner>/Watcher/.github/workflows/release.yml@refs/tags/<tag>" `
+     --certificate-oidc-issuer https://token.actions.githubusercontent.com `
+     Watcher-Setup.zip
+   ```
+
+   Remplacez `<owner>` par l'organisation ou l'utilisateur GitHub hébergeant ce dépôt et `<tag>` par la version téléchargée.
+   La commande échoue si la signature ne provient pas du workflow officiel exécuté sur GitHub Actions.
+4. Extrayez l'archive (clic droit → *Extraire tout...* ou `Expand-Archive` sous PowerShell) puis lancez `Watcher.exe`.
+   Conservez le dossier d'extraction tel quel : il contient la configuration (`config/`), les prompts LLM et les fichiers
+   auxiliaires (`LICENSE`, `example.env`) nécessaires à l'exécutable.
+
+Le bundle Sigstore fournit également un horodatage de transparence et peut être vérifié hors-ligne grâce au
+[`rekor-cli`](https://github.com/sigstore/rekor) si vous devez archiver la preuve de signature.
 
 ## Benchmarks
 
