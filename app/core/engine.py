@@ -70,6 +70,7 @@ class Engine:
         self.start_msg = self._bootstrap()
         self.last_prompt = ""
         self.last_answer = ""
+        self._offline_mode = settings.intelligence.mode.lower() == "offline"
         if perform_maintenance:
             Thread(target=self.perform_maintenance, daemon=True).start()
 
@@ -191,7 +192,11 @@ class Engine:
             if excerpts:
                 llm_prompt = "\n\n".join([llm_prompt, "\n".join(excerpts)])
 
-            answer, trace = self.client.generate(llm_prompt)
+            if self.is_offline():
+                answer = f"{self.client.fallback_phrase}: {user_prompt}"
+                trace = "offline"
+            else:
+                answer, trace = self.client.generate(llm_prompt)
 
             if details:
                 answer += "\n\nVoici quelques détails supplémentaires.\n" + "\n".join(
@@ -366,6 +371,16 @@ class Engine:
 
         self._load_plugins()
         return f"{len(self.plugins)} plugins rechargés"
+
+    def set_offline_mode(self, offline: bool) -> None:
+        """Enable or disable offline mode for the engine."""
+
+        self._offline_mode = bool(offline)
+
+    def is_offline(self) -> bool:
+        """Return ``True`` when the engine operates without LLM calls."""
+
+        return bool(getattr(self, "_offline_mode", False))
 
     def run_plugins(self) -> list[str]:
         """Execute all loaded plugins in isolated sandboxes."""

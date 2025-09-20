@@ -96,11 +96,17 @@ $env:DISPLAY = ""
 ./run.ps1
 ```
 
+L'onglet **Chat** propose un tableau « Utilisation plugins » rafraîchi en continu qui affiche le CPU et la RAM consommés par chaque plugin via `psutil`. Un bouton « Mode offline » permet d'activer ou de désactiver à la volée les appels réseau/LLM afin de travailler hors ligne.
+
 ### Ligne de commande
 
+Pour piloter Watcher sans interface graphique :
+
 ```bash
-python -m app.ui.main
+watcher run --offline --prompt "bonjour"
 ```
+
+L'option `--offline` force le mode hors ligne (aucun appel réseau/LLM n'est effectué) et `--prompt` envoie un message unique avant de quitter. Utilisez `--online` pour lever explicitement le mode offline. Le lanceur historique reste disponible via `python -m app.ui.main`.
 
 ### Générer une CLI Python
 
