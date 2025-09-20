@@ -19,7 +19,8 @@ def _stub_cli_settings(monkeypatch):
     """Avoid loading full configuration when exercising the CLI."""
 
     settings = SimpleNamespace(
-        llm=SimpleNamespace(backend="stub-backend", model="stub-model")
+        llm=SimpleNamespace(backend="stub-backend", model="stub-model"),
+        training=SimpleNamespace(seed=42),
     )
     monkeypatch.setattr(cli, "get_settings", lambda: settings)
     return settings

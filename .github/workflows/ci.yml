@@ -16,6 +16,8 @@ jobs:
     env:
       PYTHONHASHSEED: "42"
       WATCHER_TRAINING__SEED: "42"
+      CUBLAS_WORKSPACE_CONFIG: ":4096:8"
+      TORCH_DETERMINISTIC: "1"
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4

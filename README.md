@@ -231,17 +231,27 @@ Pour plus de détails (priorités, gestion du label `blocked`, etc.), consultez
 ## Reproductibilité
 
 Un utilitaire `set_seed` permet de fixer la graine aléatoire pour Python,
-NumPy et, si disponible, PyTorch. Le fichier de configuration `config/settings.toml`
-contient un paramètre `seed` dans la section `[training]` qui peut être adapté
-pour garantir des exécutions déterministes.
+NumPy et, si disponible, PyTorch. Le fichier de configuration
+`config/settings.toml` contient un paramètre `seed` dans la section `[training]`
+qui peut être adapté pour garantir des exécutions déterministes.
 
-La commande CLI `watcher` applique automatiquement cette graine dès son
-démarrage afin d'initialiser toutes les bibliothèques stochastiques. Une
-option `--seed` est disponible pour surcharger ponctuellement la valeur par
-défaut définie dans `config/settings.toml`. Pour les exécutions automatisées,
-exportez `PYTHONHASHSEED` ainsi que `WATCHER_TRAINING__SEED` avant de lancer
-Nox ou vos scripts afin d'aligner l'environnement avec la configuration
-versionnée.
+La commande CLI `watcher` lit cette graine au démarrage (ou l'option
+`--seed`) puis appelle `set_seed` avant de déléguer aux sous-commandes.
+Cela initialise toutes les bibliothèques stochastiques et met à jour les
+variables d'environnement `PYTHONHASHSEED` et `WATCHER_TRAINING__SEED` pour que
+les sous-processus héritent de la configuration.
+
+La chaîne d'outils reproduit le même comportement :
+
+- la CI exporte `PYTHONHASHSEED=42`, `WATCHER_TRAINING__SEED=42`,
+  `CUBLAS_WORKSPACE_CONFIG=:4096:8` et `TORCH_DETERMINISTIC=1` ;
+- le `Makefile` et le script PowerShell `run.ps1` propagent ces variables
+  (avec une graine configurable via `SEED`/`WATCHER_TRAINING__SEED`).
+
+Pour vos exécutions locales, vous pouvez soit utiliser le `Makefile`
+(`make check`, `make nox`, …), soit exporter explicitement les variables
+précitées avant de lancer vos scripts afin d'aligner l'environnement avec
+la configuration versionnée.
 
 ## Données
 
