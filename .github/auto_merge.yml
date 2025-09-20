@@ -1,6 +1,8 @@
 auto-merge:
   method: merge
   required-labels:
-    - status:auto-merge
+    - status:queued-for-merge
+    - status:maintainer-approved
+    - status:qa-approved
   blocking-labels:
     - status:blocked
