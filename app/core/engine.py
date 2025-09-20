@@ -29,6 +29,11 @@ from app.data import pipeline
 from app.data.validation import validate_feedback_schema
 from app.tools import plugins
 from app.utils.metrics import metrics
+
+try:  # pragma: no cover - optional dependency
+    import psutil  # type: ignore[import-not-found]
+except ImportError:  # pragma: no cover - fallback
+    from app.utils import psutil_stub as psutil  # type: ignore[assignment]
 from app.core.logging_setup import get_logger
 from app.core import sandbox
 
