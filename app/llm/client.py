@@ -101,6 +101,12 @@ class Client:
         self.host = host or llm_cfg.host
         self.ctx = ctx if ctx is not None else llm_cfg.ctx
         self.fallback_phrase = fallback_phrase or llm_cfg.fallback_phrase
+        self._offline = False
+
+    def set_offline(self, offline: bool) -> None:
+        """Enable or disable offline mode for the client."""
+
+        self._offline = bool(offline)
 
     def generate(self, prompt: str, *, separator: str = "") -> tuple[str, str]:
         """Return a response and trace for *prompt*.
@@ -116,6 +122,10 @@ class Client:
         """
 
         trace: list[str] = []
+        if self._offline:
+            trace.extend(["offline", "fallback"])
+            return f"{self.fallback_phrase}: {prompt}", " -> ".join(trace)
+
         try:  # pragma: no cover - network path
             responses: list[str] = []
             for idx, chunk in enumerate(chunk_prompt(prompt)):
