@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 from pathlib import Path
 
 import nox
@@ -50,6 +51,19 @@ def typecheck(session: nox.Session) -> None:
 @nox.session(python=PYTHON_VERSIONS)
 def security(session: nox.Session) -> None:
     """Execute security scanning tools."""
+    install_dir = Path(".tools").resolve()
+    session.run(
+        "python",
+        "scripts/install_cli_tools.py",
+        "--install-dir",
+        install_dir.as_posix() if os.name != "nt" else str(install_dir),
+    )
+    existing_path = session.env.get("PATH", "")
+    install_dir_str = str(install_dir)
+    session.env["PATH"] = (
+        f"{install_dir_str}{os.pathsep}{existing_path}" if existing_path else install_dir_str
+    )
+
     install_project(session)
     session.run("bandit", "-q", "-r", ".", "-c", "bandit.yml")
     session.run(
