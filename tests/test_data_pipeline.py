@@ -104,6 +104,7 @@ def test_feedback_batch_loading_benchmark(tmp_path):
     """Compare naive feedback loading with batched iteration."""
 
     mem = Memory(tmp_path / "mem.db")
+    mem.set_offline(False)
     for i in range(1000):
         mem.add_feedback("k", f"p{i}", f"a{i}", float(i))
 

@@ -19,6 +19,7 @@ def test_trace_stored_in_memory(tmp_path, monkeypatch):
 
     eng = Engine.__new__(Engine)
     eng.mem = Memory(tmp_path / "mem.db")
+    eng.mem.set_offline(False)
     eng.client = DummyClient()
     eng.critic = Critic()
 

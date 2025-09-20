@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import Sequence
 
 from config import get_settings
+from app.core.engine import Engine
 from app.core.reproducibility import set_seed
 from app.tools import plugins
 
@@ -69,6 +70,16 @@ def main(argv: Sequence[str] | None = None) -> int:
     plugin_sub = plugin_parser.add_subparsers(dest="plugin_command", required=True)
     plugin_sub.add_parser("list", help="List available plugins")
 
+    mode_parser = sub.add_parser(
+        "mode",
+        help="Basculer le mode d'intelligence entre online et offline",
+    )
+    mode_parser.add_argument(
+        "mode",
+        choices=("offline", "online"),
+        help="Mode cible: 'offline' désactive les appels réseaux, 'online' les réactive.",
+    )
+
     args = parser.parse_args(argv)
 
     set_seed(args.seed)
@@ -76,6 +87,15 @@ def main(argv: Sequence[str] | None = None) -> int:
     if args.command == "plugin" and args.plugin_command == "list":
         for plugin in _iter_plugins():
             print(plugin.name)
+        return 0
+
+    if args.command == "mode":
+        target = str(args.mode).lower()
+        offline = target == "offline"
+        settings.intelligence.mode = "offline" if offline else "online"
+        engine = Engine()
+        engine.set_offline(offline)
+        print(f"Mode intelligence défini sur {settings.intelligence.mode}")
         return 0
 
     parser.error("unknown command")

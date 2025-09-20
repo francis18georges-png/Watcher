@@ -25,6 +25,7 @@ def test_engine_chat_rejects_command(tmp_path, monkeypatch) -> None:
 
     eng = Engine.__new__(Engine)
     eng.mem = Memory(tmp_path / "mem.db")
+    eng.mem.set_offline(False)
     eng.client = DummyClient()
     eng.critic = Critic()
 

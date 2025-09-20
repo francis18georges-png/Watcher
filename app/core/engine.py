@@ -62,6 +62,8 @@ class Engine:
         self.learner = Learner(self.bench, self.base / "data")
         self.planner = Planner()
         self.client = Client()
+        self._offline = str(settings.intelligence.mode).lower() == "offline"
+        self.set_offline(self._offline)
         self.critic = Critic()
         # LRU cache for chat responses
         self._cache_size = int(settings.memory.cache_size)
@@ -74,6 +76,28 @@ class Engine:
         self.last_answer = ""
         if perform_maintenance:
             Thread(target=self.perform_maintenance, daemon=True).start()
+
+    def set_offline(self, offline: bool) -> None:
+        """Switch the engine between offline and online modes."""
+
+        self._offline = bool(offline)
+        mode = "offline" if self._offline else "online"
+
+        settings = getattr(self, "settings", None)
+        if settings is not None:
+            try:
+                settings.intelligence.mode = mode
+            except AttributeError:
+                pass
+
+        client = getattr(self, "client", None)
+        setter = getattr(client, "set_offline", None)
+        if callable(setter):
+            setter(self._offline)
+
+        mem = getattr(self, "mem", None)
+        if hasattr(mem, "set_offline"):
+            mem.set_offline(self._offline)
 
     def _bootstrap(self) -> str:
         """Load context and set up an initial ready agent."""
@@ -134,8 +158,14 @@ class Engine:
             cache: OrderedDict[str, str] = self.__dict__.setdefault(
                 "_cache", OrderedDict()
             )
+            settings = getattr(self, "settings", None)
+            default_cache_size = (
+                settings.memory.cache_size
+                if settings is not None
+                else get_settings().memory.cache_size
+            )
             cache_size: int = self.__dict__.setdefault(
-                "_cache_size", self.settings.memory.cache_size
+                "_cache_size", default_cache_size
             )
             cached = cache.pop(user_prompt, None)
             if cached is not None:

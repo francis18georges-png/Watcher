@@ -14,6 +14,7 @@ def test_add_and_search(tmp_path, monkeypatch):
     monkeypatch.setattr("app.core.memory.embed_ollama", fake_embed)
     db_path = tmp_path / "mem.db"
     mem = Memory(db_path)
+    mem.set_offline(False)
     mem.add("note", "salut")
 
     with sqlite3.connect(db_path) as con:
@@ -37,6 +38,7 @@ def test_search_embedding_error(tmp_path, monkeypatch):
     monkeypatch.setattr("app.core.memory.embed_ollama", good_embed)
     db_path = tmp_path / "mem.db"
     mem = Memory(db_path)
+    mem.set_offline(False)
     mem.add("note", "bonjour")
 
     def bad_embed(texts, model="nomic-embed-text"):
@@ -56,6 +58,7 @@ def test_search_respects_threshold(tmp_path, monkeypatch):
     fake_embed.calls = 0
     monkeypatch.setattr("app.core.memory.embed_ollama", fake_embed)
     mem = Memory(tmp_path / "mem.db")
+    mem.set_offline(False)
     mem.add("note", "salut")
     with pytest.raises(ValueError):
         mem.search("salut", threshold=0.5)
@@ -71,6 +74,7 @@ def test_search_threshold_checks_top_score(tmp_path, monkeypatch):
 
     monkeypatch.setattr("app.core.memory.embed_ollama", fake_embed)
     mem = Memory(tmp_path / "mem.db")
+    mem.set_offline(False)
     mem.add("note", "good")
     mem.add("note", "bad")
 
@@ -97,6 +101,7 @@ def test_sqlcipher_configuration_executes_key_pragma(tmp_path, monkeypatch):
     monkeypatch.setenv("WATCHER_MEMORY_SQLCIPHER_PASSWORD", "pa'ss")
 
     mem = Memory(tmp_path / "mem.db")
+    mem.set_offline(False)
     mem._sqlcipher_available = True
     mem._sqlcipher_enabled = True
     mem._sqlcipher_key_sql = "PRAGMA key = 'pa''ss'"
@@ -139,6 +144,7 @@ def test_connection_pragmas_applied(tmp_path, monkeypatch):
 
     monkeypatch.setattr("app.core.memory.embed_ollama", fake_embed)
     mem = Memory(tmp_path / "mem.db")
+    mem.set_offline(False)
 
     with mem._connect() as con:
         journal_mode = con.execute("PRAGMA journal_mode").fetchone()[0]
@@ -153,6 +159,7 @@ def test_connection_pragmas_applied(tmp_path, monkeypatch):
 def test_ensure_fts5_detects_compile_option(tmp_path, monkeypatch):
     monkeypatch.setattr(Memory, "_run_migrations", lambda self: None)
     mem = Memory(tmp_path / "mem.db")
+    mem.set_offline(False)
     mem._fts5_checked = False
     mem._fts5_available = False
     mem._fts5_requires_extension = False
@@ -170,6 +177,7 @@ def test_ensure_fts5_detects_compile_option(tmp_path, monkeypatch):
 def test_ensure_fts5_loads_extension(tmp_path, monkeypatch):
     monkeypatch.setattr(Memory, "_run_migrations", lambda self: None)
     mem = Memory(tmp_path / "mem.db")
+    mem.set_offline(False)
     mem._fts5_checked = False
     mem._fts5_available = False
     mem._fts5_requires_extension = False
