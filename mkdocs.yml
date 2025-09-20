@@ -2,6 +2,7 @@ site_name: "Watcher"
 site_description: "Documentation technique et opérationnelle de l'atelier Watcher"
 site_url: "https://<github-username>.github.io/Watcher/"
 repo_url: "https://github.com/<github-username>/Watcher"
+edit_uri: "edit/main/docs/"
 
 theme:
   name: material
