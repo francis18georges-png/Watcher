@@ -2,13 +2,14 @@
 
 from __future__ import annotations
 
-from pathlib import Path
 import logging
 import logging.config
 import datetime
 import json
 import os
 import random
+from pathlib import Path
+from typing import Any
 import importlib.resources as resources
 from contextvars import ContextVar
 
@@ -142,8 +143,83 @@ def get_logger(name: str | None = None) -> logging.Logger:
     return logger if name is None else logger.getChild(name)
 
 
+def _matches_target(candidate: object, expected: type[object]) -> bool:
+    """Return whether ``candidate`` refers to ``expected``."""
+
+    if candidate is None:
+        return False
+    if candidate is expected:
+        return True
+    if isinstance(candidate, type):
+        try:
+            return issubclass(candidate, expected)
+        except TypeError:  # pragma: no cover - defensive
+            return False
+    if isinstance(candidate, str):
+        normalized = candidate.replace(":", ".")
+        qualified_name = f"{expected.__module__}.{expected.__qualname__}"
+        return normalized == qualified_name
+    return False
+
+
+def _apply_sample_rate(config: dict[str, Any], sample_rate: float | None) -> None:
+    """Inject the configured sample rate into known filters and formatters."""
+
+    if sample_rate is None:
+        return
+
+    filters = config.get("filters")
+    if isinstance(filters, dict):
+        for filter_config in filters.values():
+            if not isinstance(filter_config, dict):
+                continue
+            if any(
+                _matches_target(filter_config.get(key), SamplingFilter)
+                for key in ("()", "class")
+            ):
+                filter_config["sample_rate"] = sample_rate
+
+    formatters = config.get("formatters")
+    if isinstance(formatters, dict):
+        for formatter_config in formatters.values():
+            if not isinstance(formatter_config, dict):
+                continue
+            if any(
+                _matches_target(formatter_config.get(key), JSONFormatter)
+                for key in ("()", "class")
+            ):
+                formatter_config["sample_rate"] = sample_rate
+
+
+def _set_formatter_sample_rate(sample_rate: float | None) -> None:
+    """Ensure instantiated formatters know about the configured sample rate."""
+
+    if sample_rate is None:
+        return
+
+    seen_handlers: set[int] = set()
+    loggers_to_check: list[logging.Logger] = [logging.getLogger(), logger]
+
+    for existing in logging.root.manager.loggerDict.values():
+        if isinstance(existing, logging.Logger):
+            loggers_to_check.append(existing)
+
+    for current in loggers_to_check:
+        for handler in getattr(current, "handlers", []):
+            handler_id = id(handler)
+            if handler_id in seen_handlers:
+                continue
+            seen_handlers.add(handler_id)
+            formatter = handler.formatter
+            if isinstance(formatter, JSONFormatter):
+                formatter.default_sample_rate = sample_rate
+
+
 def _configure_from_path(
-    config_path: Path, *, fallback_level: int | str | None = logging.INFO
+    config_path: Path,
+    *,
+    fallback_level: int | str | None = logging.INFO,
+    sample_rate: float | None = None,
 ) -> None:
     """Load logging configuration from ``config_path`` if possible."""
 
@@ -160,13 +236,17 @@ def _configure_from_path(
     if suffix == ".json":
         with config_path.open("r", encoding="utf-8") as f:
             config = json.load(f)
+        _apply_sample_rate(config, sample_rate)
         logging.config.dictConfig(config)
+        _set_formatter_sample_rate(sample_rate)
         return
 
     if yaml:
         with config_path.open("r", encoding="utf-8") as f:
             config = yaml.safe_load(f)
+        _apply_sample_rate(config, sample_rate)
         logging.config.dictConfig(config)
+        _set_formatter_sample_rate(sample_rate)
         return
 
     config = {
@@ -202,10 +282,12 @@ def _configure_from_path(
         },
         "root": {"level": "INFO", "handlers": ["console", "file"]},
     }
+    _apply_sample_rate(config, sample_rate)
     logging.config.dictConfig(config)
+    _set_formatter_sample_rate(sample_rate)
 
 
-def configure() -> None:
+def configure(*, sample_rate: float | None = None) -> None:
     """Configure logging from the YAML configuration file if possible."""
     from config import get_settings
 
@@ -215,20 +297,26 @@ def configure() -> None:
     config_path = settings.logging.config_path
     if config_path is not None:
         resolved = settings.paths.resolve(config_path)
-        _configure_from_path(resolved, fallback_level=fallback_level)
+        _configure_from_path(
+            resolved, fallback_level=fallback_level, sample_rate=sample_rate
+        )
         logger.setLevel(logging.NOTSET)
         return
 
     env_path = os.environ.get("LOGGING_CONFIG_PATH")
     if env_path:
-        _configure_from_path(Path(env_path), fallback_level=fallback_level)
+        _configure_from_path(
+            Path(env_path), fallback_level=fallback_level, sample_rate=sample_rate
+        )
         logger.setLevel(logging.NOTSET)
         return
 
     resource = resources.files("config") / "logging.yml"
     try:
         with resources.as_file(resource) as config_path:
-            _configure_from_path(config_path, fallback_level=fallback_level)
+            _configure_from_path(
+                config_path, fallback_level=fallback_level, sample_rate=sample_rate
+            )
     except FileNotFoundError:  # pragma: no cover - config resource missing
         logging.basicConfig(level=fallback_level)
     # Ensure application logger does not filter messages on its own and relies

@@ -97,3 +97,43 @@ def test_sampling_filter_blocks_when_probability_low(monkeypatch):
     monkeypatch.setattr(logging_setup.random, "random", lambda: 0.9)
     assert flt.filter(record) is False
     assert record.sample_rate == 0.5
+
+
+def test_configure_applies_sample_rate_to_formatter_class(
+    tmp_path, capfd, monkeypatch
+):
+    config = {
+        "version": 1,
+        "disable_existing_loggers": False,
+        "formatters": {
+            "json": {
+                "class": "app.core.logging_setup.JSONFormatter",
+            }
+        },
+        "handlers": {
+            "console": {
+                "class": "logging.StreamHandler",
+                "level": "INFO",
+                "formatter": "json",
+                "stream": "ext://sys.stdout",
+            }
+        },
+        "root": {"level": "INFO", "handlers": ["console"]},
+    }
+    config_path = tmp_path / "logging.json"
+    config_path.write_text(json.dumps(config))
+    monkeypatch.setenv("LOGGING_CONFIG_PATH", str(config_path))
+    _cleanup()
+    logging_setup.set_trace_context()
+
+    logging_setup.configure(sample_rate=0.2)
+    logger = logging_setup.get_logger("test")
+    logger.info("sample")
+
+    out, err = capfd.readouterr()
+    _cleanup()
+    logging_setup.set_trace_context()
+
+    assert err == ""
+    data = json.loads(out.strip())
+    assert data["sample_rate"] == 0.2
