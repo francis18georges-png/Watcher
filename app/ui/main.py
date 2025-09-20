@@ -1,9 +1,13 @@
+import importlib
+import importlib.util
 import json
 import logging
 import os
 import shutil
 import subprocess
 import tkinter as tk
+from collections.abc import Iterable, Mapping
+from typing import Any
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from tkinter import messagebox, ttk
 from threading import Thread
@@ -12,6 +16,30 @@ from app.core import logging_setup
 from app.core.engine import Engine
 from app.utils.metrics import PerformanceMetrics, metrics
 from config import get_settings
+
+
+if importlib.util.find_spec("psutil") is not None:  # pragma: no cover - optional dependency
+    psutil = importlib.import_module("psutil")  # type: ignore[import-not-found]
+else:  # pragma: no cover - fallback to lightweight stub
+    from app.utils import psutil_stub as psutil  # type: ignore[assignment]
+
+
+_PSUTIL_EXCEPTIONS: tuple[type[BaseException], ...] = tuple(
+    exc
+    for exc in (
+        getattr(psutil, "Error", None),
+        getattr(psutil, "NoSuchProcess", None),
+        getattr(psutil, "AccessDenied", None),
+        getattr(psutil, "ZombieProcess", None),
+    )
+    if isinstance(exc, type) and issubclass(exc, BaseException)
+)
+_COMMON_PROCESS_ERRORS: tuple[type[BaseException], ...] = (ProcessLookupError, PermissionError)
+_PSUTIL_EXCEPTIONS = _PSUTIL_EXCEPTIONS + tuple(
+    exc for exc in _COMMON_PROCESS_ERRORS if exc not in _PSUTIL_EXCEPTIONS
+)
+if not _PSUTIL_EXCEPTIONS:
+    _PSUTIL_EXCEPTIONS = _COMMON_PROCESS_ERRORS or (Exception,)
 
 
 logger = logging.getLogger(__name__)
@@ -27,6 +55,14 @@ def _validate_score(raw_score: float) -> float:
     if not 0.0 <= raw_score <= 1.0:
         raise ValueError(_SCORE_ERROR)
     return raw_score
+
+
+def _get_entry_attr(entry: object, name: str) -> Any:
+    """Return attribute *name* from *entry* supporting mapping access."""
+
+    if isinstance(entry, Mapping):
+        return entry.get(name)
+    return getattr(entry, name, None)
 
 
 class MetricsHandler(BaseHTTPRequestHandler):
@@ -70,6 +106,7 @@ class WatcherApp(ttk.Frame):
         super().__init__(master)
         self.settings = get_settings()
         self.engine = Engine()
+        self._plugin_process_cache: dict[str, psutil.Process] = {}
         master.title(APP_NAME)
         master.geometry("1100x700")
         master.minsize(900, 600)
@@ -145,6 +182,119 @@ class WatcherApp(ttk.Frame):
         ttk.Button(at, text="Améliorer (A/B)", command=self._improve).pack(
             side="left", padx=6
         )
+
+    def _collect_plugin_stats(
+        self, entries: Iterable[object] | None = None
+    ) -> list[dict[str, Any]]:
+        """Return runtime statistics about active plugin sandbox processes."""
+
+        if entries is None:
+            entries = getattr(self, "_sandbox_processes", [])
+
+        if not hasattr(self, "_plugin_process_cache"):
+            self._plugin_process_cache = {}
+
+        cache: dict[str, psutil.Process] = self._plugin_process_cache
+        stats: list[dict[str, Any]] = []
+        active_keys: set[str] = set()
+
+        for entry in entries:
+            pid = _get_entry_attr(entry, "pid")
+            if pid is None:
+                continue
+
+            try:
+                pid_int = int(pid)
+            except (TypeError, ValueError):
+                continue
+
+            plugin_obj = _get_entry_attr(entry, "plugin")
+            import_path = None
+            if plugin_obj is not None:
+                import_path = _get_entry_attr(plugin_obj, "import_path")
+            if not import_path:
+                import_path = _get_entry_attr(entry, "import_path")
+            if not import_path:
+                import_path = str(pid_int)
+
+            key = f"{pid_int}:{import_path}"
+            active_keys.add(key)
+
+            process = cache.get(key)
+            if process is None or getattr(process, "pid", pid_int) != pid_int:
+                try:
+                    process = psutil.Process(pid_int)
+                except _PSUTIL_EXCEPTIONS:
+                    cache.pop(key, None)
+                    continue
+
+                cache[key] = process
+                try:
+                    process.cpu_percent(None)
+                except _PSUTIL_EXCEPTIONS:
+                    cache.pop(key, None)
+                    continue
+                cpu_percent = 0.0
+            else:
+                try:
+                    cpu_percent = float(process.cpu_percent(None))
+                except _PSUTIL_EXCEPTIONS:
+                    cache.pop(key, None)
+                    continue
+
+            try:
+                mem_info = process.memory_info()
+            except AttributeError:
+                rss = vms = 0
+            except _PSUTIL_EXCEPTIONS:
+                cache.pop(key, None)
+                continue
+            else:
+                rss = getattr(mem_info, "rss", 0)
+                vms = getattr(mem_info, "vms", 0)
+
+            try:
+                num_threads = int(process.num_threads())
+            except AttributeError:
+                num_threads = 0
+            except _PSUTIL_EXCEPTIONS:
+                cache.pop(key, None)
+                continue
+
+            try:
+                process_name = process.name()
+            except AttributeError:
+                process_name = ""
+            except _PSUTIL_EXCEPTIONS:
+                cache.pop(key, None)
+                continue
+
+            plugin_name = None
+            if plugin_obj is not None:
+                plugin_name = _get_entry_attr(plugin_obj, "name")
+            if plugin_name is None:
+                plugin_name = _get_entry_attr(entry, "name")
+
+            stats.append(
+                {
+                    "key": key,
+                    "pid": pid_int,
+                    "import_path": import_path,
+                    "cpu_percent": cpu_percent,
+                    "rss": rss,
+                    "vms": vms,
+                    "num_threads": num_threads,
+                    "process_name": process_name,
+                    "plugin_name": plugin_name,
+                }
+            )
+
+        stale_keys = [key for key in cache if key not in active_keys]
+        for key in stale_keys:
+            cache.pop(key, None)
+
+        self._plugin_stats_snapshot = stats
+        return stats
 
     def _send(self) -> None:
         q = self.inp.get("1.0", "end").strip()
