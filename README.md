@@ -1,5 +1,7 @@
 # Watcher
 
+![Benchmark performance badge](metrics/performance_badge.svg)
+
 Atelier local d'IA de programmation autonome (offline par défaut).
 Mémoire vectorielle, curriculum adaptatif, A/B + bench et quality gate sécurité.
 
