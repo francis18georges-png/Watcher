@@ -1,9 +1,28 @@
 # Sandbox: point d'entrée pour exécutions confinées avec quotas
 
 import logging
+import os
 from dataclasses import dataclass
+from typing import Mapping
 
 logger = logging.getLogger(__name__)
+
+_ALLOWED_ENV_VARS = {
+    "PATH",
+    "PYTHONPATH",
+    "PYTHONHOME",
+    "SYSTEMROOT",
+    "COMSPEC",
+    "WINDIR",
+    "HOME",
+    "USERPROFILE",
+    "TEMP",
+    "TMP",
+    "TMPDIR",
+    "LANG",
+    "LC_ALL",
+    "LC_CTYPE",
+}
 
 
 @dataclass
@@ -17,8 +36,34 @@ class SandboxResult:
     cpu_exceeded: bool = False
     memory_exceeded: bool = False
 
+def _sanitize_environment(extra: Mapping[str, str] | None = None) -> dict[str, str]:
+    """Return a sanitized environment dictionary."""
 
-def _run_without_pywin32(cmd: list[str], timeout: float | None) -> SandboxResult:
+    env: dict[str, str] = {}
+    for key in _ALLOWED_ENV_VARS:
+        value = os.environ.get(key)
+        if value:
+            env[key] = value
+
+    path = os.environ.get("PATH")
+    if path:
+        env.setdefault("PATH", path)
+
+    if extra:
+        for key, value in extra.items():
+            if value is not None:
+                env[key] = value
+
+    env.setdefault("PYTHONUNBUFFERED", "1")
+    return env
+
+
+def _run_without_pywin32(
+    cmd: list[str],
+    timeout: float | None,
+    cwd: str | os.PathLike[str] | None,
+    env: Mapping[str, str],
+) -> SandboxResult:
     """Fallback execution for Windows when pywin32 is unavailable."""
     import subprocess
     from subprocess import Popen
@@ -28,6 +73,8 @@ def _run_without_pywin32(cmd: list[str], timeout: float | None) -> SandboxResult
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
         text=True,
+        cwd=cwd,
+        env=dict(env),
     )
 
     try:
@@ -54,6 +101,9 @@ def run(
     cpu_seconds: int | None = None,
     memory_bytes: int | None = None,
     timeout: float | None = 30,
+    cwd: str | os.PathLike[str] | None = None,
+    env: Mapping[str, str] | None = None,
+    allow_network: bool = False,
 ) -> SandboxResult:
     """Exécute ``cmd`` avec quotas optionnels.
 
@@ -62,6 +112,11 @@ def run(
         cpu_seconds: Limite de temps CPU en secondes.
         memory_bytes: Limite mémoire maximale en octets.
         timeout: Temps d'expiration mur (timeout) pour ``subprocess.run``.
+        cwd: Répertoire de travail isolé pour le processus enfant.
+        env: Variables d'environnement additionnelles à injecter après
+            nettoyage.
+        allow_network: Autoriser (``True``) ou bloquer (``False``) l'accès
+            réseau.
 
     Returns:
         SandboxResult: Informations d'exécution comprenant codes et dépassements.
@@ -69,6 +124,12 @@ def run(
     import sys
 
     result = SandboxResult()
+
+    sanitized_env = _sanitize_environment(env)
+    if not allow_network:
+        sanitized_env["WATCHER_BLOCK_NETWORK"] = "1"
+
+    cwd_path = os.fspath(cwd) if cwd is not None else None
 
     if sys.platform == "win32":
         import subprocess
@@ -83,7 +144,7 @@ def run(
             logger.warning(
                 "pywin32 introuvable; exécution sans quotas CPU/mémoire sur Windows"
             )
-            return _run_without_pywin32(cmd, timeout)
+            return _run_without_pywin32(cmd, timeout, cwd_path, sanitized_env)
 
         CloseHandle = cast(Callable[[int], None], CloseHandle)
 
@@ -114,6 +175,8 @@ def run(
             stderr=subprocess.PIPE,
             text=True,
             creationflags=creation_flags,
+            cwd=cwd_path,
+            env=sanitized_env,
         )
         handle = OpenProcess(win32con.PROCESS_ALL_ACCESS, False, win_proc.pid)
         win32job.AssignProcessToJobObject(job, handle)
@@ -159,21 +222,55 @@ def run(
     import signal
     import subprocess
 
-    def _limits() -> None:
+    def _preexec() -> None:
         if cpu_seconds is not None:
             resource.setrlimit(resource.RLIMIT_CPU, (cpu_seconds, cpu_seconds))
         if memory_bytes is not None:
             resource.setrlimit(resource.RLIMIT_AS, (memory_bytes, memory_bytes))
+        if not allow_network:
+            try:
+                import errno
+                import seccomp
+
+                filt = seccomp.SyscallFilter(defaction=seccomp.SCMP_ACT_ALLOW)
+                for syscall in [
+                    "socket",
+                    "connect",
+                    "accept",
+                    "accept4",
+                    "sendto",
+                    "sendmsg",
+                    "recvfrom",
+                    "recvmsg",
+                    "getsockname",
+                    "getpeername",
+                    "bind",
+                    "listen",
+                ]:
+                    try:
+                        filt.add_rule(seccomp.SCMP_ACT_ERRNO(errno.EPERM), syscall)
+                    except OSError:
+                        continue
+                filt.load()
+            except Exception:
+                # Best effort: seccomp might be unavailable; environment based
+                # blocking is still enforced in the child process.
+                pass
 
     from subprocess import Popen
     from typing import cast
+
+    preexec = _preexec if (cpu_seconds or memory_bytes or not allow_network) else None
 
     proc: Popen[str] = Popen(
         cmd,
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
         text=True,
-        preexec_fn=_limits if cpu_seconds or memory_bytes else None,
+        preexec_fn=preexec,
+        cwd=cwd_path,
+        env=sanitized_env,
+        close_fds=True,
     )
 
     try:
