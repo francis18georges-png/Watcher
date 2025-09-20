@@ -1,2 +1,5 @@
 [core]
-autostage = false
+    autostage = false
+    remote = storage
+['remote "storage"']
+    url = s3://watcher-artifacts

@@ -1,6 +1,6 @@
 """Train a simple linear regression model on the sample dataset.
 
-The dataset is expected at ``datasets/simple_linear.csv`` with columns
+The dataset is expected at ``datasets/processed/simple_linear.csv`` with columns
 ``x`` and ``y``.  The script fits ``y = w * x + b`` using gradient descent
 and prints the learned parameters and mean squared error.
 """
@@ -13,7 +13,7 @@ from pathlib import Path
 
 from app.core import logging_setup
 
-DATA_PATH = Path("datasets/simple_linear.csv")
+DATA_PATH = Path("datasets/processed/simple_linear.csv")
 
 
 def load_data() -> tuple[list[float], list[float]]:

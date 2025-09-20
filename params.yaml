@@ -1,0 +1,18 @@
+{
+  "prepare": {
+    "random_seed": 42,
+    "sample_size": 10
+  },
+  "validate": {
+    "simple_linear": {
+      "expected_hash": "99eea07b3b7d51f54f4880ecb530df68",
+      "expected_size": 60,
+      "columns": ["x", "y"],
+      "min_rows": 8
+    }
+  },
+  "train": {
+    "lr": 0.01,
+    "epochs": 1000
+  }
+}
