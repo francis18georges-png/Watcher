@@ -26,6 +26,7 @@ def _hide_source_manifest(tmp_path: Path):
     backup = tmp_path / manifest.name
     manifest.rename(backup)
     try:
+        assert not manifest.exists()
         yield
     finally:
         backup.rename(manifest)
