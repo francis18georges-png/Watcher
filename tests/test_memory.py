@@ -97,6 +97,9 @@ def test_sqlcipher_configuration_executes_key_pragma(tmp_path, monkeypatch):
     monkeypatch.setenv("WATCHER_MEMORY_SQLCIPHER_PASSWORD", "pa'ss")
 
     mem = Memory(tmp_path / "mem.db")
+    mem._sqlcipher_available = True
+    mem._sqlcipher_enabled = True
+    mem._sqlcipher_key_sql = "PRAGMA key = 'pa''ss'"
 
     executed: list[str] = []
 
@@ -105,8 +108,6 @@ def test_sqlcipher_configuration_executes_key_pragma(tmp_path, monkeypatch):
             if params is not None:
                 raise AssertionError("SQLCipher PRAGMA should not use parameter binding")
             executed.append(sql)
-            if sql == "PRAGMA cipher_version":
-                return self
             if sql.startswith("PRAGMA key ="):
                 return self
             raise AssertionError(f"Unexpected SQL: {sql}")
@@ -127,9 +128,23 @@ def test_sqlcipher_configuration_executes_key_pragma(tmp_path, monkeypatch):
             return False
 
     fake_con = FakeSQLCipherConnection()
-    monkeypatch.setattr(sqlite3, "connect", lambda *args, **kwargs: fake_con)
+    mem._configure_sqlcipher(fake_con)
 
-    con = sqlite3.connect("ignored.db")
-    mem._configure_sqlcipher(con)
+    assert executed == ["PRAGMA key = 'pa''ss'"]
 
-    assert executed == ["PRAGMA cipher_version", "PRAGMA key = 'pa''ss'"]
+
+def test_connection_pragmas_applied(tmp_path, monkeypatch):
+    def fake_embed(texts, model="nomic-embed-text"):
+        return [np.array([1.0])]
+
+    monkeypatch.setattr("app.core.memory.embed_ollama", fake_embed)
+    mem = Memory(tmp_path / "mem.db")
+
+    with mem._connect() as con:
+        journal_mode = con.execute("PRAGMA journal_mode").fetchone()[0]
+        assert isinstance(journal_mode, str)
+        assert journal_mode.lower() == "wal"
+        assert con.execute("PRAGMA foreign_keys").fetchone()[0] == 1
+        assert con.execute("PRAGMA busy_timeout").fetchone()[0] == 5000
+        secure_delete = con.execute("PRAGMA secure_delete").fetchone()[0]
+        assert secure_delete in (1, "1", "on", "ON")

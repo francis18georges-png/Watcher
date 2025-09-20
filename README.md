@@ -78,6 +78,31 @@ Si son import échoue, un module de repli léger `numpy_stub` est utilisé à la
 place. Les modules Python importent donc `np` via `from app.utils import np`
 pour bénéficier automatiquement de ce mécanisme.
 
+## Mémoire et migrations
+
+Le module `Memory` s'appuie sur SQLite et exécute automatiquement les
+migrations [Alembic](https://alembic.sqlalchemy.org/) au démarrage pour garantir
+la présence du schéma attendu. Chaque connexion active `journal_mode=WAL`,
+`foreign_keys=ON`, `busy_timeout=5000`, `secure_delete=ON` et tente d'exposer
+FTS5 lorsque la compilation de SQLite le permet.
+
+### Activer le chiffrement SQLCipher
+
+Watcher détecte automatiquement la prise en charge de
+[SQLCipher](https://www.zetetic.net/sqlcipher/). Lorsque le binaire `sqlite3`
+est compilé avec cette extension, vous pouvez chiffrer la base mémoire en
+définissant les variables d'environnement suivantes avant de lancer
+l'application :
+
+```bash
+export WATCHER_MEMORY_ENABLE_SQLCIPHER=1
+export WATCHER_MEMORY_SQLCIPHER_PASSWORD="motdepasse-solide"
+```
+
+Si SQLCipher n'est pas détecté ou si le mot de passe est absent, Watcher
+revient automatiquement à un stockage non chiffré et inscrit un avertissement
+dans les journaux pour faciliter le diagnostic.
+
 ## Utilisation
 
 ### Interface graphique
