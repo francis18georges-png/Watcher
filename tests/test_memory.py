@@ -155,6 +155,7 @@ def test_ensure_fts5_detects_compile_option(tmp_path, monkeypatch):
     mem = Memory(tmp_path / "mem.db")
     mem._fts5_checked = False
     mem._fts5_available = False
+    mem._fts5_requires_extension = False
 
     class FakeConnection:
         def execute(self, sql):
@@ -171,22 +172,40 @@ def test_ensure_fts5_loads_extension(tmp_path, monkeypatch):
     mem = Memory(tmp_path / "mem.db")
     mem._fts5_checked = False
     mem._fts5_available = False
+    mem._fts5_requires_extension = False
 
     class FakeConnection:
         def __init__(self):
             self._extension_enabled = False
+            self.enable_calls: list[bool] = []
+            self.load_calls: list[str] = []
+            self.execute_calls = 0
 
         def execute(self, sql):
             assert sql == "PRAGMA compile_options"
+            self.execute_calls += 1
             raise sqlite3.DatabaseError
 
         def enable_load_extension(self, flag):
+            self.enable_calls.append(bool(flag))
             self._extension_enabled = bool(flag)
 
         def load_extension(self, name):
             assert self._extension_enabled is True
             assert name == "fts5"
+            self.load_calls.append(name)
 
-    mem._ensure_fts5(FakeConnection())
+    first = FakeConnection()
+    mem._ensure_fts5(first)
+    assert first.execute_calls == 1
+    assert first.load_calls == ["fts5"]
+    assert first.enable_calls == [True, False]
+    assert mem.fts5_available is True
+    assert mem._fts5_requires_extension is True
 
+    second = FakeConnection()
+    mem._ensure_fts5(second)
+    assert second.execute_calls == 0
+    assert second.load_calls == ["fts5"]
+    assert second.enable_calls == [True, False]
     assert mem.fts5_available is True
