@@ -11,10 +11,11 @@ stages:
     outs:
       - datasets/processed/simple_linear.csv
   validate-data:
-    cmd: >-
-      python scripts/validate_schema.py --file datasets/processed/simple_linear.csv --params params.yaml &&
-      python scripts/validate_size.py --file datasets/processed/simple_linear.csv --params params.yaml &&
-      python scripts/validate_hash.py --file datasets/processed/simple_linear.csv --params params.yaml
+    cmd: |
+      set -e
+      python scripts/validate_schema.py --file datasets/processed/simple_linear.csv --params params.yaml --dataset-key simple_linear
+      python scripts/validate_size.py --file datasets/processed/simple_linear.csv --params params.yaml --dataset-key simple_linear
+      python scripts/validate_hash.py --file datasets/processed/simple_linear.csv --params params.yaml --dataset-key simple_linear
     deps:
       - datasets/processed/simple_linear.csv
       - scripts/common.py
