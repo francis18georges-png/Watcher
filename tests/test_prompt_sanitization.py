@@ -20,7 +20,7 @@ def test_engine_chat_rejects_command(tmp_path, monkeypatch) -> None:
     monkeypatch.setattr(Memory, "search", lambda self, q, top_k=8: [])
 
     class DummyClient:
-        def generate(self, prompt: str) -> str:
+        def generate(self, prompt: str, *, offline=None) -> str:
             return "pong"
 
     eng = Engine.__new__(Engine)

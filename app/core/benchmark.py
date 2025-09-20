@@ -7,14 +7,39 @@ import gc
 import hashlib
 import html
 import json
+import logging
 import math
 import statistics
 import tempfile
 import time
 import tracemalloc
+from contextlib import contextmanager
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Callable, Final, Iterable, Sequence
+from typing import Any, Callable, Final, Iterable, Iterator, Sequence
+
+
+@contextmanager
+def _preserve_logging_state() -> Iterator[None]:
+    """Temporarily save and restore the root logger configuration."""
+
+    root_logger = logging.getLogger()
+    previous_level = root_logger.level
+    previous_handlers = list(root_logger.handlers)
+    previous_filters = list(root_logger.filters)
+    logger_states: dict[str, bool] = {}
+    for name, existing in list(logging.root.manager.loggerDict.items()):
+        if isinstance(existing, logging.Logger):
+            logger_states[existing.name] = existing.disabled
+    try:
+        yield
+    finally:
+        root_logger.handlers[:] = previous_handlers
+        root_logger.filters[:] = previous_filters
+        root_logger.setLevel(previous_level)
+        for name, disabled in logger_states.items():
+            logger = logging.getLogger(name)
+            logger.disabled = disabled
 
 
 class Bench:
@@ -71,54 +96,59 @@ class Bench:
         if warmup < 0:
             raise ValueError("warmup must be >= 0")
 
-        scenario_map = self._build_scenarios()
-        if scenario is not None:
-            if scenario not in scenario_map:
-                raise KeyError(f"unknown benchmark scenario: {scenario}")
-            selected = [(scenario, scenario_map[scenario])]
-        else:
-            selected = list(scenario_map.items())
+        with _preserve_logging_state():
+            scenario_map = self._build_scenarios()
+            if scenario is not None:
+                if scenario not in scenario_map:
+                    raise KeyError(f"unknown benchmark scenario: {scenario}")
+                selected = [(scenario, scenario_map[scenario])]
+            else:
+                selected = list(scenario_map.items())
 
-        run_id = datetime.now(timezone.utc).isoformat(timespec="seconds")
-        thresholds = self._load_thresholds(thresholds_path)
-        results: list[dict[str, Any]] = []
+            run_id = datetime.now(timezone.utc).isoformat(timespec="seconds")
+            thresholds = self._load_thresholds(thresholds_path)
+            results: list[dict[str, Any]] = []
 
-        for name, func in selected:
-            durations, peaks = self._sample_scenario(func, samples=samples, warmup=warmup)
-            metrics = self._format_metrics(durations, peaks)
-            status, breaches = self._evaluate_against_thresholds(
-                metrics, thresholds.get(name)
-            )
-            record: dict[str, Any] = {
+            for name, func in selected:
+                durations, peaks = self._sample_scenario(
+                    func, samples=samples, warmup=warmup
+                )
+                metrics = self._format_metrics(durations, peaks)
+                status, breaches = self._evaluate_against_thresholds(
+                    metrics, thresholds.get(name)
+                )
+                record: dict[str, Any] = {
+                    "run_id": run_id,
+                    "scenario": name,
+                    "samples": samples,
+                    "metrics": metrics,
+                    "raw_samples": {
+                        "durations_ms": [round(d * 1000.0, 6) for d in durations],
+                        "memory_kb": [round(p / 1024.0, 6) for p in peaks],
+                    },
+                    "status": status,
+                }
+                if breaches:
+                    record["breaches"] = breaches
+                results.append(record)
+
+            results.sort(key=lambda item: item["scenario"])
+            summary = {
                 "run_id": run_id,
-                "scenario": name,
-                "samples": samples,
-                "metrics": metrics,
-                "raw_samples": {
-                    "durations_ms": [round(d * 1000.0, 6) for d in durations],
-                    "memory_kb": [round(p / 1024.0, 6) for p in peaks],
-                },
-                "status": status,
+                "generated_at": run_id,
+                "results": results,
             }
-            if breaches:
-                record["breaches"] = breaches
-            results.append(record)
+            summary["overall_status"] = self._overall_status(results)
 
-        results.sort(key=lambda item: item["scenario"])
-        summary = {
-            "run_id": run_id,
-            "generated_at": run_id,
-            "results": results,
-        }
-        summary["overall_status"] = self._overall_status(results)
-
-        jsonl_target = Path(jsonl_path) if jsonl_path is not None else self.jsonl_path
-        summary_target = Path(summary_path) if summary_path is not None else self.summary_path
-        jsonl_target.parent.mkdir(parents=True, exist_ok=True)
-        summary_target.parent.mkdir(parents=True, exist_ok=True)
-        self._write_jsonl(jsonl_target, results)
-        self._write_summary(summary_target, summary)
-        self._update_status_badge(summary)
+            jsonl_target = Path(jsonl_path) if jsonl_path is not None else self.jsonl_path
+            summary_target = (
+                Path(summary_path) if summary_path is not None else self.summary_path
+            )
+            jsonl_target.parent.mkdir(parents=True, exist_ok=True)
+            summary_target.parent.mkdir(parents=True, exist_ok=True)
+            self._write_jsonl(jsonl_target, results)
+            self._write_summary(summary_target, summary)
+            self._update_status_badge(summary)
         return summary
 
     def check_thresholds(
@@ -133,16 +163,19 @@ class Bench:
         summary_file = Path(summary_path) if summary_path is not None else self.summary_path
         if not summary_file.exists():
             raise FileNotFoundError(f"summary file not found: {summary_file}")
-        summary = json.loads(summary_file.read_text(encoding="utf-8"))
-        thresholds = self._load_thresholds(thresholds_path)
+        with _preserve_logging_state():
+            summary = json.loads(summary_file.read_text(encoding="utf-8"))
+            thresholds = self._load_thresholds(thresholds_path)
 
-        overall, breaches = self._apply_thresholds(summary.get("results", []), thresholds)
-        summary["overall_status"] = overall
-        if breaches:
-            summary["results"] = summary.get("results", [])
-        self._write_summary(summary_file, summary)
-        if update_badge:
-            self._update_status_badge(summary)
+            overall, breaches = self._apply_thresholds(
+                summary.get("results", []), thresholds
+            )
+            summary["overall_status"] = overall
+            if breaches:
+                summary["results"] = summary.get("results", [])
+            self._write_summary(summary_file, summary)
+            if update_badge:
+                self._update_status_badge(summary)
         return breaches
 
     # ------------------------------------------------------------------

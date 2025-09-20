@@ -144,6 +144,14 @@ class WatcherApp(ttk.Frame):
         self.inp.pack(side="left", fill="both", expand=True)
         self.send_btn = ttk.Button(bottom, text="Envoyer", command=self._send)
         self.send_btn.pack(side="left", padx=8)
+        self.offline_var = tk.BooleanVar(master=self, value=self.engine.is_offline)
+        self.offline_toggle = ttk.Checkbutton(
+            bottom,
+            text="Mode offline",
+            variable=self.offline_var,
+            command=self._toggle_offline,
+        )
+        self.offline_toggle.pack(side="left", padx=4)
         ttk.Label(bottom, text="Note (0.0 – 1.0)").pack(side="left")
         self.rate_var = tk.DoubleVar(value=0.0)
         self.rate_input = tk.Spinbox(
@@ -158,13 +166,10 @@ class WatcherApp(ttk.Frame):
         ttk.Button(bottom, text="Noter", command=self._rate).pack(side="left")
         self.status = ttk.Label(
             self,
-            text=(
-                f"Mode: {self.settings.ui.mode} | "
-                f"Backend: {self.settings.llm.backend} | "
-                f"Modèle: {self.settings.llm.model}"
-            ),
+            text="",
         )
         self.status.pack(fill="x")
+        self._refresh_status()
 
         # Briefing button
         ttk.Button(self.brief, text="Démarrer le Briefing", command=self._brief).pack(
@@ -373,6 +378,37 @@ class WatcherApp(ttk.Frame):
                 after(1000, self._update_plugin_monitor)
             except Exception:  # pragma: no cover - scheduling errors are non-fatal
                 logger.debug("Unable to reschedule plugin monitor", exc_info=True)
+
+    def _refresh_status(self) -> None:
+        """Update the footer label with the current runtime configuration."""
+
+        offline_state = "Offline" if self.engine.is_offline else "Online"
+        self.status.config(
+            text=(
+                f"Interface: {self.settings.ui.mode} | "
+                f"Backend: {self.settings.llm.backend} | "
+                f"Modèle: {self.settings.llm.model} | "
+                f"LLM: {offline_state}"
+            )
+        )
+
+    def _toggle_offline(self) -> None:
+        """Toggle offline mode when the associated checkbox changes state."""
+
+        offline = bool(self.offline_var.get())
+        setter = getattr(self.engine, "set_offline", None)
+        if callable(setter):
+            setter(offline)
+        intelligence = getattr(self.settings, "intelligence", None)
+        if intelligence is not None:
+            try:
+                intelligence.mode = "offline" if offline else "online"
+            except Exception:  # pragma: no cover - defensive assignment
+                logger.debug("Unable to update intelligence mode", exc_info=True)
+        mode_label = "offline" if offline else "online"
+        self.out.insert("end", f"\n[Watcher] Mode {mode_label} activé\n")
+        self.out.see("end")
+        self._refresh_status()
 
     def _send(self) -> None:
         q = self.inp.get("1.0", "end").strip()

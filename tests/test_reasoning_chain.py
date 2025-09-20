@@ -18,7 +18,7 @@ def test_chat_records_reasoning(tmp_path, monkeypatch):
     monkeypatch.setattr(Critic, "suggest", lambda self, prompt: [])
 
     class DummyClient:
-        def generate(self, prompt: str) -> tuple[str, str]:
+        def generate(self, prompt: str, *, offline=None) -> tuple[str, str]:
             return "pong", "dummy-trace"
 
     eng = Engine.__new__(Engine)

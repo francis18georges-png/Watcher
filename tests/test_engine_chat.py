@@ -15,7 +15,7 @@ def test_chat_saves_distinct_kinds(tmp_path, monkeypatch):
     monkeypatch.setattr(Memory, "search", lambda self, q, top_k=8: [])
 
     class DummyClient:
-        def generate(self, prompt: str) -> tuple[str, str]:
+        def generate(self, prompt: str, *, offline=None) -> tuple[str, str]:
             return "pong", "dummy-trace"
 
     eng = Engine.__new__(Engine)
@@ -56,7 +56,7 @@ def test_chat_includes_retrieved_terms(tmp_path, monkeypatch):
         def __init__(self):
             self.prompt = None
 
-        def generate(self, prompt: str) -> tuple[str, str]:
+        def generate(self, prompt: str, *, offline=None) -> tuple[str, str]:
             self.prompt = prompt
             return "pong", "dummy-trace"
 
@@ -77,7 +77,7 @@ def test_chat_suggests_details_without_llm(tmp_path, monkeypatch):
     monkeypatch.setattr("app.core.memory.embed_ollama", fake_embed)
 
     class DummyClient:
-        def generate(self, prompt: str) -> tuple[str, str]:
+        def generate(self, prompt: str, *, offline=None) -> tuple[str, str]:
             raise AssertionError("LLM should not be called when suggestions exist")
 
     eng = Engine.__new__(Engine)
@@ -108,7 +108,7 @@ def test_chat_uses_cache_for_identical_prompts(tmp_path, monkeypatch):
         def __init__(self):
             self.calls = 0
 
-        def generate(self, prompt: str) -> tuple[str, str]:
+        def generate(self, prompt: str, *, offline=None) -> tuple[str, str]:
             self.calls += 1
             return "pong", "dummy-trace"
 
@@ -137,7 +137,7 @@ def test_chat_evicts_least_recent(tmp_path, monkeypatch):
         def __init__(self):
             self.calls = []
 
-        def generate(self, prompt: str) -> tuple[str, str]:
+        def generate(self, prompt: str, *, offline=None) -> tuple[str, str]:
             self.calls.append(prompt)
             return "pong", "dummy-trace"
 

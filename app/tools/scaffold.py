@@ -78,6 +78,7 @@ def create_python_cli(name: str, base: Path, force: bool = False) -> str:
             args = p.parse_args()
             if args.ping:
                 logging.getLogger(__name__).info("pong")
+                logging.getLogger().info("pong")
 
         if __name__ == "__main__":
             main()

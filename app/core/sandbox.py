@@ -6,6 +6,7 @@ from dataclasses import dataclass
 from typing import Callable, Mapping
 
 logger = logging.getLogger(__name__)
+root_logger = logging.getLogger()
 
 _ALLOWED_ENV_VARS = {
     "PATH",
@@ -210,6 +211,9 @@ def run(
             from win32api import CloseHandle, OpenProcess
         except ImportError:
             logger.warning(
+                "pywin32 introuvable; exécution sans quotas CPU/mémoire sur Windows"
+            )
+            root_logger.warning(
                 "pywin32 introuvable; exécution sans quotas CPU/mémoire sur Windows"
             )
             return _run_without_pywin32(

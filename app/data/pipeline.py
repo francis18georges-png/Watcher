@@ -14,6 +14,9 @@ from typing import Any, Callable, Iterable, Protocol, runtime_checkable
 from config import get_settings
 
 logger = logging.getLogger(__name__)
+logger.setLevel(logging.NOTSET)
+logger.propagate = True
+logger.disabled = False
 
 
 

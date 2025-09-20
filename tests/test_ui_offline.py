@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from types import SimpleNamespace
+from types import MethodType, SimpleNamespace
 from typing import Any
 
 import pytest
@@ -61,6 +61,38 @@ class _DummyTreeview:
         text = kwargs.get("text", "")
         self.rows.append({"values": values, "text": text})
         return iid or str(len(self.rows) - 1)
+
+
+class _DummyLabel:
+    def __init__(self) -> None:
+        self.text = ""
+
+    def config(self, **kwargs: Any) -> None:
+        if "text" in kwargs:
+            self.text = kwargs["text"]
+
+
+class _DummyTextWidget:
+    def __init__(self) -> None:
+        self.buffer: list[str] = []
+
+    def insert(self, index: str, text: str) -> None:  # noqa: ARG002 - Tkinter compat
+        self.buffer.append(text)
+
+    def see(self, index: str) -> None:  # noqa: ARG002 - Tkinter compat
+        pass
+
+
+class _ToggleEngine:
+    def __init__(self) -> None:
+        self.offline = False
+
+    @property
+    def is_offline(self) -> bool:
+        return self.offline
+
+    def set_offline(self, offline: bool) -> None:
+        self.offline = bool(offline)
 
 
 def test_collect_plugin_stats_uses_cached_handles(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -138,3 +170,29 @@ def test_update_plugin_monitor_populates_tree(monkeypatch: pytest.MonkeyPatch) -
     assert app._sandbox_processes
     assert len(app.plugin_tree.rows) == len(populated)
     assert app.plugin_tree.rows[0]["values"][0] == pid
+
+
+def test_toggle_offline_updates_status() -> None:
+    app = main.WatcherApp.__new__(main.WatcherApp)
+    app.engine = _ToggleEngine()
+    app.settings = SimpleNamespace(
+        ui=SimpleNamespace(mode="Sur"),
+        llm=SimpleNamespace(backend="ollama", model="stub-model"),
+        intelligence=SimpleNamespace(mode="offline"),
+    )
+    app.status = _DummyLabel()
+    app.out = _DummyTextWidget()
+    tcl = main.tk.Tcl()
+    app.offline_var = main.tk.BooleanVar(master=tcl, value=False)
+    app._refresh_status = MethodType(main.WatcherApp._refresh_status, app)
+    app._toggle_offline = MethodType(main.WatcherApp._toggle_offline, app)
+
+    app._refresh_status()
+    assert "LLM: Online" in app.status.text
+
+    app.offline_var.set(True)
+    app._toggle_offline()
+
+    assert app.engine.is_offline
+    assert "LLM: Offline" in app.status.text
+    assert any("Mode offline" in entry for entry in app.out.buffer)

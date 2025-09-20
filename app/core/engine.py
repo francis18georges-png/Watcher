@@ -62,6 +62,10 @@ class Engine:
         self.learner = Learner(self.bench, self.base / "data")
         self.planner = Planner()
         self.client = Client()
+        self._offline_mode = settings.intelligence.mode.lower() == "offline"
+        setter = getattr(self.client, "set_offline", None)
+        if callable(setter):
+            setter(self._offline_mode)
         self.critic = Critic()
         # LRU cache for chat responses
         self._cache_size = int(settings.memory.cache_size)
@@ -134,8 +138,12 @@ class Engine:
             cache: OrderedDict[str, str] = self.__dict__.setdefault(
                 "_cache", OrderedDict()
             )
+            settings_obj = getattr(self, "settings", None)
+            default_cache_size = getattr(
+                getattr(settings_obj, "memory", None), "cache_size", 128
+            )
             cache_size: int = self.__dict__.setdefault(
-                "_cache_size", self.settings.memory.cache_size
+                "_cache_size", int(default_cache_size)
             )
             cached = cache.pop(user_prompt, None)
             if cached is not None:
@@ -193,7 +201,7 @@ class Engine:
             if excerpts:
                 llm_prompt = "\n\n".join([llm_prompt, "\n".join(excerpts)])
 
-            answer, trace = self.client.generate(llm_prompt)
+            answer, trace = self.client.generate(llm_prompt, offline=self.is_offline)
 
             if details:
                 answer += "\n\nVoici quelques détails supplémentaires.\n" + "\n".join(
@@ -217,6 +225,20 @@ class Engine:
         except Exception as exc:
             metrics.log_error(str(exc))
             raise
+
+    @property
+    def is_offline(self) -> bool:
+        """Return ``True`` when the engine is operating in offline mode."""
+
+        return getattr(self, "_offline_mode", False)
+
+    def set_offline(self, offline: bool) -> None:
+        """Enable or disable offline mode across engine components."""
+
+        self._offline_mode = bool(offline)
+        setter = getattr(self.client, "set_offline", None)
+        if callable(setter):
+            setter(self._offline_mode)
 
     def add_feedback(self, rating: float, kind: str = "chat") -> str:
         """Persist user feedback on the last exchange.

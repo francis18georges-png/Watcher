@@ -47,6 +47,7 @@ class PerformanceMetrics:
 
         self._append_with_limit(self.error_logs, message)
         logging.getLogger(__name__).error(message)
+        logging.getLogger().error(message)
 
     @contextmanager
     def track_engine(self) -> Iterator[None]:

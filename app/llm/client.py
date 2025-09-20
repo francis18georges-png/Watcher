@@ -2,9 +2,12 @@
 
 from __future__ import annotations
 
+from __future__ import annotations
+
 import http.client
 import json
 import logging
+from typing import Optional
 from urllib.parse import urlparse
 
 from config import get_settings
@@ -101,8 +104,20 @@ class Client:
         self.host = host or llm_cfg.host
         self.ctx = ctx if ctx is not None else llm_cfg.ctx
         self.fallback_phrase = fallback_phrase or llm_cfg.fallback_phrase
+        self.offline = settings.intelligence.mode.lower() == "offline"
 
-    def generate(self, prompt: str, *, separator: str = "") -> tuple[str, str]:
+    def set_offline(self, offline: bool) -> None:
+        """Explicitly enable or disable offline mode."""
+
+        self.offline = bool(offline)
+
+    def generate(
+        self,
+        prompt: str,
+        *,
+        separator: str = "",
+        offline: Optional[bool] = None,
+    ) -> tuple[str, str]:
         """Return a response and trace for *prompt*.
 
         Args:
@@ -116,6 +131,14 @@ class Client:
         """
 
         trace: list[str] = []
+        if offline is None:
+            offline = self.offline
+
+        if offline:
+            trace.append("offline")
+            trace.append("fallback")
+            return f"{self.fallback_phrase}: {prompt}", " -> ".join(trace)
+
         try:  # pragma: no cover - network path
             responses: list[str] = []
             for idx, chunk in enumerate(chunk_prompt(prompt)):

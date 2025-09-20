@@ -14,7 +14,7 @@ def test_trace_stored_in_memory(tmp_path, monkeypatch):
     monkeypatch.setattr(Memory, "search", lambda self, q, top_k=8: [])
 
     class DummyClient:
-        def generate(self, prompt: str):
+        def generate(self, prompt: str, *, offline=None):
             return "pong", "trace-steps"
 
     eng = Engine.__new__(Engine)

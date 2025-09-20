@@ -5,6 +5,22 @@
 Atelier local d'IA de programmation autonome (offline par défaut).
 Mémoire vectorielle, curriculum adaptatif, A/B + bench et quality gate sécurité.
 
+## Mode offline / online
+
+L'interface Tkinter propose désormais une case à cocher « Mode offline » dans
+l'onglet Chat. Elle active ou désactive les appels réseau/LLM en temps réel et
+met à jour la barre d'état pour indiquer l'état courant (« LLM: Offline » ou
+« LLM: Online »). La bascule reste disponible en CLI via `watcher run` avec les
+options `--offline` (par défaut) et `--online` pour rétablir les requêtes vers
+le backend LLM.
+
+## Monitoring des plugins
+
+Le tableau « Plugins en cours » de l'onglet Atelier s'appuie sur `psutil` pour
+afficher, plugin par plugin, l'utilisation CPU instantanée, la mémoire RSS et
+le nombre de threads. Les métriques sont rafraîchies automatiquement toutes les
+secondes afin de surveiller l'activité des sandbox.
+
 ## Documentation
 
 La documentation technique est générée avec [MkDocs Material](https://squidfunk.github.io/mkdocs-material/)

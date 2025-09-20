@@ -55,6 +55,7 @@ def _read_toml(path: Path) -> dict[str, Any]:
         raise
     except tomllib.TOMLDecodeError as exc:
         logger.error("Invalid TOML in %s: %s", path, exc)
+        logging.getLogger().error("Invalid TOML in %s: %s", path, exc)
         raise
 
 
@@ -132,6 +133,9 @@ class _TomlSettingsSource(PydanticBaseSettingsSource):
                 data = _deep_merge(data, env_data)
             else:
                 logger.warning(
+                    "Profile configuration file not found: %s", profile_path
+                )
+                logging.getLogger().warning(
                     "Profile configuration file not found: %s", profile_path
                 )
         self._data = data
