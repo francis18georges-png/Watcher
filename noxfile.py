@@ -10,7 +10,7 @@ from pathlib import Path
 import nox
 from nox.command import CommandFailed
 
-DEFAULT_PYTHON_VERSIONS = ("3.12",)
+DEFAULT_PYTHON_VERSIONS = ("3.10", "3.11", "3.12")
 
 
 def _parse_python_versions(

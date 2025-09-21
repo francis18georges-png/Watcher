@@ -16,4 +16,4 @@ Les profils permettent d'adapter rapidement les limites ou le niveau de verbosit
 
 ## Qualité et automatisation
 
-Les sessions Nox et la matrice Python du pipeline CI respectent la variable d'environnement `WATCHER_NOX_PYTHON`. Elle accepte une liste de versions séparées par des virgules et/ou des espaces (par exemple `"3.10, 3.11 3.12"`). Lorsque la variable est absente ou ne contient aucune version, la valeur par défaut reste `3.12`.
+Les sessions Nox et la matrice Python du pipeline CI respectent la variable d'environnement `WATCHER_NOX_PYTHON`. Elle accepte une liste de versions séparées par des virgules et/ou des espaces (par exemple `"3.10, 3.11 3.12"`). Lorsque la variable est absente ou ne contient aucune version, la valeur par défaut couvre explicitement les interpréteurs pris en charge (`3.10`, `3.11` et `3.12`).
