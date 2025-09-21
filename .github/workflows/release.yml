@@ -89,10 +89,27 @@ PY
       - name: Install build dependencies
         run: |
           python -m pip install --upgrade pip
-          python -m pip install build
+          python -m pip install -c constraints.txt build pip-audit
 
       - name: Build wheel and sdist
         run: python -m build
+
+      - name: Run pip-audit
+        run: |
+          mkdir -p dist
+          pip-audit \
+            --strict \
+            --format json \
+            --output dist/pip-audit-report.json \
+            -r requirements.txt \
+            -r requirements-dev.txt
+
+      - name: Upload pip-audit report
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-pip-audit
+          if-no-files-found: error
+          path: dist/pip-audit-report.json
 
       - name: Upload distributions
         uses: actions/upload-artifact@v4
@@ -181,12 +198,12 @@ PY
         shell: pwsh
         run: |
           python -m pip install --upgrade pip
-          python -m pip install -r requirements.txt
-          python -m pip install pyinstaller
+          python -m pip install -c constraints.txt -r requirements.txt
+          python -m pip install -c constraints.txt pyinstaller
 
       - name: Install SBOM tooling
         shell: pwsh
-        run: python -m pip install cyclonedx-bom cyclonedx-py
+        run: python -m pip install -c constraints.txt cyclonedx-bom cyclonedx-py
 
       - name: Build Windows executable
         shell: pwsh
@@ -197,6 +214,12 @@ PY
         run: |
           New-Item -ItemType Directory -Force -Path dist | Out-Null
           cyclonedx-py environment --format json --output-file dist/Watcher-sbom.json
+
+      - name: Sign SBOM
+        uses: sigstore/gh-action@v2.1.1
+        with:
+          artifact: dist/Watcher-sbom.json
+          bundle: dist/Watcher-sbom.json.sigstore
 
       - name: Package installer archive
         shell: pwsh
@@ -227,7 +250,7 @@ PY
         shell: pwsh
         run: |
           $hash = Get-FileHash dist/Watcher-Setup.zip -Algorithm SHA256
-          "sha256=sha256:$($hash.Hash.ToLower())" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
+          "sha256=$($hash.Hash.ToLower())" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
 
       - name: Upload release artifacts
         uses: actions/upload-artifact@v4
@@ -238,6 +261,7 @@ PY
             dist/Watcher-Setup.zip
             dist/Watcher-Setup.zip.sigstore
             dist/Watcher-sbom.json
+            dist/Watcher-sbom.json.sigstore
 
   build-unix-executables:
     name: Build ${{ matrix.display-name }} executable
@@ -340,14 +364,14 @@ PY
         run: |
           set -euo pipefail
           python -m pip install --upgrade pip
-          python -m pip install -r requirements.txt
-          python -m pip install pyinstaller
+          python -m pip install -c constraints.txt -r requirements.txt
+          python -m pip install -c constraints.txt pyinstaller
 
       - name: Install SBOM tooling
         shell: bash
         run: |
           set -euo pipefail
-          python -m pip install cyclonedx-bom cyclonedx-py
+          python -m pip install -c constraints.txt cyclonedx-bom cyclonedx-py
 
       - name: Build executable
         shell: bash
@@ -377,6 +401,12 @@ PY
           SBOM_FILE="dist/${{ matrix.sbom-name }}"
           cyclonedx-py environment --format json --output-file "$SBOM_FILE"
           echo "SBOM_FILE=$SBOM_FILE" >> "$GITHUB_ENV"
+
+      - name: Sign SBOM
+        uses: sigstore/gh-action@v2.1.1
+        with:
+          artifact: ${{ env.SBOM_FILE }}
+          bundle: ${{ env.SBOM_FILE }}.sigstore
 
       - name: Package executable
         shell: bash
@@ -418,6 +448,12 @@ PY
           fi
           python scripts/normalize_zip_metadata.py "$ARCHIVE_FILE"
 
+      - name: Sign executable archive
+        uses: sigstore/gh-action@v2.1.1
+        with:
+          artifact: ${{ env.ARCHIVE_FILE }}
+          bundle: ${{ env.ARCHIVE_FILE }}.sigstore
+
       - name: Store notarization credentials
         if: matrix.os == 'macos-latest' && env.APPLE_NOTARIZE_APPLE_ID != '' && env.APPLE_NOTARIZE_TEAM_ID != '' && env.APPLE_NOTARIZE_PASSWORD != ''
         shell: bash
@@ -453,7 +489,9 @@ PY
           if-no-files-found: error
           path: |
             ${{ env.ARCHIVE_FILE }}
+            ${{ env.ARCHIVE_FILE }}.sigstore
             ${{ env.SBOM_FILE }}
+            ${{ env.SBOM_FILE }}.sigstore
 
       - name: Upload notarization log
         if: matrix.os == 'macos-latest' && env.NOTARIZATION_LOG != ''
@@ -486,6 +524,7 @@ PY
     runs-on: ubuntu-latest
     permissions:
       contents: write
+      id-token: write
     steps:
       - name: Download build artifacts
         uses: actions/download-artifact@v4
@@ -509,6 +548,59 @@ PY
           provenance-path: dist/Watcher-Setup.intoto.jsonl
           artifact-path: dist/Watcher-Setup.zip
 
+      - name: Sign SLSA provenance
+        uses: sigstore/gh-action@v2.1.1
+        with:
+          artifact: dist/Watcher-Setup.intoto.jsonl
+          bundle: dist/Watcher-Setup.intoto.jsonl.sigstore
+
+      - name: Generate SHA256 manifest
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+import hashlib
+import pathlib
+
+base = pathlib.Path("dist")
+patterns = [
+    "Watcher-Setup.zip",
+    "Watcher-Setup.zip.sigstore",
+    "Watcher-sbom.json",
+    "Watcher-sbom.json.sigstore",
+    "Watcher-Setup.intoto.jsonl",
+    "Watcher-Setup.intoto.jsonl.sigstore",
+    "Watcher-linux-x86_64.tar.gz",
+    "Watcher-linux-x86_64.tar.gz.sigstore",
+    "Watcher-linux-sbom.json",
+    "Watcher-linux-sbom.json.sigstore",
+    "Watcher-macos-x86_64.zip",
+    "Watcher-macos-x86_64.zip.sigstore",
+    "Watcher-macos-sbom.json",
+    "Watcher-macos-sbom.json.sigstore",
+    "watcher-*.whl",
+    "watcher-*.tar.gz",
+    "pip-audit-report.json",
+]
+
+files = []
+for pattern in patterns:
+    files.extend(sorted(base.glob(pattern)))
+
+files = [path for path in files if path.is_file()]
+
+if not files:
+    raise SystemExit("No release artifacts found for SHA256 manifest")
+
+manifest = base / "Watcher-sha256.txt"
+
+with manifest.open("w", encoding="utf-8") as fh:
+    for path in files:
+        digest = hashlib.sha256(path.read_bytes()).hexdigest()
+        fh.write(f"{digest}  {path.name}\n")
+
+print(f"Wrote {len(files)} entries to {manifest}")
+PY
+
       - name: Publish GitHub release
         uses: softprops/action-gh-release@v2
         with:
@@ -522,12 +614,20 @@ PY
             dist/Watcher-Setup.zip
             dist/Watcher-Setup.zip.sigstore
             dist/Watcher-sbom.json
+            dist/Watcher-sbom.json.sigstore
             dist/Watcher-Setup.intoto.jsonl
+            dist/Watcher-Setup.intoto.jsonl.sigstore
             dist/Watcher-linux-x86_64.tar.gz
+            dist/Watcher-linux-x86_64.tar.gz.sigstore
             dist/Watcher-linux-sbom.json
+            dist/Watcher-linux-sbom.json.sigstore
             dist/Watcher-macos-x86_64.zip
+            dist/Watcher-macos-x86_64.zip.sigstore
             dist/Watcher-macos-sbom.json
+            dist/Watcher-macos-sbom.json.sigstore
             dist/watcher-*.whl
             dist/watcher-*.tar.gz
+            dist/pip-audit-report.json
+            dist/Watcher-sha256.txt
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

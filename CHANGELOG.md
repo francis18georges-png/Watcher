@@ -3,7 +3,11 @@
 ## [Unreleased]
 
 ### Added
-- Rien pour le moment.
+- Publication automatique d'un manifeste `Watcher-sha256.txt` listant les empreintes de tous les artefacts de release.
+
+### Fixed
+- Alignement de la version `beautifulsoup4` entre `requirements.txt` et `constraints.txt` afin d'éviter les résolutions pip
+  contradictoires.
 
 ## [v0.4.0] - 2025-09-20
 
