@@ -79,7 +79,11 @@ nav:
           - 2025-09-19: journal/2025-09-19.md
   - Sécurité et conformité:
       - Modèle de menaces: threat-model.md
+      - Vérification des artefacts: security_provenance.md
       - Charte éthique: ethics.md
+  - Gestion des releases:
+      - Notes de version: release_notes.md
+      - Guide hors-ligne: offline_guide.md
   - Exploitation:
       - Conventions de logging: logging.md
       - Feuille de route: ROADMAP.md
