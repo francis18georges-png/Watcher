@@ -56,6 +56,14 @@ qui rejoue l'analyse Scorecard à chaque Pull Request. Le job échoue si le scor
 redescend sous `7`, empêchant ainsi le reste du pipeline et la fusion tant que les bonnes
 pratiques identifiées par Scorecard ne sont pas rétablies.
 
+La matrice Python du même workflow est résolue par le job `determine-python`. En l'absence
+de variable `WATCHER_NOX_PYTHON`, il publie explicitement les versions supportées (`3.10`,
+`3.11`, `3.12`) afin que les jobs `quality` puissent s'exécuter sur Linux, macOS et Windows
+pour chaque interpréteur. Pour cibler un sous-ensemble lors d'un debug ou d'un backport,
+exportez `WATCHER_NOX_PYTHON="3.11"` (ou plusieurs valeurs séparées par des virgules) avant
+de lancer `nox` ou de déclencher le workflow manuellement ; la même logique s'applique aux
+exécutions locales via `noxfile.py`.
+
 ## Releases, SBOM et provenance
 
 Chaque tag SemVer (`vMAJOR.MINOR.PATCH`) déclenche le workflow [`release.yml`](.github/workflows/release.yml) qui produit
