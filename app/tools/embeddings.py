@@ -49,11 +49,20 @@ def embed_ollama(
     host = host or memory_cfg.embed_host
 
     parsed = urlparse(host if "://" in host else f"http://{host}")
+    scheme = (parsed.scheme or "http").lower()
+    if scheme == "https":
+        conn_cls = http.client.HTTPSConnection
+        default_port = 443
+    else:
+        conn_cls = http.client.HTTPConnection
+        default_port = 11434
 
     conn = None
     try:
-        conn = http.client.HTTPConnection(
-            parsed.hostname or "127.0.0.1", parsed.port or 11434, timeout=30
+        conn = conn_cls(
+            parsed.hostname or "127.0.0.1",
+            parsed.port or default_port,
+            timeout=30,
         )
         payload = json.dumps({"model": model, "input": texts})
         conn.request(
