@@ -85,6 +85,7 @@ nav:
       - Notes de version: release_notes.md
       - Guide hors-ligne: offline_guide.md
   - Exploitation:
+      - Guide de configuration: configuration.md
       - Conventions de logging: logging.md
       - Feuille de route: ROADMAP.md
       - Journal des modifications: CHANGELOG.md
