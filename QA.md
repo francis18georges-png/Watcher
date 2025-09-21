@@ -43,7 +43,20 @@
 * Immediately afterwards the workflow launches `./run.ps1` with an empty `DISPLAY` variable to emulate
   headless mode. Any startup failure or premature exit fails the build.
 * Forked pull requests skip the DVC artifact pull and verification steps because the AWS credentials are not
-  exposed to external runners. Maintainer branches still fail when artifacts are missing or corrupt.
+  exposed to external runners. Maintainer branches load the repository secrets (`AWS_ACCESS_KEY_ID`,
+  `AWS_SECRET_ACCESS_KEY`, `AWS_DEFAULT_REGION` and optionally `AWS_SESSION_TOKEN`) to access
+  `s3://watcher-artifacts`. The workflow fails fast when `dvc pull` or `dvc status --cloud` detect
+  missing, stale or corrupted artifacts so that merges remain blocked until the datasets are repaired.
+
+## Dataset recovery playbook
+
+1. Fetch the expected artifacts locally with `dvc pull`. When the remote diverges, inspect the diff with
+   `dvc status --cloud`.
+2. Rebuild the missing files (`dvc repro`, `python train.py`, etc.) or copy the canonical assets into
+   the workspace. Run `dvc add` if new data files are introduced.
+3. Validate the synchronization via `dvc status --cloud`. The command must report `Data and pipeline are up to date`.
+4. Publish the refreshed dataset with `dvc push` and commit the updated `.dvc` metadata (typically
+   `dvc.lock`). Open a PR referencing the incident that triggered the regeneration.
 
 ## Static Analysis
 

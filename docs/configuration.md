@@ -21,3 +21,18 @@ Les sessions Nox et la matrice Python du pipeline CI respectent la variable d'en
 Les pull requests provenant d'un fork n'ont pas accès aux identifiants AWS nécessaires au `dvc pull`. La CI journalise un
 avertissement et saute les étapes de récupération et de vérification des artefacts dans ce cas. Les branches internes
 continuent d'échouer si un artefact manque ou est corrompu.
+
+### Accès aux artefacts DVC
+
+Les branches protégées doivent disposer des secrets GitHub suivants afin que la CI accède au remote `s3://watcher-artifacts` :
+
+| Secret | Description |
+| --- | --- |
+| `AWS_ACCESS_KEY_ID` | Identifiant de la clé d'accès disposant des droits `GetObject`/`PutObject` sur le bucket `watcher-artifacts`. |
+| `AWS_SECRET_ACCESS_KEY` | Secret associé à la clé précédente. |
+| `AWS_DEFAULT_REGION` | Région AWS du bucket (par exemple `eu-west-1`). |
+| `AWS_SESSION_TOKEN` *(optionnel)* | Jeton temporaire pour des identifiants STS. Le laisser vide pour des clés longues durées. |
+
+Le workflow GitHub Actions configure automatiquement ces identifiants via `aws-actions/configure-aws-credentials@v4` avant de
+lancer `dvc pull`. Un `dvc status --cloud` systématique vérifie ensuite la parité entre le dépôt local et le remote. Tout échec
+sur ces étapes bloque la CI sur les branches des mainteneurs tant que les artefacts n'ont pas été corrigés ou régénérés.

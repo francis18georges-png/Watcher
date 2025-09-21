@@ -86,7 +86,7 @@ jobs:
       - determine-python
     runs-on: ${{ matrix.os }}
     env:
-      DVC_CREDENTIALS_AVAILABLE: ${{ secrets.AWS_ACCESS_KEY_ID != '' }}
+      DVC_CREDENTIALS_AVAILABLE: ${{ secrets.AWS_ACCESS_KEY_ID != '' && secrets.AWS_SECRET_ACCESS_KEY != '' && secrets.AWS_DEFAULT_REGION != '' }}
     strategy:
       fail-fast: false
       matrix:
@@ -135,14 +135,21 @@ jobs:
       - name: Install security CLIs
         run: python scripts/install_cli_tools.py --install-dir ./.tools --add-to-path
 
+      - name: Configure AWS credentials
+        if: env.DVC_CREDENTIALS_AVAILABLE == 'true'
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_DEFAULT_REGION }}
+
       - name: Pull data artifacts
         if: env.DVC_CREDENTIALS_AVAILABLE == 'true'
         run: dvc pull
-        continue-on-error: true
 
       - name: Verify data artifacts
         if: env.DVC_CREDENTIALS_AVAILABLE == 'true'
-        run: dvc status
+        run: dvc status --cloud
 
       - name: Skip DVC artifact checks
         if: env.DVC_CREDENTIALS_AVAILABLE != 'true'
