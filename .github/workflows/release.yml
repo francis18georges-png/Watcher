@@ -340,6 +340,16 @@ jobs:
           path: dist
           merge-multiple: true
 
+      - name: Download container image SBOM
+        if: github.ref_type == 'tag'
+        uses: dawidd6/action-download-artifact@v3
+        with:
+          workflow: docker.yml
+          workflow_conclusion: success
+          name: Watcher-container-sbom
+          tag: ${{ github.ref_name }}
+          path: dist
+
       - name: Normalize provenance filename
         run: |
           set -euo pipefail
@@ -368,6 +378,7 @@ jobs:
             dist/Watcher-linux-sbom.json
             dist/Watcher-macos-x86_64.zip
             dist/Watcher-macos-sbom.json
+            dist/Watcher-container-sbom.cdx.json
             dist/watcher-*.whl
             dist/watcher-*.tar.gz
         env:

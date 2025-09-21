@@ -39,12 +39,44 @@ jobs:
             type=raw,value=latest,enable=${{ github.ref == 'refs/heads/main' }}
             type=ref,event=tag,pattern=v*
 
-      - name: Build and push
+      - name: Build image
         uses: docker/build-push-action@v5
         with:
           context: .
-          push: true
+          push: false
+          load: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
+
+      - name: Download Syft
+        uses: anchore/sbom-action/download-syft@v0
+
+      - name: Generate container SBOM
+        id: generate-sbom
+        run: |
+          set -euo pipefail
+          PRIMARY_TAG=$(printf '%s\n' "${{ steps.meta.outputs.tags }}" | head -n 1)
+          if [ -z "$PRIMARY_TAG" ]; then
+            echo "No image tag was generated" >&2
+            exit 1
+          fi
+          syft "$PRIMARY_TAG" -o cyclonedx-json > Watcher-container-sbom.cdx.json
+          echo "sbom-file=Watcher-container-sbom.cdx.json" >> "$GITHUB_OUTPUT"
+
+      - name: Upload container SBOM artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Watcher-container-sbom
+          if-no-files-found: error
+          path: ${{ steps.generate-sbom.outputs.sbom-file }}
+
+      - name: Push image
+        run: |
+          set -euo pipefail
+          while IFS= read -r tag; do
+            if [ -n "$tag" ]; then
+              docker image push "$tag"
+            fi
+          done < <(printf '%s\n' "${{ steps.meta.outputs.tags }}")
