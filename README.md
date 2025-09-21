@@ -389,12 +389,17 @@ Watcher s'appuie désormais sur [Nox](https://nox.thea.codes/) pour unifier les
 linters, l'analyse statique, les tests et la construction du package :
 
 ```bash
-nox -s lint typecheck security tests
+nox -s lint typecheck security tests hypothesis
 ```
 
 Les sessions peuvent également être exécutées individuellement (`nox -s lint`,
-`nox -s tests`, etc.) et une étape `nox -s build` génère les artefacts wheel et
-sdist.
+`nox -s tests`, `nox -s hypothesis`, etc.) et une étape `nox -s build` génère les
+artefacts wheel et sdist.
+
+La session `hypothesis` exécute les tests property-based (`pytest -q
+tests/property`) avec le plugin Hypothesis activé. Pour les lancer sans Nox, il
+suffit d'installer les dépendances de développement puis de lancer directement
+`pytest -q tests/property`.
 
 Pour automatiser les corrections, la cible `make format` applique Ruff (lint
 et formattage) puis Black, et `make check` délègue dorénavant à Nox.

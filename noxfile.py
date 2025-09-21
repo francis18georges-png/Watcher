@@ -19,7 +19,7 @@ SOURCE_DIRECTORIES = (
 SBOM_PATH = Path("dist/Watcher-sbom.json")
 SBOM_DIRECTORY = SBOM_PATH.parent
 
-nox.options.sessions = ("lint", "typecheck", "tests", "build", "security")
+nox.options.sessions = ("lint", "typecheck", "tests", "hypothesis", "build", "security")
 nox.options.reuse_existing_virtualenvs = True
 
 
@@ -116,6 +116,13 @@ def tests(session: nox.Session) -> None:
     """Run the unit test suite."""
     install_project(session)
     session.run("pytest", "-q")
+
+
+@nox.session(python=PYTHON_VERSIONS)
+def hypothesis(session: nox.Session) -> None:
+    """Run property-based tests with Hypothesis."""
+    install_project(session)
+    session.run("pytest", "-q", "tests/property")
 
 
 @nox.session(python=PYTHON_VERSIONS)
