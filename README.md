@@ -282,6 +282,46 @@ Pour exécuter une commande CLI, passez-la directement après l'image :
 docker run --rm -it ghcr.io/<owner>/watcher:latest plugin list
 ```
 
+### Vérifier les bundles Sigstore
+
+Le workflow [`docker.yml`](.github/workflows/docker.yml) publie, en plus de l'image container,
+deux bundles Sigstore disponibles dans les artefacts du job « Sign published images » ainsi que
+dans les releases GitHub :
+
+- `ghcr.io__<owner>__watcher__<tag>.sigstore` : signature de l'image `ghcr.io/<owner>/watcher:<tag>`.
+- `ghcr.io__<owner>__watcher__<tag>.attestation.sigstore` : attestation SLSA pour la même image.
+
+Les caractères `/` et `:` du nom d'image sont remplacés par `__` pour garantir des noms de fichiers
+compatibles avec GitHub Actions. Téléchargez l'image et ses bundles correspondant au tag SemVer
+souhaité (`vMAJOR.MINOR.PATCH`), puis vérifiez la signature hors-ligne avec `cosign` :
+
+```bash
+cosign verify \
+  --bundle ghcr.io__<owner>__watcher__<tag>.sigstore \
+  --certificate-identity "https://github.com/<owner>/Watcher/.github/workflows/docker.yml@refs/tags/<tag>" \
+  --certificate-oidc-issuer https://token.actions.githubusercontent.com \
+  ghcr.io/<owner>/watcher@sha256:<digest>
+```
+
+Remplacez `<tag>` par la version téléchargée (par exemple `v0.4.0`) et `<digest>` par l'empreinte
+SHA256 de l'image. Vous pouvez récupérer ce digest via `docker buildx imagetools inspect`
+(`docker buildx imagetools inspect ghcr.io/<owner>/watcher:<tag> --format '{{.Digest}}'`).
+
+L'attestation SLSA peut être vérifiée sur la même image en pointant vers le bundle dédié :
+
+```bash
+cosign verify-attestation \
+  --bundle ghcr.io__<owner>__watcher__<tag>.attestation.sigstore \
+  --certificate-identity "https://github.com/<owner>/Watcher/.github/workflows/docker.yml@refs/tags/<tag>" \
+  --certificate-oidc-issuer https://token.actions.githubusercontent.com \
+  --type slsaprovenance \
+  ghcr.io/<owner>/watcher@sha256:<digest>
+```
+
+Pour les images construites depuis `main`, remplacez l'identité du certificat par
+`https://github.com/<owner>/Watcher/.github/workflows/docker.yml@refs/heads/main` et utilisez le
+digest correspondant (affiché par `docker pull` ou `crane digest`).
+
 ### Construire l'image en local
 
 Si vous ne souhaitez pas attendre la publication GitHub Actions, construisez et testez l'image avec Docker :
