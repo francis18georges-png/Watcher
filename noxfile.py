@@ -6,6 +6,7 @@ import os
 from pathlib import Path
 
 import nox
+from nox.command import CommandFailed
 
 PYTHON_VERSIONS = ["3.12"]
 SOURCE_DIRECTORIES = (
@@ -18,8 +19,10 @@ SOURCE_DIRECTORIES = (
 )
 SBOM_PATH = Path("dist/Watcher-sbom.json")
 SBOM_DIRECTORY = SBOM_PATH.parent
+DEFAULT_COMPARE_BRANCH = "origin/main"
+DIFF_COVER_FAIL_UNDER = 80
 
-nox.options.sessions = ("lint", "typecheck", "tests", "build", "security")
+nox.options.sessions = ("lint", "typecheck", "tests", "coverage", "build", "security")
 nox.options.reuse_existing_virtualenvs = True
 
 
@@ -115,7 +118,53 @@ def security(session: nox.Session) -> None:
 def tests(session: nox.Session) -> None:
     """Run the unit test suite."""
     install_project(session)
-    session.run("pytest", "-q")
+    session.run("pytest", "--cov=app", "--cov=config", "--cov-report=xml")
+
+
+@nox.session(python=PYTHON_VERSIONS)
+def coverage(session: nox.Session) -> None:
+    """Evaluate coverage on the diff against the target branch."""
+    install_project(session)
+
+    coverage_path = Path("coverage.xml")
+    if not coverage_path.exists():
+        session.error("coverage.xml not found. Run 'nox -s tests' first.")
+
+    compare_branch = os.environ.get("DIFF_COVER_COMPARE_BRANCH", DEFAULT_COMPARE_BRANCH)
+    fail_under = os.environ.get("DIFF_COVER_FAIL_UNDER", str(DIFF_COVER_FAIL_UNDER))
+
+    candidates = [compare_branch]
+    if compare_branch.startswith("origin/"):
+        candidates.append(compare_branch.split("/", 1)[1])
+
+    for candidate in candidates:
+        try:
+            session.run(
+                "git",
+                "rev-parse",
+                "--verify",
+                candidate,
+                external=True,
+                silent=True,
+            )
+        except CommandFailed:
+            continue
+        else:
+            compare_branch = candidate
+            break
+    else:
+        session.error(
+            "Unable to locate a branch to compare against for diff coverage. "
+            "Fetch the target branch or set DIFF_COVER_COMPARE_BRANCH."
+        )
+
+    session.run(
+        "diff-cover",
+        coverage_path.as_posix(),
+        f"--fail-under={fail_under}",
+        "--compare-branch",
+        compare_branch,
+    )
 
 
 @nox.session(python=PYTHON_VERSIONS)
