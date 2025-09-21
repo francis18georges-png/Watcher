@@ -8,7 +8,7 @@ référençant les pages GitHub Releases correspondantes.
 
 | Version | Date | Points clés | Lien GitHub Releases |
 | --- | --- | --- | --- |
-| *(à publier)* | — | Préparez la release initiale à partir de la section `Unreleased` du [CHANGELOG](CHANGELOG.md). | [Brouillons et releases](https://github.com/<github-username>/Watcher/releases) |
+| *(à publier)* | — | Préparez la release initiale à partir de la section `Unreleased` du [CHANGELOG](CHANGELOG.md). | [Brouillons et releases](https://github.com/WatcherOrg/Watcher/releases) |
 
 !!! info "Mettre à jour dès la première release"
     Remplacez la ligne ci-dessus par un bloc par version dès qu'un tag `vMAJOR.MINOR.PATCH`
@@ -21,7 +21,7 @@ référençant les pages GitHub Releases correspondantes.
     - 🛠️ Nouveaux connecteurs de données.
     - 📦 SBOM CycloneDX enrichi (classification des licences).
 
-    ➤ [Consulter la release GitHub](https://github.com/<github-username>/Watcher/releases/tag/v1.2.3)
+    ➤ [Consulter la release GitHub](https://github.com/WatcherOrg/Watcher/releases/tag/v1.2.3)
     ```
 
 ## Processus de publication

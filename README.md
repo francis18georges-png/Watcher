@@ -1,7 +1,7 @@
 # Watcher
 
 ![Benchmark status badge](metrics/performance_badge.svg)
-[![OpenSSF Scorecard](https://api.securityscorecards.dev/projects/github.com/<owner>/Watcher/badge)](https://securityscorecards.dev/viewer/?uri=github.com/<owner>/Watcher)
+[![OpenSSF Scorecard](https://api.securityscorecards.dev/projects/github.com/WatcherOrg/Watcher/badge)](https://securityscorecards.dev/viewer/?uri=github.com/WatcherOrg/Watcher)
 
 Atelier local d'IA de programmation autonome (offline par défaut).
 Mémoire vectorielle, curriculum adaptatif, A/B + bench et quality gate sécurité.
@@ -26,25 +26,44 @@ cffconvert --validate --format bibtex --outfile watcher.bib
 ## Documentation
 
 La documentation technique est générée avec [MkDocs Material](https://squidfunk.github.io/mkdocs-material/)
-et déployée automatiquement via GitHub Pages : https://<github-username>.github.io/Watcher/.
-Activez GitHub Pages dans les paramètres du dépôt (source : **GitHub Actions**) pour autoriser le workflow
-`deploy-docs.yml` à publier le site.
+et publiée via l'environnement **github-pages** du dépôt.
+Activez GitHub Pages dans les paramètres du dépôt (source : **GitHub Actions**) puis cliquez sur
+« View deployment » depuis l'onglet **Deployments → github-pages** pour accéder au site public généré
+par `deploy-docs.yml`. Une fois l'environnement publié, le site sera disponible sur
+`https://watcherorg.github.io/Watcher/` ou sur l'URL personnalisée définie dans `WATCHER_DOCS_URL`.
 
 Pour la prévisualiser localement :
 
 ```bash
-pip install -r requirements-dev.txt
+pip install -c constraints.txt -r requirements-dev.txt
 mkdocs serve
 ```
 
 Le workflow GitHub Actions [`deploy-docs.yml`](.github/workflows/deploy-docs.yml) construit le site avec `mkdocs build --strict`
 avant de le publier sur l'environnement **GitHub Pages** à chaque push sur `main`.
 
+## Dépendances Python verrouillées
+
+Watcher utilise [`constraints.txt`](constraints.txt) pour figer la résolution des dépendances Python utilisées en
+production (CLI, API et binaires PyInstaller). Tous les workflows GitHub Actions et les instructions de ce README appliquent
+automatiquement ce fichier lors de l'installation des requirements.
+
+Lorsque vous ajoutez ou mettez à jour une dépendance dans `requirements*.txt`, regénérez le fichier de contraintes avec
+`pip-compile` (nécessite un accès réseau) afin de capturer la fermeture transitive exacte :
+
+```bash
+pip install pip-tools
+pip-compile --resolver=backtracking --strip-extras \
+  --output-file constraints.txt requirements.txt requirements-dev.txt
+```
+
+Commitez ensuite `constraints.txt` avec votre changement pour conserver des builds déterministes hors-ligne.
+
 ## Sécurité et qualité automatisées
 
 Le badge OpenSSF Scorecard reflète en continu l'état de la posture de sécurité du dépôt
 (`.github/workflows/scorecard.yml`). Il est généré à partir de l'API publique
-<https://api.securityscorecards.dev/projects/github.com/<owner>/Watcher> et renvoie vers le
+<https://api.securityscorecards.dev/projects/github.com/WatcherOrg/Watcher> et renvoie vers le
 rapport détaillé sur <https://securityscorecards.dev>. Un run planifié hebdomadaire publie les
 résultats sur le tableau de bord OpenSSF, tandis que chaque Pull Request bénéficie d'une analyse
 à jour dans GitHub Actions.
@@ -59,16 +78,36 @@ pratiques identifiées par Scorecard ne sont pas rétablies.
 Chaque tag SemVer (`vMAJOR.MINOR.PATCH`) déclenche le workflow [`release.yml`](.github/workflows/release.yml) qui produit
 des exécutables Windows, Linux et macOS, un SBOM CycloneDX par plateforme et une attestation de provenance SLSA niveau 3.
 
+### Publier une release
+
+1. Mettez à jour `CHANGELOG.md` et les fichiers de configuration éventuels puis ouvrez une PR.
+2. Une fois la PR fusionnée sur `main`, créez le tag versionné (ex. `v0.4.0`) :
+
+   ```bash
+   git tag v0.4.0
+   git push origin v0.4.0
+   ```
+
+3. Le workflow `release.yml` s'exécute et publie automatiquement la page GitHub Releases correspondante avec les binaires,
+   SBOM et provenance SLSA.
+4. Vérifiez le résultat via l'onglet **Actions → Release** puis annoncez la disponibilité de la version.
+
+> 💡 Le premier run attendu est `v0.4.0`, annoncé dans la section « Version » en tête de ce README.
+
 ### Artefacts publiés
 
 - `Watcher-Setup.zip` : archive PyInstaller Windows signée et empaquetée.
 - `Watcher-Setup.zip.sigstore` : bundle Sigstore pour vérifier la signature du binaire Windows (`sigstore verify identity --bundle ...`).
-- `Watcher-sbom.json` : inventaire CycloneDX des dépendances installées pendant le build Windows (`cyclonedx-bom` / `cyclonedx-py`).
+- `Watcher-sbom.json` et `Watcher-sbom.json.sigstore` : inventaire CycloneDX des dépendances installées pendant le build Windows et son bundle de vérification.
 - `Watcher-linux-x86_64.tar.gz` : tarball PyInstaller contenant le binaire autonome Linux.
-- `Watcher-linux-sbom.json` : SBOM CycloneDX généré lors du build Linux.
+- `Watcher-linux-x86_64.tar.gz.sigstore` : signature Sigstore du tarball Linux.
+- `Watcher-linux-sbom.json` et `Watcher-linux-sbom.json.sigstore` : SBOM CycloneDX généré lors du build Linux et son bundle.
 - `Watcher-macos-x86_64.zip` : archive PyInstaller macOS signée (si certificat configuré) et soumise à la notarisation Apple lorsque les secrets sont fournis.
-- `Watcher-macos-sbom.json` : SBOM CycloneDX généré lors du build macOS.
+- `Watcher-macos-x86_64.zip.sigstore` : signature Sigstore de l'archive macOS.
+- `Watcher-macos-sbom.json` et `Watcher-macos-sbom.json.sigstore` : SBOM CycloneDX généré lors du build macOS et son bundle.
 - `Watcher-Setup.intoto.jsonl` : provenance SLSA générée par [`slsa-github-generator`](https://github.com/slsa-framework/slsa-github-generator).
+- `Watcher-Setup.intoto.jsonl.sigstore` : bundle Sigstore attestant de l'intégrité de la provenance SLSA.
+- `pip-audit-report.json` : rapport JSON de l'analyse `pip-audit` exécutée sur `requirements.txt` et `requirements-dev.txt`.
 
 Ces fichiers sont publiés en tant qu'artefacts de release. Téléchargez le SBOM correspondant pour auditer les composants de la
 plateforme visée et conservez la provenance `*.intoto.jsonl` pour tracer la chaîne de build ou alimenter un vérificateur SLSA.
@@ -88,13 +127,13 @@ plateforme visée et conservez la provenance `*.intoto.jsonl` pour tracer la cha
    ```powershell
    sigstore verify identity `
      --bundle Watcher-Setup.zip.sigstore `
-     --certificate-identity "https://github.com/<owner>/Watcher/.github/workflows/release.yml@refs/tags/<tag>" `
+     --certificate-identity "https://github.com/WatcherOrg/Watcher/.github/workflows/release.yml@refs/tags/<tag>" `
      --certificate-oidc-issuer https://token.actions.githubusercontent.com `
      Watcher-Setup.zip
    ```
 
-   Remplacez `<owner>` par l'organisation ou l'utilisateur GitHub hébergeant ce dépôt et `<tag>` par la version téléchargée.
-   La commande échoue si la signature ne provient pas du workflow officiel exécuté sur GitHub Actions.
+   Remplacez `<tag>` par la version téléchargée. La commande échoue si la signature ne provient pas
+   du workflow officiel exécuté sur GitHub Actions (`WatcherOrg/Watcher`).
 4. Extrayez l'archive (clic droit → *Extraire tout...* ou `Expand-Archive` sous PowerShell) puis lancez `Watcher.exe`.
    Conservez le dossier d'extraction tel quel : il contient la configuration (`config/`), les prompts LLM et les fichiers
    auxiliaires (`LICENSE`, `example.env`) nécessaires à l'exécutable.
@@ -227,7 +266,7 @@ et mettez à jour la configuration d'authentification associée.
 3. Installer les dépendances :
 
    ```bash
-   pip install -r requirements.txt
+   pip install -c constraints.txt -r requirements.txt
    ```
 
    Pour activer les quotas d'exécution sur Windows, installez
@@ -240,7 +279,7 @@ et mettez à jour la configuration d'authentification associée.
 4. Installer les outils de développement :
 
     ```bash
-    pip install -r requirements-dev.txt
+    pip install -c constraints.txt -r requirements-dev.txt
     ```
 
     Ce fichier fixe des versions précises afin d'assurer une installation reproductible.
@@ -252,7 +291,7 @@ Les fichiers d'environnement (`*.env`), les journaux (`*.log`) et les environnem
 ## Exécution via Docker
 
 Une image container officielle est construite par le workflow [`docker.yml`](.github/workflows/docker.yml)
-et publiée sur le registre GitHub Container Registry sous `ghcr.io/<owner>/watcher`.
+et publiée sur le registre GitHub Container Registry sous `ghcr.io/watcherorg/watcher`.
 
 ### Utiliser l'image publiée
 
@@ -269,7 +308,7 @@ docker run --rm -it \
   -v watcher-data:/app/data \
   -v watcher-memory:/app/memory \
   -v watcher-logs:/app/logs \
-  ghcr.io/<owner>/watcher:latest --help
+  ghcr.io/watcherorg/watcher:latest --help
 ```
 
 Copiez le dossier `config/` du dépôt si vous souhaitez le personnaliser avant de le monter en lecture
@@ -279,47 +318,37 @@ Copiez le dossier `config/` du dépôt si vous souhaitez le personnaliser avant 
 Pour exécuter une commande CLI, passez-la directement après l'image :
 
 ```bash
-docker run --rm -it ghcr.io/<owner>/watcher:latest plugin list
+docker run --rm -it ghcr.io/watcherorg/watcher:latest plugin list
 ```
 
-### Vérifier les bundles Sigstore
+### Vérifier les artefacts de signature et lister le SBOM
 
 Le workflow [`docker.yml`](.github/workflows/docker.yml) publie, en plus de l'image container,
-deux bundles Sigstore disponibles dans les artefacts du job « Sign published images » ainsi que
-dans les releases GitHub :
+les artefacts suivants pour chaque exécution :
 
-- `ghcr.io__<owner>__watcher__<tag>.sigstore` : signature de l'image `ghcr.io/<owner>/watcher:<tag>`.
-- `ghcr.io__<owner>__watcher__<tag>.attestation.sigstore` : attestation SLSA pour la même image.
+- `cosign-bundles/ghcr.io__watcherorg__watcher__<tag>.sigstore` : bundle Sigstore de la signature
+  keyless pour la référence `ghcr.io/watcherorg/watcher:<tag>`.
+- `watcher-image-sbom.cdx.json` : SBOM CycloneDX généré avec `syft`, téléchargeable depuis
+  l'artefact `watcher-image-sbom` ou joint à la release correspondante.
 
 Les caractères `/` et `:` du nom d'image sont remplacés par `__` pour garantir des noms de fichiers
-compatibles avec GitHub Actions. Téléchargez l'image et ses bundles correspondant au tag SemVer
-souhaité (`vMAJOR.MINOR.PATCH`), puis vérifiez la signature hors-ligne avec `cosign` :
+compatibles avec GitHub Actions. Téléchargez l'image, le bundle Sigstore et le SBOM correspondant
+au tag SemVer souhaité (`vMAJOR.MINOR.PATCH`), puis vérifiez la signature hors-ligne avec `cosign` :
 
 ```bash
 cosign verify \
-  --bundle ghcr.io__<owner>__watcher__<tag>.sigstore \
-  --certificate-identity "https://github.com/<owner>/Watcher/.github/workflows/docker.yml@refs/tags/<tag>" \
+  --bundle ghcr.io__watcherorg__watcher__<tag>.sigstore \
+  --certificate-identity "https://github.com/WatcherOrg/Watcher/.github/workflows/docker.yml@refs/tags/<tag>" \
   --certificate-oidc-issuer https://token.actions.githubusercontent.com \
-  ghcr.io/<owner>/watcher@sha256:<digest>
+  ghcr.io/watcherorg/watcher@sha256:<digest>
 ```
 
 Remplacez `<tag>` par la version téléchargée (par exemple `v0.4.0`) et `<digest>` par l'empreinte
 SHA256 de l'image. Vous pouvez récupérer ce digest via `docker buildx imagetools inspect`
-(`docker buildx imagetools inspect ghcr.io/<owner>/watcher:<tag> --format '{{.Digest}}'`).
-
-L'attestation SLSA peut être vérifiée sur la même image en pointant vers le bundle dédié :
-
-```bash
-cosign verify-attestation \
-  --bundle ghcr.io__<owner>__watcher__<tag>.attestation.sigstore \
-  --certificate-identity "https://github.com/<owner>/Watcher/.github/workflows/docker.yml@refs/tags/<tag>" \
-  --certificate-oidc-issuer https://token.actions.githubusercontent.com \
-  --type slsaprovenance \
-  ghcr.io/<owner>/watcher@sha256:<digest>
-```
+(`docker buildx imagetools inspect ghcr.io/watcherorg/watcher:<tag> --format '{{.Digest}}'`).
 
 Pour les images construites depuis `main`, remplacez l'identité du certificat par
-`https://github.com/<owner>/Watcher/.github/workflows/docker.yml@refs/heads/main` et utilisez le
+`https://github.com/WatcherOrg/Watcher/.github/workflows/docker.yml@refs/heads/main` et utilisez le
 digest correspondant (affiché par `docker pull` ou `crane digest`).
 
 ### Construire l'image en local

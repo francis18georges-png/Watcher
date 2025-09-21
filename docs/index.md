@@ -37,8 +37,9 @@ mode d'exploitation de la plate-forme.
 ## Accès à la documentation publiée
 
 Lorsque le workflow GitHub Actions **Deploy MkDocs site** est exécuté sur la branche `main`, la version statique la plus
-récente est disponible à l'adresse : `https://<github-username>.github.io/Watcher/` (remplacez `<github-username>` par
-votre compte ou organisation GitHub).
+récente est accessible via l'environnement **github-pages** du dépôt. Ouvrez l'onglet **Deployments → github-pages** puis
+cliquez sur « View deployment » pour consulter le site public. Une fois GitHub Pages activé, la documentation est également
+disponible sur `https://watcherorg.github.io/Watcher/` ou sur le domaine personnalisé défini dans `WATCHER_DOCS_URL`.
 
 !!! info "URL personnalisée"
     Si un domaine personnalisé est configuré, mettez à jour le champ `site_url` dans `mkdocs.yml` et ajoutez un fichier
@@ -47,7 +48,7 @@ votre compte ou organisation GitHub).
 ## Prévisualiser la documentation localement
 
 ```bash
-pip install -r requirements-dev.txt
+pip install -c constraints.txt -r requirements-dev.txt
 mkdocs serve
 ```
 
