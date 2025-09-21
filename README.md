@@ -26,9 +26,10 @@ cffconvert --validate --format bibtex --outfile watcher.bib
 ## Documentation
 
 La documentation technique est générée avec [MkDocs Material](https://squidfunk.github.io/mkdocs-material/)
-et déployée automatiquement via GitHub Pages : https://<github-username>.github.io/Watcher/.
-Activez GitHub Pages dans les paramètres du dépôt (source : **GitHub Actions**) pour autoriser le workflow
-`deploy-docs.yml` à publier le site.
+et publiée via l'environnement **github-pages** du dépôt.
+Activez GitHub Pages dans les paramètres du dépôt (source : **GitHub Actions**) puis cliquez sur
+« View deployment » depuis l'onglet **Deployments → github-pages** pour accéder au site public généré
+par `deploy-docs.yml`.
 
 Pour la prévisualiser localement :
 
@@ -69,6 +70,7 @@ des exécutables Windows, Linux et macOS, un SBOM CycloneDX par plateforme et un
 - `Watcher-macos-x86_64.zip` : archive PyInstaller macOS signée (si certificat configuré) et soumise à la notarisation Apple lorsque les secrets sont fournis.
 - `Watcher-macos-sbom.json` : SBOM CycloneDX généré lors du build macOS.
 - `Watcher-Setup.intoto.jsonl` : provenance SLSA générée par [`slsa-github-generator`](https://github.com/slsa-framework/slsa-github-generator).
+- `pip-audit-report.json` : rapport JSON de l'analyse `pip-audit` exécutée sur `requirements.txt` et `requirements-dev.txt`.
 
 Ces fichiers sont publiés en tant qu'artefacts de release. Téléchargez le SBOM correspondant pour auditer les composants de la
 plateforme visée et conservez la provenance `*.intoto.jsonl` pour tracer la chaîne de build ou alimenter un vérificateur SLSA.
@@ -282,18 +284,19 @@ Pour exécuter une commande CLI, passez-la directement après l'image :
 docker run --rm -it ghcr.io/<owner>/watcher:latest plugin list
 ```
 
-### Vérifier les bundles Sigstore
+### Vérifier les artefacts de signature et lister le SBOM
 
 Le workflow [`docker.yml`](.github/workflows/docker.yml) publie, en plus de l'image container,
-deux bundles Sigstore disponibles dans les artefacts du job « Sign published images » ainsi que
-dans les releases GitHub :
+les artefacts suivants pour chaque exécution :
 
-- `ghcr.io__<owner>__watcher__<tag>.sigstore` : signature de l'image `ghcr.io/<owner>/watcher:<tag>`.
-- `ghcr.io__<owner>__watcher__<tag>.attestation.sigstore` : attestation SLSA pour la même image.
+- `cosign-bundles/ghcr.io__<owner>__watcher__<tag>.sigstore` : bundle Sigstore de la signature
+  keyless pour la référence `ghcr.io/<owner>/watcher:<tag>`.
+- `watcher-image-sbom.cdx.json` : SBOM CycloneDX généré avec `syft`, téléchargeable depuis
+  l'artefact `watcher-image-sbom` ou joint à la release correspondante.
 
 Les caractères `/` et `:` du nom d'image sont remplacés par `__` pour garantir des noms de fichiers
-compatibles avec GitHub Actions. Téléchargez l'image et ses bundles correspondant au tag SemVer
-souhaité (`vMAJOR.MINOR.PATCH`), puis vérifiez la signature hors-ligne avec `cosign` :
+compatibles avec GitHub Actions. Téléchargez l'image, le bundle Sigstore et le SBOM correspondant
+au tag SemVer souhaité (`vMAJOR.MINOR.PATCH`), puis vérifiez la signature hors-ligne avec `cosign` :
 
 ```bash
 cosign verify \
@@ -306,17 +309,6 @@ cosign verify \
 Remplacez `<tag>` par la version téléchargée (par exemple `v0.4.0`) et `<digest>` par l'empreinte
 SHA256 de l'image. Vous pouvez récupérer ce digest via `docker buildx imagetools inspect`
 (`docker buildx imagetools inspect ghcr.io/<owner>/watcher:<tag> --format '{{.Digest}}'`).
-
-L'attestation SLSA peut être vérifiée sur la même image en pointant vers le bundle dédié :
-
-```bash
-cosign verify-attestation \
-  --bundle ghcr.io__<owner>__watcher__<tag>.attestation.sigstore \
-  --certificate-identity "https://github.com/<owner>/Watcher/.github/workflows/docker.yml@refs/tags/<tag>" \
-  --certificate-oidc-issuer https://token.actions.githubusercontent.com \
-  --type slsaprovenance \
-  ghcr.io/<owner>/watcher@sha256:<digest>
-```
 
 Pour les images construites depuis `main`, remplacez l'identité du certificat par
 `https://github.com/<owner>/Watcher/.github/workflows/docker.yml@refs/heads/main` et utilisez le
