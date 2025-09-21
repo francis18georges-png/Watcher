@@ -42,6 +42,8 @@
   without the Ollama models.
 * Immediately afterwards the workflow launches `./run.ps1` with an empty `DISPLAY` variable to emulate
   headless mode. Any startup failure or premature exit fails the build.
+* Forked pull requests skip the DVC artifact pull and verification steps because the AWS credentials are not
+  exposed to external runners. Maintainer branches still fail when artifacts are missing or corrupt.
 
 ## Static Analysis
 

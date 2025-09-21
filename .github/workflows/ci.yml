@@ -85,6 +85,8 @@ jobs:
       - scorecard
       - determine-python
     runs-on: ${{ matrix.os }}
+    env:
+      DVC_CREDENTIALS_AVAILABLE: ${{ secrets.AWS_ACCESS_KEY_ID != '' }}
     strategy:
       fail-fast: false
       matrix:
@@ -134,8 +136,18 @@ jobs:
         run: python scripts/install_cli_tools.py --install-dir ./.tools --add-to-path
 
       - name: Pull data artifacts
+        if: env.DVC_CREDENTIALS_AVAILABLE == 'true'
         run: dvc pull
         continue-on-error: true
+
+      - name: Verify data artifacts
+        if: env.DVC_CREDENTIALS_AVAILABLE == 'true'
+        run: dvc status
+
+      - name: Skip DVC artifact checks
+        if: env.DVC_CREDENTIALS_AVAILABLE != 'true'
+        run: >-
+          echo "::warning::Skipping DVC artifact pull and verification because AWS credentials are unavailable for forked pull requests."
 
       - name: Validate Windows installer
         if: runner.os == 'Windows'
