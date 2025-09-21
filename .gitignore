@@ -7,6 +7,7 @@ __pycache__/
 # Virtual environments
 .venv/
 .tools/
+.pyinstaller/
 
 # Environment variables
 *.env
