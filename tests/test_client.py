@@ -1,7 +1,8 @@
+import http.client
 from types import SimpleNamespace
 
 from app.core.engine import Engine
-from app.llm.client import Client
+from app.llm.client import Client, generate_ollama
 
 
 def test_client_fallback_echo() -> None:
@@ -64,3 +65,46 @@ def test_engine_set_offline_toggles_client(monkeypatch) -> None:
     assert "ollama:0" in online_trace.split(" -> ")
     assert online_trace.split(" -> ")[-1] == "success"
     assert calls == [online_prompt]
+
+
+def test_generate_ollama_https_uses_https_connection(monkeypatch) -> None:
+    def raising_http_connection(*args, **kwargs):
+        raise AssertionError("HTTPConnection should not be used for HTTPS hosts")
+
+    monkeypatch.setattr(http.client, "HTTPConnection", raising_http_connection)
+
+    class DummyResponse:
+        status = 200
+
+        def read(self) -> str:
+            return "{\"response\": \"ok\"}"
+
+    calls: dict[str, object] = {}
+
+    class DummyConnection:
+        def __init__(self, host: str, port: int, timeout: int) -> None:
+            calls["host"] = host
+            calls["port"] = port
+            calls["timeout"] = timeout
+
+        def request(self, method: str, path: str, *, body: str, headers: dict[str, str]) -> None:
+            calls["request"] = (method, path, body, headers)
+
+        def getresponse(self) -> DummyResponse:
+            calls["getresponse"] = True
+            return DummyResponse()
+
+        def close(self) -> None:
+            calls["closed"] = True
+
+    monkeypatch.setattr(
+        http.client, "HTTPSConnection", lambda *args, **kwargs: DummyConnection(*args, **kwargs)
+    )
+
+    result = generate_ollama("bonjour", host="https://example.com", model="mistral")
+
+    assert result == "ok"
+    assert calls["host"] == "example.com"
+    assert calls["port"] == 443
+    assert calls["timeout"] == 30
+    assert calls["closed"] is True
