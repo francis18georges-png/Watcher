@@ -3,12 +3,35 @@
 from __future__ import annotations
 
 import os
+import re
+from collections.abc import Iterable
 from pathlib import Path
 
 import nox
 from nox.command import CommandFailed
 
-PYTHON_VERSIONS = ["3.12"]
+DEFAULT_PYTHON_VERSIONS = ("3.12",)
+
+
+def _parse_python_versions(
+    value: str | None, default: Iterable[str] = DEFAULT_PYTHON_VERSIONS
+) -> list[str]:
+    """Return a list of Python versions from a comma/space separated string."""
+
+    if value is None:
+        return list(default)
+
+    parts = [fragment.strip() for fragment in re.split(r"[,\s]+", value) if fragment.strip()]
+    return parts or list(default)
+
+
+def get_python_versions() -> list[str]:
+    """Resolve the Python versions to use for Nox sessions."""
+
+    return _parse_python_versions(os.environ.get("WATCHER_NOX_PYTHON"))
+
+
+PYTHON_VERSIONS = get_python_versions()
 SOURCE_DIRECTORIES = (
     "app",
     "config",

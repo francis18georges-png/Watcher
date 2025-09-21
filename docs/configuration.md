@@ -13,3 +13,7 @@ Le tableau ci-dessous récapitule les principaux interrupteurs liés aux profils
 | Blocage réseau sandbox | `WATCHER_BLOCK_NETWORK` | `"0"` (désactivé), `"1"` (activé) | Injecté par `app.core.sandbox.run` et le lanceur de plugins. Seule la valeur `"1"` active le blocage réseau ; toute autre valeur laisse l'accès réseau autorisé. | `"0"` |
 
 Les profils permettent d'adapter rapidement les limites ou le niveau de verbosité selon l'environnement d'exécution. Les commutateurs d'instrumentation garantissent quant à eux un cadre d'observabilité cohérent (traçabilité, réseau) quelle que soit la manière de lancer Watcher (processus principal, sandbox ou plugin).
+
+## Qualité et automatisation
+
+Les sessions Nox et la matrice Python du pipeline CI respectent la variable d'environnement `WATCHER_NOX_PYTHON`. Elle accepte une liste de versions séparées par des virgules et/ou des espaces (par exemple `"3.10, 3.11 3.12"`). Lorsque la variable est absente ou ne contient aucune version, la valeur par défaut reste `3.12`.
