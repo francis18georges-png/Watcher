@@ -45,6 +45,23 @@ def test_embed_ollama_host_argument(monkeypatch):
     assert called == {"host": "example.com", "port": 1234}
 
 
+def test_embed_ollama_https_host(monkeypatch):
+    called = {}
+
+    def bad_http_conn(*args, **kwargs):
+        raise AssertionError("HTTPConnection should not be used for HTTPS hosts")
+
+    def bad_https_conn(host, port, *args, **kwargs):
+        called["host"] = host
+        called["port"] = port
+        raise OSError("fail")
+
+    monkeypatch.setattr("http.client.HTTPConnection", bad_http_conn)
+    monkeypatch.setattr("http.client.HTTPSConnection", bad_https_conn)
+    embed_ollama(["hi"], host="https://secure.example.com")
+    assert called == {"host": "secure.example.com", "port": 443}
+
+
 def test_embed_ollama_host_from_config(monkeypatch):
     called = {}
 
