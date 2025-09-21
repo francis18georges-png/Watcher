@@ -1,5 +1,10 @@
 import logging
-import tomllib
+
+try:
+    import tomllib
+except ModuleNotFoundError:  # Python <3.11
+    import tomli as tomllib  # type: ignore[import-not-found]
+
 import pytest
 
 from config import _read_toml

@@ -7,7 +7,13 @@ from pathlib import Path
 
 import nox
 
-PYTHON_VERSIONS = ["3.12"]
+DEFAULT_PYTHON_VERSION = "3.12"
+PYTHON_VERSIONS = tuple(
+    version.strip()
+    for version in os.environ.get("WATCHER_NOX_PYTHON", DEFAULT_PYTHON_VERSION).split(","
+    )
+    if version.strip()
+)
 SOURCE_DIRECTORIES = (
     "app",
     "config",

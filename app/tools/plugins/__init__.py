@@ -14,7 +14,10 @@ from importlib.util import find_spec
 from pathlib import Path
 from typing import Iterable, Protocol
 
-import tomllib
+try:
+    import tomllib
+except ModuleNotFoundError:  # Python <3.11
+    import tomli as tomllib  # type: ignore[import-not-found]
 
 #: Manifest bundled with the :mod:`app` package.
 DEFAULT_MANIFEST: Traversable = resources.files("app") / "plugins.toml"

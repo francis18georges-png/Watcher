@@ -85,6 +85,8 @@ nav:
       - Feuille de route: ROADMAP.md
       - Journal des modifications: CHANGELOG.md
       - Politique de fusion: merge-policy.md
+  - Observabilité:
+      - Configuration: configuration.md
 
 extra_javascript:
   - https://unpkg.com/mermaid@10.9.1/dist/mermaid.min.js

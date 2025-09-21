@@ -11,6 +11,19 @@ Mémoire vectorielle, curriculum adaptatif, A/B + bench et quality gate sécurit
 La dernière version stable est **v0.4.0** (tag `v0.4.0`, publiée le 20 septembre 2025). Consultez le
 [CHANGELOG](CHANGELOG.md) pour le détail des nouveautés et correctifs.
 
+## Compatibilité
+
+| Plateforme | Architectures | Python 3.9 | Python 3.10 | Python 3.11 | Python 3.12 |
+| --- | --- | --- | --- | --- | --- |
+| Linux (Ubuntu) | x86_64 | ✅ (CI) | ✅ (CI) | ✅ (CI) | ✅ (CI) |
+| macOS | x86_64, arm64 | ✅ | ✅ | ✅ | ✅ |
+| Windows | x86_64 | ✅ | ✅ | ✅ | ✅ |
+
+La CI (`ci.yml`) exécute la matrice de versions ci-dessus sur Linux, macOS et
+Windows. Les accélérations GPU restent optionnelles et dépendent des
+distributions de PyTorch/`sentence-transformers`; Watcher fonctionne intégralement
+sur CPU.
+
 ## Documentation
 
 La documentation technique est générée avec [MkDocs Material](https://squidfunk.github.io/mkdocs-material/)
