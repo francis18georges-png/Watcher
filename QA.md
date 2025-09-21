@@ -42,6 +42,10 @@
   without the Ollama models.
 * Immediately afterwards the workflow launches `./run.ps1` with an empty `DISPLAY` variable to emulate
   headless mode. Any startup failure or premature exit fails the build.
+* Les étapes `dvc pull` puis `dvc status --cloud` bloquent désormais la CI si les données versionnées sont absentes
+  ou corrompues. En cas d'échec, exécutez `dvc repro` localement pour régénérer les artefacts (ou les scripts
+  listés dans `dvc.yaml`), validez les fichiers produits puis publiez-les avec `dvc push` afin de remettre le
+  remote S3 en cohérence.
 
 ## Static Analysis
 
