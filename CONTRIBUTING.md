@@ -11,11 +11,21 @@ inapproprié aux mainteneurs.
 ## Préparer son environnement
 
 - **Python 3.12** : créez un environnement virtuel dédié (`python -m venv .venv`).
-- **Dépendances projet** : installez les requirements de base et de développement :
+- **Dépendances projet** : installez les requirements de base et de développement en appliquant le verrouillage commun :
   ```bash
-  pip install -r requirements.txt
-  pip install -r requirements-dev.txt
+  pip install -c constraints.txt -r requirements.txt
+  pip install -c constraints.txt -r requirements-dev.txt
   ```
+- **Verrouillage** : le fichier [`constraints.txt`](constraints.txt) fixe les résolutions Python utilisées en production.
+  En cas d'ajout ou de mise à jour de dépendances, regénérez-le à l'aide de
+  [`pip-compile`](https://pip-tools.readthedocs.io/en/latest/) depuis un environnement
+  connecté à Internet :
+  ```bash
+  pip install pip-tools
+  pip-compile --resolver=backtracking --strip-extras \
+    --output-file constraints.txt requirements.txt requirements-dev.txt
+  ```
+  Veillez à commiter le fichier mis à jour avec vos modifications.
 - **Nox** : l'ensemble des linters, tests, vérifications de sécurité et build passe par [Nox](https://nox.thea.codes/). Installez-le
   globalement ou dans votre venv (`pip install nox`). Les commandes utilisées par la CI sont :
   ```bash

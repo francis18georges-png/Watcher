@@ -26,13 +26,20 @@ nox.options.sessions = ("lint", "typecheck", "tests", "coverage", "build", "secu
 nox.options.reuse_existing_virtualenvs = True
 
 
+def install_with_constraints(session: nox.Session, *args: str) -> None:
+    """Install packages while honoring the shared constraints file."""
+
+    session.install("-c", "constraints.txt", *args)
+
+
 def install_project(session: nox.Session, *extra: str) -> None:
     """Install runtime and development dependencies."""
+
     session.install("--upgrade", "pip")
-    session.install("-r", "requirements.txt")
-    session.install("-r", "requirements-dev.txt")
+    install_with_constraints(session, "-r", "requirements.txt")
+    install_with_constraints(session, "-r", "requirements-dev.txt")
     if extra:
-        session.install(*extra)
+        install_with_constraints(session, *extra)
 
 
 @nox.session(python=PYTHON_VERSIONS)
@@ -170,5 +177,5 @@ def coverage(session: nox.Session) -> None:
 @nox.session(python=PYTHON_VERSIONS)
 def build(session: nox.Session) -> None:
     """Build the project wheel and source distribution."""
-    install_project(session, "build")
+    install_project(session)
     session.run("python", "-m", "build")

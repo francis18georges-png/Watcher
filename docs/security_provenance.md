@@ -31,11 +31,19 @@ Watcher-Setup.intoto.jsonl
 Watcher-Setup.intoto.jsonl.sigstore
 Watcher-sbom.json
 Watcher-sbom.json.sigstore
+Watcher-linux-x86_64.tar.gz
+Watcher-linux-x86_64.tar.gz.sigstore
+Watcher-linux-sbom.json
+Watcher-linux-sbom.json.sigstore
+Watcher-macos-x86_64.zip
+Watcher-macos-x86_64.zip.sigstore
+Watcher-macos-sbom.json
+Watcher-macos-sbom.json.sigstore
 ```
 
 !!! tip "Utiliser les SHA256 publiés"
-    Chaque release expose également les empreintes `sha256sum` en tant qu'artefacts.
-    Téléchargez-les pour automatiser l'intégrité des fichiers transférés vers un réseau déconnecté.
+    Le fichier `Watcher-sha256.txt` regroupe l'empreinte `sha256sum` de chaque artefact de la release.
+    Téléchargez-le pour automatiser l'intégrité des fichiers transférés vers un réseau déconnecté.
 
 ## Vérifier la signature Sigstore (`sigstore verify`)
 
@@ -48,19 +56,18 @@ Watcher-sbom.json.sigstore
 2. Vérifiez la signature du bundle Sigstore et la provenance GitHub Actions :
 
    ```bash
-   sigstore verify identity \
-     --bundle Watcher-Setup.zip.sigstore \
-     --certificate-identity "https://github.com/<owner>/Watcher/.github/workflows/release.yml@refs/tags/<tag>" \
-     --certificate-oidc-issuer https://token.actions.githubusercontent.com \
-     Watcher-Setup.zip
+    sigstore verify identity \
+      --bundle Watcher-Setup.zip.sigstore \
+      --certificate-identity "https://github.com/WatcherOrg/Watcher/.github/workflows/release.yml@refs/tags/<tag>" \
+      --certificate-oidc-issuer https://token.actions.githubusercontent.com \
+      Watcher-Setup.zip
    ```
 
-   - Remplacez `<owner>` par l'organisation ou l'utilisateur GitHub hébergeant Watcher.
-   - Substituez `<tag>` par la version téléchargée (`vMAJOR.MINOR.PATCH`).
-   - La commande échoue si le bundle ne provient pas du workflow officiel `release.yml`.
+    - Remplacez `<tag>` par la version correspondante (par exemple `v0.4.0`).
+    - La commande échoue si le bundle ne provient pas du workflow officiel `release.yml`.
 
-3. Répétez la vérification pour les archives Linux et macOS (`Watcher-linux-x86_64.tar.gz`,
-   `Watcher-macos-x86_64.zip`) en adaptant le nom du fichier et du bundle.
+3. Répétez la vérification pour les archives Linux et macOS (`Watcher-linux-x86_64.tar.gz`
+   et `Watcher-macos-x86_64.zip`) en adaptant le nom du fichier et du bundle (`*.sigstore`).
 
 !!! success "Automatiser la validation"
     Intégrez ces commandes dans un script CI interne pour refuser tout artefact dont la
@@ -71,12 +78,12 @@ Watcher-sbom.json.sigstore
 1. Exécutez la vérification cryptographique du fichier de provenance :
 
    ```bash
-   cosign verify-attestation \
-     --type slsaprovenance \
-     --certificate-identity "https://github.com/<owner>/Watcher/.github/workflows/release.yml@refs/tags/<tag>" \
-     --certificate-oidc-issuer https://token.actions.githubusercontent.com \
-     --bundle Watcher-Setup.intoto.jsonl.sigstore \
-     Watcher-Setup.intoto.jsonl | jq '.'
+    cosign verify-attestation \
+      --type slsaprovenance \
+      --certificate-identity "https://github.com/WatcherOrg/Watcher/.github/workflows/release.yml@refs/tags/<tag>" \
+      --certificate-oidc-issuer https://token.actions.githubusercontent.com \
+      --bundle Watcher-Setup.intoto.jsonl.sigstore \
+      Watcher-Setup.intoto.jsonl | jq '.'
    ```
 
 2. Contrôlez la section `subject` du JSON retourné : le digest SHA256 doit correspondre au
@@ -96,23 +103,23 @@ recommandées :
 1. Vérifiez la signature du SBOM à l'aide de son bundle Sigstore :
 
    ```bash
-   sigstore verify identity \
-     --bundle Watcher-sbom.json.sigstore \
-     --certificate-identity "https://github.com/<owner>/Watcher/.github/workflows/release.yml@refs/tags/<tag>" \
-     --certificate-oidc-issuer https://token.actions.githubusercontent.com \
-     Watcher-sbom.json
+    sigstore verify identity \
+      --bundle Watcher-sbom.json.sigstore \
+      --certificate-identity "https://github.com/WatcherOrg/Watcher/.github/workflows/release.yml@refs/tags/<tag>" \
+      --certificate-oidc-issuer https://token.actions.githubusercontent.com \
+      Watcher-sbom.json
    ```
 
 2. Validez le lien entre le SBOM et l'artefact grâce à `cosign verify-attestation` avec le type
    `cyclonedx` :
 
    ```bash
-   cosign verify-attestation \
-     --type cyclonedx \
-     --certificate-identity "https://github.com/<owner>/Watcher/.github/workflows/release.yml@refs/tags/<tag>" \
-     --certificate-oidc-issuer https://token.actions.githubusercontent.com \
-     --bundle Watcher-sbom.json.sigstore \
-     Watcher-sbom.json | jq '.predicate' | less
+    cosign verify-attestation \
+      --type cyclonedx \
+      --certificate-identity "https://github.com/WatcherOrg/Watcher/.github/workflows/release.yml@refs/tags/<tag>" \
+      --certificate-oidc-issuer https://token.actions.githubusercontent.com \
+      --bundle Watcher-sbom.json.sigstore \
+      Watcher-sbom.json | jq '.predicate' | less
    ```
 
    Le champ `predicate.metadata.component.externalRefs` doit pointer vers l'artefact (binaire,

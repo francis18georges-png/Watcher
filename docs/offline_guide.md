@@ -12,7 +12,7 @@ contrôles d'intégrité.
    ```bash
    mkdir -p ~/watcher-offline-kit/artifacts
    cd ~/watcher-offline-kit/artifacts
-   gh release download <tag> --repo <owner>/Watcher
+   gh release download <tag> --repo WatcherOrg/Watcher
    ```
 
    Ce répertoire doit contenir au minimum :
@@ -20,7 +20,7 @@ contrôles d'intégrité.
    - `Watcher-Setup.zip`, `Watcher-linux-x86_64.tar.gz`, `Watcher-macos-x86_64.zip`.
    - Les SBOM (`Watcher-*.json`).
    - L'attestation SLSA (`Watcher-Setup.intoto.jsonl`).
-   - Les bundles Sigstore (`*.sigstore`) et les `sha256sum`.
+   - Les bundles Sigstore (`*.sigstore`) et le manifeste `Watcher-sha256.txt`.
 
    Le CLI `gh` facilite le téléchargement groupé ; à défaut, récupérez les mêmes fichiers via
    l'interface web ou `curl -L -O`.
@@ -68,40 +68,40 @@ tar -xzf /mnt/usb/watcher-offline-kit.tgz
 1. **Empreintes SHA256** :
 
    ```bash
-   sha256sum --check sha256sums.txt
+   sha256sum --check Watcher-sha256.txt
    ```
 
 2. **Signatures Sigstore** (fonctionnent hors-ligne grâce aux bundles) :
 
-   ```bash
-   sigstore verify identity \
-     --bundle artifacts/Watcher-Setup.zip.sigstore \
-     --certificate-identity "https://github.com/<owner>/Watcher/.github/workflows/release.yml@refs/tags/<tag>" \
-     --certificate-oidc-issuer https://token.actions.githubusercontent.com \
-     artifacts/Watcher-Setup.zip
-   ```
+    ```bash
+    sigstore verify identity \
+      --bundle artifacts/Watcher-Setup.zip.sigstore \
+      --certificate-identity "https://github.com/WatcherOrg/Watcher/.github/workflows/release.yml@refs/tags/<tag>" \
+      --certificate-oidc-issuer https://token.actions.githubusercontent.com \
+      artifacts/Watcher-Setup.zip
+    ```
 
 3. **Attestation SLSA** :
 
-   ```bash
-   cosign verify-attestation \
-     --type slsaprovenance \
-     --bundle artifacts/Watcher-Setup.intoto.jsonl.sigstore \
-     --certificate-identity "https://github.com/<owner>/Watcher/.github/workflows/release.yml@refs/tags/<tag>" \
-     --certificate-oidc-issuer https://token.actions.githubusercontent.com \
-     artifacts/Watcher-Setup.intoto.jsonl | jq '.subject'
-   ```
+    ```bash
+    cosign verify-attestation \
+      --type slsaprovenance \
+      --bundle artifacts/Watcher-Setup.intoto.jsonl.sigstore \
+      --certificate-identity "https://github.com/WatcherOrg/Watcher/.github/workflows/release.yml@refs/tags/<tag>" \
+      --certificate-oidc-issuer https://token.actions.githubusercontent.com \
+      artifacts/Watcher-Setup.intoto.jsonl | jq '.subject'
+    ```
 
 4. **SBOM CycloneDX** :
 
-   ```bash
-   cosign verify-attestation \
-     --type cyclonedx \
-     --bundle artifacts/Watcher-sbom.json.sigstore \
-     --certificate-identity "https://github.com/<owner>/Watcher/.github/workflows/release.yml@refs/tags/<tag>" \
-     --certificate-oidc-issuer https://token.actions.githubusercontent.com \
-     artifacts/Watcher-sbom.json | jq '.predicate.metadata'
-   ```
+    ```bash
+    cosign verify-attestation \
+      --type cyclonedx \
+      --bundle artifacts/Watcher-sbom.json.sigstore \
+      --certificate-identity "https://github.com/WatcherOrg/Watcher/.github/workflows/release.yml@refs/tags/<tag>" \
+      --certificate-oidc-issuer https://token.actions.githubusercontent.com \
+      artifacts/Watcher-sbom.json | jq '.predicate.metadata'
+    ```
 
 Conservez les journaux de ces commandes comme preuves d'intégrité et stockez-les avec les
 artefacts validés.
@@ -113,7 +113,8 @@ artefacts validés.
    ```bash
    python3 -m venv watcher-venv
    source watcher-venv/bin/activate
-   pip install --no-index --find-links ./pypi-mirror -r requirements.txt
+   pip install --no-index --find-links ./pypi-mirror \
+     -r requirements.txt -c constraints.txt
    ```
 
 2. **Déployer le binaire** correspondant à votre plateforme :
