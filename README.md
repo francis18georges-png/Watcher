@@ -8,9 +8,12 @@ Mémoire vectorielle, curriculum adaptatif, A/B + bench et quality gate sécurit
 
 ## Version
 
-La dernière version stable est **v0.4.0** (tag `v0.4.0`, publiée le 20 septembre 2025). Téléchargez-la
-depuis [GitHub Releases](https://github.com/<owner>/Watcher/releases/tag/v0.4.0) et consultez le
-[CHANGELOG](CHANGELOG.md) pour le détail des nouveautés et correctifs.
+La dernière version stable est **v0.4.0** (tag `v0.4.0`, publiée le 20 septembre 2025).
+
+- 📦 Téléchargement direct : [https://github.com/<owner>/Watcher/releases/tag/v0.4.0](https://github.com/<owner>/Watcher/releases/tag/v0.4.0)
+- 🗒️ Notes complètes : voir le [CHANGELOG](CHANGELOG.md) et la [page de notes de version](docs/release_notes.md).
+- ✅ Instructions de vérification (signatures, provenance, empreintes) : détaillées ci-dessous pour chaque
+  artefact publié.
 
 ## Citer Watcher
 
@@ -72,8 +75,47 @@ des exécutables Windows, Linux et macOS, un SBOM CycloneDX par plateforme et un
 | [`Watcher-linux-sbom.json`](https://github.com/<owner>/Watcher/releases/download/v0.4.0/Watcher-linux-sbom.json) | SBOM CycloneDX généré lors du build Linux. |
 | [`Watcher-macos-x86_64.zip`](https://github.com/<owner>/Watcher/releases/download/v0.4.0/Watcher-macos-x86_64.zip) | Archive PyInstaller macOS signée (si certificat configuré) et soumise à la notarisation Apple lorsque les secrets sont fournis. |
 | [`Watcher-macos-sbom.json`](https://github.com/<owner>/Watcher/releases/download/v0.4.0/Watcher-macos-sbom.json) | SBOM CycloneDX généré lors du build macOS. |
-| [`Watcher-Setup.intoto.jsonl`](https://github.com/<owner>/Watcher/releases/download/v0.4.0/Watcher-Setup.intoto.jsonl) | Provenance SLSA générée par [`slsa-github-generator`](https://github.com/slsa-framework/slsa-github-generator). |
+| [`Watcher-Setup.intoto.jsonl`](https://github.com/<owner>/Watcher/releases/download/v0.4.0/Watcher-Setup.intoto.jsonl) | Provenance SLSA générée par [`slsa-github-generator`](https://github.com/slsa-framework/slsa-github-generator) (atteste la supply chain du binaire Windows). |
+| `watcher-*.whl` / `watcher-*.tar.gz` | Paquets Python (wheel + source) publiés dans la section *Assets* (installables via `pip`). |
 | [`pip-audit-report.json`](https://github.com/<owner>/Watcher/releases/download/v0.4.0/pip-audit-report.json) | Rapport JSON de l'analyse `pip-audit` exécutée sur `requirements.txt` et `requirements-dev.txt`. |
+
+### Vérifier les artefacts publiés
+
+Avant toute installation, validez l'authenticité et l'intégrité des binaires téléchargés depuis la
+release `v0.4.0` :
+
+```bash
+# 1. Télécharger tous les fichiers nécessaires (binaire + SBOM + provenance)
+RELEASE="https://github.com/<owner>/Watcher/releases/download/v0.4.0"
+wget "$RELEASE/Watcher-Setup.zip" \
+     "$RELEASE/Watcher-Setup.zip.sigstore" \
+     "$RELEASE/Watcher-Setup.intoto.jsonl" \
+     "$RELEASE/Watcher-sbom.json"
+
+# 2. Vérifier la signature Sigstore (Windows)
+sigstore verify identity \
+  --bundle Watcher-Setup.zip.sigstore \
+  --certificate-identity "https://github.com/<owner>/Watcher/.github/workflows/release.yml@refs/tags/v0.4.0" \
+  --certificate-oidc-issuer https://token.actions.githubusercontent.com \
+  Watcher-Setup.zip
+
+# 3. Vérifier la provenance SLSA (attestation supply chain)
+slsa-verifier verify-artifact \
+  --provenance Watcher-Setup.intoto.jsonl \
+  --source-uri github.com/<owner>/Watcher \
+  --source-tag v0.4.0 \
+  Watcher-Setup.zip
+
+# 4. Calculer/valider les empreintes
+sha256sum Watcher-Setup.zip Watcher-linux-x86_64.tar.gz Watcher-macos-x86_64.zip
+```
+
+- Pour Linux/macOS, comparez le `sha256sum` obtenu avec les empreintes publiées dans la release.
+- Les SBOM (`Watcher-*-sbom.json`) peuvent être explorés avec `jq`, importés dans un scanner CycloneDX ou
+  validés via `cyclonedx-py validate Watcher-sbom.json`.
+- Les distributions Python (`watcher-*.whl`, `watcher-*.tar.gz`) sont signées par la provenance GitHub
+  (workflow `release.yml`) et peuvent être installées via `pip install watcher-*.whl` après vérification des
+  `sha256sum`.
 
 Ces fichiers sont publiés en tant qu'artefacts de release. Téléchargez le SBOM correspondant pour auditer les composants de la
 plateforme visée et conservez la provenance `*.intoto.jsonl` pour tracer la chaîne de build ou alimenter un vérificateur SLSA.

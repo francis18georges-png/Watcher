@@ -8,7 +8,7 @@ référençant les pages GitHub Releases correspondantes.
 
 | Version | Date | Points clés | Lien GitHub Releases |
 | --- | --- | --- | --- |
-| v0.4.0 | 20 septembre 2025 | - Configurer les versions Python ciblées par Nox et CI.<br>- Ajouter des property tests compatibles numpy-stub.<br>- Améliorer les workflows de release et de conteneurisation. | [Consulter la release v0.4.0](https://github.com/<owner>/Watcher/releases/tag/v0.4.0) |
+| v0.4.0 | 20 septembre 2025 | - Configurer les versions Python ciblées par Nox et CI.<br>- Ajouter des property tests compatibles numpy-stub.<br>- Améliorer les workflows de release et de conteneurisation. | [Release v0.4.0 (GitHub)](https://github.com/<owner>/Watcher/releases/tag/v0.4.0) |
 
 !!! info "Suivre les prochaines versions"
     Ajoutez une nouvelle ligne à ce tableau et un bloc dédié dès qu'un tag `vMAJOR.MINOR.PATCH`
@@ -22,6 +22,59 @@ référençant les pages GitHub Releases correspondantes.
 - 📚 Documentation du blocage réseau dans la configuration par défaut.
 
 ➤ [Consulter la release GitHub](https://github.com/<owner>/Watcher/releases/tag/v0.4.0)
+
+### Vérifier les artefacts de la release v0.4.0
+
+1. Téléchargez les binaires et métadonnées depuis la release officielle :
+
+   ```bash
+   RELEASE="https://github.com/<owner>/Watcher/releases/download/v0.4.0"
+   wget "$RELEASE/Watcher-Setup.zip" \
+        "$RELEASE/Watcher-Setup.zip.sigstore" \
+        "$RELEASE/Watcher-Setup.intoto.jsonl" \
+        "$RELEASE/Watcher-sbom.json" \
+        "$RELEASE/Watcher-linux-x86_64.tar.gz" \
+        "$RELEASE/Watcher-linux-sbom.json" \
+        "$RELEASE/Watcher-macos-x86_64.zip" \
+        "$RELEASE/Watcher-macos-sbom.json"
+   ```
+
+2. Vérifiez la signature Sigstore du binaire Windows :
+
+   ```bash
+   sigstore verify identity \
+     --bundle Watcher-Setup.zip.sigstore \
+     --certificate-identity "https://github.com/<owner>/Watcher/.github/workflows/release.yml@refs/tags/v0.4.0" \
+     --certificate-oidc-issuer https://token.actions.githubusercontent.com \
+     Watcher-Setup.zip
+   ```
+
+3. Vérifiez l'attestation de provenance SLSA :
+
+   ```bash
+   slsa-verifier verify-artifact \
+     --provenance Watcher-Setup.intoto.jsonl \
+     --source-uri github.com/<owner>/Watcher \
+     --source-tag v0.4.0 \
+     Watcher-Setup.zip
+   ```
+
+4. Contrôlez les empreintes `sha256sum` des binaires et comparez-les à celles publiées dans la release :
+
+   ```bash
+   sha256sum Watcher-Setup.zip \
+             Watcher-linux-x86_64.tar.gz \
+             Watcher-macos-x86_64.zip
+   ```
+
+5. Explorez les SBOM pour auditer les dépendances :
+
+   ```bash
+   cyclonedx-py validate Watcher-sbom.json
+   jq '.components[] | {name, version}' Watcher-linux-sbom.json | head
+   ```
+
+6. Archivez le rapport `pip-audit-report.json` et les distributions Python pour des installations offline.
 
 ## Processus de publication
 
