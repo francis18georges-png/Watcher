@@ -102,3 +102,42 @@ assure que les équipes adéquates sont sollicitées. Quelques principes :
 Les modifications sensibles (sécurité, configuration, opérations) doivent
 rester en `status:blocked` tant que le plan d'action n'est pas validé par
 l'équipe responsable.
+
+## Conventions de commit et de changelog
+
+- **Commitlint** : le workflow `.github/workflows/commitlint.yml` applique les
+  [Conventional Commits](https://www.conventionalcommits.org/fr/v1.0.0/). Les
+  commits et titres de PR doivent respecter le format `type(scope): message`.
+  Les types autorisés sont `feat`, `fix`, `docs`, `style`, `refactor`, `perf`,
+  `test`, `build`, `ci`, `chore` et `revert`. Les scopes suivent les labels
+  `scope:*` décrits ci-dessus.
+- **Changelog automatisé** : Release Drafter regroupe les PR par catégories
+  (`type:*`, `scope:*`) et ignore celles marquées `status:blocked`,
+  `status:needs-triage` ou `status:wip`. Assurez-vous que la PR possède les
+  bons labels avant merge pour alimenter les sections « Fonctionnalités »,
+  « Corrections », « Maintenance », etc.
+- **Résolution de version** : ajoutez un label `release:major`,
+  `release:minor` ou `release:patch` lorsque la PR implique un changement
+  SemVer spécifique. Sans label explicite, l'incrément par défaut est de type
+  patch.
+
+## Publication automatisée
+
+Le workflow `.github/workflows/release-drafter.yml` met à jour le brouillon de
+release à chaque push sur `main`. Une fois la release validée par les
+mainteneurs :
+
+1. Ouvrez le draft généré par Release Drafter, vérifiez les sections et
+   finalisez le numéro de version (`vX.Y.Z`).
+2. Publiez la release GitHub : cela crée le tag et déclenche le workflow
+   `.github/workflows/release.yml` qui construit les artefacts et uploads
+   associés.
+3. Contrôlez que les artefacts publiés sont conformes, mettez à jour le
+   `CHANGELOG.md`, `pyproject.toml` et `CITATION.cff` si besoin, puis
+   communiquez la version aux équipes concernées.
+
+> ℹ️ Les workflows commitlint et release-drafter n'accordent que les
+> permissions minimales (`contents:read/pull-requests:read` pour commitlint,
+> `contents:write/pull-requests:read` pour Release Drafter) et n'interfèrent
+> pas avec l'automerge : ils opèrent sur des événements différents (`push` ou
+> `pull_request`) et ne modifient pas les labels `status:*`.

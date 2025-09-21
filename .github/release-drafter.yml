@@ -1,0 +1,55 @@
+name-template: 'v$NEXT_PATCH_VERSION'
+tag-template: 'v$NEXT_PATCH_VERSION'
+change-template: '- $TITLE (#$NUMBER) @$AUTHOR'
+no-changes-template: 'Aucun changement notable dans cette itération.'
+exclude-labels:
+  - 'status:blocked'
+  - 'status:needs-triage'
+  - 'status:wip'
+categories:
+  - title: '🚀 Fonctionnalités'
+    labels:
+      - 'type:feature'
+  - title: '🐛 Corrections de bugs'
+    labels:
+      - 'type:bug'
+  - title: '🧰 Maintenance'
+    labels:
+      - 'type:maintenance'
+  - title: '📚 Documentation'
+    labels:
+      - 'scope:docs'
+  - title: '🛠️ Plateforme & Ops'
+    labels:
+      - 'scope:ops'
+  - title: '🔐 Sécurité'
+    labels:
+      - 'scope:security'
+  - title: '🧪 Qualité & Tests'
+    labels:
+      - 'scope:quality'
+  - title: '🤖 ML & Données'
+    labels:
+      - 'scope:ml'
+replacers:
+  - search: '### 🚀 Fonctionnalités\n\n###'
+    replace: '### 🚀 Fonctionnalités\n'
+version-resolver:
+  major:
+    labels:
+      - 'release:major'
+  minor:
+    labels:
+      - 'release:minor'
+  patch:
+    labels:
+      - 'release:patch'
+  default: patch
+template: |
+  ## ✨ Nouveautés
+  $CHANGES
+
+  ## ✅ Procédure de publication
+  - Vérifier/mettre à jour les métadonnées (`pyproject.toml`, `CHANGELOG.md`, `CITATION.cff`).
+  - Publier la release sur GitHub pour déclencher le workflow `Release`.
+  - Communiquer la version aux équipes produit et documentation.

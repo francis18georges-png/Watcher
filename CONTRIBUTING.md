@@ -44,6 +44,40 @@ inapproprié aux mainteneurs.
    les breaking changes.
 5. **Rédiger un changelog** : ajoutez une entrée dans `CHANGELOG.md` si la modification est visible pour l'utilisateur final.
 
+## Conventions de commit
+
+Watcher applique les [Conventional Commits](https://www.conventionalcommits.org/fr/v1.0.0/) et un workflow GitHub
+(`commitlint`) vérifie automatiquement que les commits et les titres de pull request respectent le format attendu.
+
+- **Structure** : `type(scope): description` (le scope est optionnel mais recommandé et doit rester aligné avec les labels
+  `scope:*`).
+- **Types autorisés** : `feat`, `fix`, `docs`, `style`, `refactor`, `perf`, `test`, `build`, `ci`, `chore`, `revert`.
+- **Description** : à l'impératif, en français ou en anglais, sans majuscule initiale inutile ni point final.
+- **Corps/footer** : laissez une ligne vide avant le corps du message ; les références à des issues (`Fixes #123`) sont indiquées
+  dans le footer.
+
+Les commits mal formatés doivent être corrigés avant la merge (via `git commit --amend` ou `git rebase --autosquash`). Si votre
+PR contient plusieurs commits, ils doivent tous respecter cette convention.
+
+## Processus de release automatisé
+
+Les mainteneurs s'appuient sur [Release Drafter](https://github.com/release-drafter/release-drafter) et sur le workflow
+`.github/workflows/release-drafter.yml` pour préparer les notes de version.
+
+1. **Labelliser la PR** : chaque PR mergée sur `main` doit porter au moins un label `type:*` (catégorie du changelog) et un ou
+   plusieurs labels `scope:*`. Ajoutez `release:major`, `release:minor` ou `release:patch` si la modification requiert une version
+   spécifique ; à défaut la version `patch` est incrémentée.
+2. **Prévisualiser la release** : à chaque push sur `main`, Release Drafter met à jour le brouillon de release `vNEXT`. Vérifiez
+   que les entrées générées correspondent bien aux changements livrés.
+3. **Publier** : quand la version est prête, publiez le draft GitHub en choisissant le numéro SemVer (`vX.Y.Z`). Cette action
+   déclenche le workflow `.github/workflows/release.yml` qui construit les artefacts (packages, installeur Windows, audit de
+   sécurité) et publie les rapports.
+4. **Communication** : synchronisez `CHANGELOG.md`, `pyproject.toml` et `CITATION.cff` si nécessaire et informez les équipes
+   produit/documentation.
+
+> 💡 Les notes de release regroupent automatiquement les PR par catégorie (`type:*`, `scope:*`) et ignorent les entrées marquées
+> `status:blocked`, `status:needs-triage` ou `status:wip`.
+
 ## Politique de merge et des pull requests
 
 - **Template obligatoire** : utilisez le modèle de PR par défaut et fournissez un contexte clair (motivation, tests, impact).
