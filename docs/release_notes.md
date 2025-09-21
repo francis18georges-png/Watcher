@@ -8,21 +8,20 @@ référençant les pages GitHub Releases correspondantes.
 
 | Version | Date | Points clés | Lien GitHub Releases |
 | --- | --- | --- | --- |
-| *(à publier)* | — | Préparez la release initiale à partir de la section `Unreleased` du [CHANGELOG](CHANGELOG.md). | [Brouillons et releases](https://github.com/<github-username>/Watcher/releases) |
+| v0.4.0 | 20 septembre 2025 | - Configurer les versions Python ciblées par Nox et CI.<br>- Ajouter des property tests compatibles numpy-stub.<br>- Améliorer les workflows de release et de conteneurisation. | [Consulter la release v0.4.0](https://github.com/<owner>/Watcher/releases/tag/v0.4.0) |
 
-!!! info "Mettre à jour dès la première release"
-    Remplacez la ligne ci-dessus par un bloc par version dès qu'un tag `vMAJOR.MINOR.PATCH`
-    est poussé :
+!!! info "Suivre les prochaines versions"
+    Ajoutez une nouvelle ligne à ce tableau et un bloc dédié dès qu'un tag `vMAJOR.MINOR.PATCH`
+    est poussé.
 
-    ```markdown
-    ## v1.2.3 — 2025-10-07
+## v0.4.0 — 2025-09-20
 
-    - 🔒 Renforcement de la politique de signatures Sigstore.
-    - 🛠️ Nouveaux connecteurs de données.
-    - 📦 SBOM CycloneDX enrichi (classification des licences).
+- 🛠️ Configuration explicite des versions Python ciblées par Nox et par la CI.
+- ✅ Ajout de property tests compatibles avec les stubs numpy.
+- 🚀 Optimisations des workflows de release et de build de conteneurs.
+- 📚 Documentation du blocage réseau dans la configuration par défaut.
 
-    ➤ [Consulter la release GitHub](https://github.com/<github-username>/Watcher/releases/tag/v1.2.3)
-    ```
+➤ [Consulter la release GitHub](https://github.com/<owner>/Watcher/releases/tag/v0.4.0)
 
 ## Processus de publication
 
