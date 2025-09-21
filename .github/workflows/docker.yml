@@ -11,6 +11,7 @@ on:
 permissions:
   contents: read
   packages: write
+  id-token: write
 
 jobs:
   build-and-push:
@@ -39,29 +40,37 @@ jobs:
             type=raw,value=latest,enable=${{ github.ref == 'refs/heads/main' }}
             type=ref,event=tag,pattern=v*
 
-      - name: Build image
+      - name: Install cosign
+        uses: sigstore/cosign-installer@v3.5.0
+
+      - name: Build and push image
+        id: build
         uses: docker/build-push-action@v5
         with:
           context: .
-          push: false
-          load: true
+          push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-      - name: Determine image reference
+      - name: Set image digest reference
         id: image-ref
         run: |
-          first_tag=$(echo "${{ steps.meta.outputs.tags }}" | head -n 1)
-          echo "IMAGE_REF=$first_tag" >> $GITHUB_ENV
-          echo "value=$first_tag" >> $GITHUB_OUTPUT
+          set -euo pipefail
+          if [ -z "${{ steps.build.outputs.digest }}" ]; then
+            echo "Image digest missing" >&2
+            exit 1
+          fi
+          image_digest="ghcr.io/${{ github.repository_owner }}/watcher@${{ steps.build.outputs.digest }}"
+          echo "IMAGE_DIGEST_REF=$image_digest" >> "$GITHUB_ENV"
+          printf 'value=%s\n' "$image_digest" >> "$GITHUB_OUTPUT"
 
       - name: Scan image with Trivy
         id: trivy-scan
         uses: aquasecurity/trivy-action@v0.24.0
         with:
-          image-ref: ${{ env.IMAGE_REF }}
+          image-ref: ${{ env.IMAGE_DIGEST_REF }}
           format: 'sarif'
           output: 'trivy-results.sarif'
           severity: 'HIGH,CRITICAL'
@@ -75,11 +84,33 @@ jobs:
           path: trivy-results.sarif
           if-no-files-found: warn
 
-      - name: Push image
+      - name: Generate CycloneDX SBOM
+        id: sbom
+        uses: anchore/sbom-action@v0
+        with:
+          image: ${{ env.IMAGE_DIGEST_REF }}
+          format: cyclonedx-json
+          output-file: watcher-image-sbom.cdx.json
+          artifact-name: watcher-image-sbom
+
+      - name: Sign published images
         if: success()
         run: |
+          set -euo pipefail
+          mkdir -p sigstore
           while IFS= read -r tag; do
-            if [ -n "$tag" ]; then
-              docker push "$tag"
+            if [ -z "$tag" ]; then
+              continue
             fi
+            safe_name=$(echo "$tag" | sed 's#[/:]#__#g')
+            bundle="sigstore/${safe_name}.sigstore"
+            cosign sign --yes --output-bundle "$bundle" "$tag"
           done <<< "${{ steps.meta.outputs.tags }}"
+
+      - name: Upload signature bundles
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cosign-bundles
+          path: sigstore/*.sigstore
+          if-no-files-found: warn
