@@ -241,6 +241,36 @@ Les fichiers d'environnement (`*.env`), les journaux (`*.log`) et les environnem
 
 Une image container officielle est construite par le workflow [`docker.yml`](.github/workflows/docker.yml)
 et publiée sur le registre GitHub Container Registry sous `ghcr.io/<owner>/watcher`.
+Les images publiées sont taguées `latest` (branche `main`) et avec chaque version SemVer (`vX.Y.Z`).
+
+```bash
+docker pull ghcr.io/<owner>/watcher:v1.2.3
+```
+
+Les signatures [Sigstore](https://www.sigstore.dev/) sont publiées pour chaque tag sous la forme de
+bundles `*.sigstore` (artefacts du workflow et assets des pages GitHub Releases). Vérifiez une image
+avec `cosign` :
+
+```bash
+cosign verify \
+  --bundle watcher_v1.2.3.sigstore \
+  --certificate-identity-regexp "https://github.com/<owner>/Watcher/.github/workflows/docker.yml@.*" \
+  --certificate-oidc-issuer https://token.actions.githubusercontent.com \
+  ghcr.io/<owner>/watcher:v1.2.3
+```
+
+Les attestations de provenance associées peuvent être vérifiées avec :
+
+```bash
+cosign verify-attestation \
+  --type slsaprovenance \
+  --certificate-identity-regexp "https://github.com/<owner>/Watcher/.github/workflows/docker.yml@.*" \
+  --certificate-oidc-issuer https://token.actions.githubusercontent.com \
+  ghcr.io/<owner>/watcher:v1.2.3
+```
+
+Les signatures permettent également de valider le tag `latest` si vous préférez suivre la branche
+principale (`--bundle watcher_latest.sigstore`).
 
 ### Utiliser l'image publiée
 
