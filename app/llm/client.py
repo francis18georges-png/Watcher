@@ -34,8 +34,16 @@ def generate_ollama(prompt: str, *, host: str, model: str) -> str:
     """
 
     parsed = urlparse(host if "://" in host else f"http://{host}")
-    conn = http.client.HTTPConnection(
-        parsed.hostname or "127.0.0.1", parsed.port or 11434, timeout=30
+    scheme = parsed.scheme or "http"
+    if scheme == "https":
+        connection_cls = http.client.HTTPSConnection
+        default_port = 443
+    else:
+        connection_cls = http.client.HTTPConnection
+        default_port = 11434
+
+    conn = connection_cls(
+        parsed.hostname or "127.0.0.1", parsed.port or default_port, timeout=30
     )
     try:  # pragma: no cover - network path
         payload = json.dumps({"model": model, "prompt": prompt})
