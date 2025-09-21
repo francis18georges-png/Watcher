@@ -544,6 +544,13 @@ accélère les itérations et facilite la reprise après interruption.
 Sandbox d'exécution confinée, tests et linters obligatoires avant adoption de code.
 Semgrep utilise un fichier de règles local (`config/semgrep.yml`), aucun accès réseau requis.
 
+Les utilitaires de sécurité tiers (`gitleaks`, `trivy`) sont téléchargés depuis leurs
+releases GitHub officielles et systématiquement vérifiés via une empreinte SHA-256.
+Le script `scripts/install_cli_tools.py` contrôle à la fois l'archive récupérée et
+le binaire extrait (pour déjouer une compromission dans l'archive) avant de les
+copier dans `.tools/`. Une divergence déclenche désormais un `InstallationError`
+et interrompt l'installation des outils.
+
 Pour le périmètre supporté, les canaux de signalement privés (PGP, formulaire, programme HackerOne) et les délais de réponse,
 consultez la [politique de sécurité](SECURITY.md).
 Les signalements doivent respecter la politique d'embargo décrite dans ce document et utiliser l'adresse dédiée
