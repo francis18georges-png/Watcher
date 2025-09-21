@@ -8,7 +8,7 @@ référençant les pages GitHub Releases correspondantes.
 
 | Version | Date | Points clés | Lien GitHub Releases |
 | --- | --- | --- | --- |
-| *(à publier)* | — | Préparez la release initiale à partir de la section `Unreleased` du [CHANGELOG](CHANGELOG.md). | [Brouillons et releases](https://github.com/<github-username>/Watcher/releases) |
+| *(à publier)* | — | Préparez la release initiale à partir de la section `Unreleased` du [CHANGELOG](CHANGELOG.md). | [Brouillons et releases](https://github.com/WatcherOrg/Watcher/releases) |
 
 !!! info "Mettre à jour dès la première release"
     Remplacez la ligne ci-dessus par un bloc par version dès qu'un tag `vMAJOR.MINOR.PATCH`
@@ -21,7 +21,7 @@ référençant les pages GitHub Releases correspondantes.
     - 🛠️ Nouveaux connecteurs de données.
     - 📦 SBOM CycloneDX enrichi (classification des licences).
 
-    ➤ [Consulter la release GitHub](https://github.com/<github-username>/Watcher/releases/tag/v1.2.3)
+    ➤ [Consulter la release GitHub](https://github.com/WatcherOrg/Watcher/releases/tag/v1.2.3)
     ```
 
 ## Processus de publication
@@ -38,13 +38,14 @@ référençant les pages GitHub Releases correspondantes.
    - Les exécutables (`Watcher-Setup.zip`, `Watcher-linux-x86_64.tar.gz`, `Watcher-macos-x86_64.zip`).
    - Les SBOM CycloneDX (`Watcher-*-sbom.json`).
    - L'attestation SLSA (`Watcher-Setup.intoto.jsonl`).
+   - Le manifeste `Watcher-sha256.txt` listant les empreintes publiées.
    - Les bundles Sigstore (`*.sigstore`).
 
 3. Complétez la description de la release avec :
 
    - Un résumé des nouveautés (copié/collé de cette page et du CHANGELOG).
    - Les instructions de vérification (`sigstore verify`, `cosign verify-attestation`).
-   - Les empreintes `sha256sum` pour chaque artefact.
+   - Le fichier `Watcher-sha256.txt` pour diffuser les empreintes `sha256sum` de chaque artefact.
 
 ## Historiser les mises à jour
 

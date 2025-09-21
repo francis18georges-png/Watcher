@@ -48,7 +48,7 @@
 Install the development dependencies:
 
 ```
-pip install -r requirements-dev.txt
+pip install -c constraints.txt -r requirements-dev.txt
 ```
 
 Install the Git hooks once the dependencies are available:
