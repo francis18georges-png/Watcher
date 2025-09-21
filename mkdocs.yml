@@ -1,7 +1,7 @@
 site_name: "Watcher"
 site_description: "Documentation technique et opérationnelle de l'atelier Watcher"
-site_url: "https://<github-username>.github.io/Watcher/"
-repo_url: "https://github.com/<github-username>/Watcher"
+site_url: !ENV ["WATCHER_DOCS_URL", ""]
+repo_url: !ENV ["WATCHER_REPO_URL", ""]
 edit_uri: "edit/main/docs/"
 strict: true
 
@@ -66,7 +66,7 @@ plugins:
 extra:
   social:
     - icon: fontawesome/brands/github
-      link: https://github.com/<github-username>/Watcher
+      link: https://github.com/WatcherOrg/Watcher
       name: Dépôt GitHub Watcher
 
 nav:
