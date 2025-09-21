@@ -89,10 +89,27 @@ PY
       - name: Install build dependencies
         run: |
           python -m pip install --upgrade pip
-          python -m pip install build
+          python -m pip install -c constraints.txt build pip-audit
 
       - name: Build wheel and sdist
         run: python -m build
+
+      - name: Run pip-audit
+        run: |
+          mkdir -p dist
+          pip-audit \
+            --strict \
+            --format json \
+            --output dist/pip-audit-report.json \
+            -r requirements.txt \
+            -r requirements-dev.txt
+
+      - name: Upload pip-audit report
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-pip-audit
+          if-no-files-found: error
+          path: dist/pip-audit-report.json
 
       - name: Upload distributions
         uses: actions/upload-artifact@v4
@@ -181,12 +198,12 @@ PY
         shell: pwsh
         run: |
           python -m pip install --upgrade pip
-          python -m pip install -r requirements.txt
-          python -m pip install pyinstaller
+          python -m pip install -c constraints.txt -r requirements.txt
+          python -m pip install -c constraints.txt pyinstaller
 
       - name: Install SBOM tooling
         shell: pwsh
-        run: python -m pip install cyclonedx-bom cyclonedx-py
+        run: python -m pip install -c constraints.txt cyclonedx-bom cyclonedx-py
 
       - name: Build Windows executable
         shell: pwsh
@@ -340,14 +357,14 @@ PY
         run: |
           set -euo pipefail
           python -m pip install --upgrade pip
-          python -m pip install -r requirements.txt
-          python -m pip install pyinstaller
+          python -m pip install -c constraints.txt -r requirements.txt
+          python -m pip install -c constraints.txt pyinstaller
 
       - name: Install SBOM tooling
         shell: bash
         run: |
           set -euo pipefail
-          python -m pip install cyclonedx-bom cyclonedx-py
+          python -m pip install -c constraints.txt cyclonedx-bom cyclonedx-py
 
       - name: Build executable
         shell: bash
@@ -529,5 +546,6 @@ PY
             dist/Watcher-macos-sbom.json
             dist/watcher-*.whl
             dist/watcher-*.tar.gz
+            dist/pip-audit-report.json
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

@@ -113,7 +113,8 @@ artefacts validés.
    ```bash
    python3 -m venv watcher-venv
    source watcher-venv/bin/activate
-   pip install --no-index --find-links ./pypi-mirror -r requirements.txt
+   pip install --no-index --find-links ./pypi-mirror \
+     -r requirements.txt -c constraints.txt
    ```
 
 2. **Déployer le binaire** correspondant à votre plateforme :

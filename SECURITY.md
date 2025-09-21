@@ -12,7 +12,9 @@ Les forks, versions communautaires modifiées ou binaires reconstruits par des t
 
 ## Signaler une vulnérabilité
 
-Merci de privilégier des canaux privés pour tout signalement de vulnérabilité afin de limiter le risque d'exploitation avant qu'un correctif ne soit disponible. Utilisez l'un des moyens suivants :
+Merci de privilégier des canaux privés pour tout signalement de vulnérabilité afin de limiter le risque d'exploitation avant qu'un correctif ne soit disponible. Utilisez en priorité le bouton **Report a vulnerability** de l'onglet *Security* du dépôt GitHub, qui ouvre le formulaire de signalement privé intégré.
+
+Si ce canal n'est pas accessible, vous pouvez utiliser l'un des moyens suivants :
 
 - 📧 **Email chiffré PGP** : security@watcher.dev — clé publique : https://watcher.dev/security/pgp.asc (empreinte `8A20 5D9E 3A1B F236 B179  5AA0 E2F0 3F1B 9D0F 4A17`).
 - 🛡️ **Formulaire privé** : https://watcher.dev/security/report.
