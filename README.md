@@ -11,6 +11,18 @@ Mémoire vectorielle, curriculum adaptatif, A/B + bench et quality gate sécurit
 La dernière version stable est **v0.4.0** (tag `v0.4.0`, publiée le 20 septembre 2025). Consultez le
 [CHANGELOG](CHANGELOG.md) pour le détail des nouveautés et correctifs.
 
+## Citer Watcher
+
+Merci de citer ce dépôt lorsque vous réutilisez son code, ses jeux de données ou sa
+documentation. Les métadonnées officielles de citation sont fournies dans
+[`CITATION.cff`](CITATION.cff) et peuvent être exportées dans différents formats à
+l'aide de [`cffconvert`](https://github.com/citation-file-format/cff-converter-python) :
+
+```bash
+pip install cffconvert
+cffconvert --validate --format bibtex --outfile watcher.bib
+```
+
 ## Documentation
 
 La documentation technique est générée avec [MkDocs Material](https://squidfunk.github.io/mkdocs-material/)

@@ -1,0 +1,14 @@
+cff-version: 1.2.0
+title: Watcher
+abstract: |
+  Watcher est un atelier local d'IA de programmation autonome, hors-ligne par défaut,
+  combinant mémoire vectorielle, curriculum adaptatif, benchmarks A/B et garde-fous de
+  sécurité.
+authors:
+  - name: Watcher contributors
+identifiers:
+  - type: url
+    value: https://github.com/<owner>/Watcher/releases/tag/v0.4.0
+    description: Version v0.4.0 publiée le 20 septembre 2025
+repository-code: https://github.com/<owner>/Watcher
+version: 0.4.0

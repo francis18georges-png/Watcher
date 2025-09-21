@@ -5,6 +5,11 @@ workflows GitHub sont utilisés pour assurer un cycle de contribution
 cohérent. Il complète les informations générales du `README.md` et les
 check-lists qualité documentées dans `QA.md`.
 
+> 📌 **Rappel citation** : lors de la préparation d'une release ou d'une
+> contribution majeure, vérifiez que la version publiée et le fichier
+> `CITATION.cff` sont alignés avec le `pyproject.toml` et le `CHANGELOG.md` afin
+> que les équipes externes puissent citer correctement le projet.
+
 ## Typologie des labels
 
 Trois familles de labels sont utilisées pour classifier les issues et les
