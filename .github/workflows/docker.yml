@@ -17,6 +17,9 @@ jobs:
   build-and-push:
     name: Build and publish image
     runs-on: ubuntu-latest
+    outputs:
+      image-digest: ${{ steps.build.outputs.digest }}
+      image-ref: ${{ steps.image-ref.outputs.value }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -93,6 +96,14 @@ jobs:
           output-file: watcher-image-sbom.cdx.json
           artifact-name: watcher-image-sbom
 
+      - name: Generate SPDX SBOM
+        uses: anchore/sbom-action@v0
+        with:
+          image: ${{ env.IMAGE_DIGEST_REF }}
+          format: spdx-json
+          output-file: sbom.spdx.json
+          artifact-name: watcher-image-sbom-spdx
+
       - name: Sign published images
         if: success()
         run: |
@@ -114,3 +125,47 @@ jobs:
           name: cosign-bundles
           path: sigstore/*.sigstore
           if-no-files-found: warn
+
+  generate-provenance:
+    name: Generate image SLSA provenance
+    needs: build-and-push
+    permissions:
+      actions: read
+      id-token: write
+      contents: write
+    uses: slsa-framework/slsa-github-generator/.github/workflows/generator_container_image_slsa3.yml@v1.10.0
+    with:
+      image: ghcr.io/${{ github.repository_owner }}/watcher
+      digest: ${{ needs.build-and-push.outputs.image-digest }}
+
+  normalize-provenance:
+    name: Publish provenance artifact
+    needs:
+      - build-and-push
+      - generate-provenance
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download provenance
+        uses: actions/download-artifact@v4
+        with:
+          path: provenance
+          merge-multiple: true
+
+      - name: Normalize provenance filename
+        run: |
+          set -euo pipefail
+          PROVENANCE=$(find provenance -name "*.intoto.jsonl" -print -quit)
+          if [ -z "$PROVENANCE" ]; then
+            echo "Provenance file not found" >&2
+            ls -R provenance >&2 || true
+            exit 1
+          fi
+          mkdir -p provenance/dist
+          mv "$PROVENANCE" provenance/dist/watcher-image.intoto.jsonl
+
+      - name: Upload provenance artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: watcher-image-provenance
+          path: provenance/dist/watcher-image.intoto.jsonl
+          if-no-files-found: error

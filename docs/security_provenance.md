@@ -2,8 +2,10 @@
 
 La chaîne de compilation de Watcher repose sur les workflows GitHub Actions et les services
 Sigstore. Chaque release SemVer publie des exécutables, un SBOM CycloneDX par plateforme et
-une provenance SLSA (`*.intoto.jsonl`). Cette page décrit comment vérifier ces artefacts avant
-de les déployer en production.
+une provenance SLSA (`*.intoto.jsonl`). Le workflow Docker associé produit également une
+attestation SLSA pour l'image container, ainsi qu'un SBOM CycloneDX et un SBOM SPDX générés
+avec `syft`. Cette page décrit comment vérifier ces artefacts avant de les déployer en
+production.
 
 ## Pré-requis
 
@@ -88,10 +90,10 @@ Pour une vérification approfondie, vous pouvez croiser cette attestation avec
 [`slsa-verifier`](https://github.com/slsa-framework/slsa-verifier) et exporter un rapport PDF
 pour vos audits internes.
 
-## Vérifier le SBOM CycloneDX
+## Vérifier les SBOM (CycloneDX et SPDX)
 
 Les SBOM sont publiés sous forme de fichiers JSON signés avec Sigstore. Deux étapes sont
-recommandées :
+recommandées pour les releases officielles :
 
 1. Vérifiez la signature du SBOM à l'aide de son bundle Sigstore :
 
@@ -127,6 +129,50 @@ recommandées :
    Utilisez `grype Watcher-sbom.json` ou un autre scanner pour générer un rapport de
    vulnérabilités basé sur la nomenclature CycloneDX.
 
+### SBOM SPDX pour l'image Docker
+
+Chaque exécution du workflow [`docker.yml`](../.github/workflows/docker.yml) publie également
+`watcher-image-sbom-spdx/sbom.spdx.json`. Le fichier est généré par `syft` et peut être importé
+dans des solutions nécessitant un SBOM au format SPDX 2.3. Après avoir téléchargé l'artefact :
+
+```bash
+jq '.packages[] | {name, versionInfo, licenseDeclared}' sbom.spdx.json | head
+```
+
+Vérifiez que le champ `documentNamespace` contient le digest SHA256 de l'image téléchargée et que
+les entrées `externalRefs` pointent bien vers `ghcr.io/<owner>/watcher@sha256:<digest>`.
+
+Pour conserver un lien de confiance, archivez ce SBOM avec le bundle de signature de l'image et
+l'attestation SLSA décrite ci-dessous.
+
+## Vérifier la provenance de l'image Docker
+
+En complément des signatures `cosign`, le workflow Docker génère une attestation SLSA (`*.intoto.jsonl`)
+avec [`slsa-github-generator`](https://github.com/slsa-framework/slsa-github-generator).
+
+1. Téléchargez l'artefact `watcher-image-provenance` et placez `watcher-image.intoto.jsonl` dans
+   votre répertoire de validation.
+2. Vérifiez la provenance avec `slsa-verifier` :
+
+   ```bash
+   slsa-verifier verify-image \
+     --provenance watcher-image.intoto.jsonl \
+     ghcr.io/<owner>/watcher@sha256:<digest>
+   ```
+
+   Le digest passé en argument doit correspondre à celui vérifié avec `cosign verify`.
+3. Inspectez ensuite le fichier pour confirmer l'identité du builder et l'origine GitHub Actions :
+
+   ```bash
+   jq '{subject, builder: .predicate.builder.id, buildType: .predicate.buildType}' \
+     watcher-image.intoto.jsonl
+   ```
+
+   Les champs doivent pointer vers `.github/workflows/docker.yml` et le commit/tag attendu.
+
+En cas de non-conformité (digest différent, workflow inconnu ou absence d'attestation), rejetez
+la publication et ouvrez une enquête auprès de l'équipe en charge des builds.
+
 ## Intégrer les contrôles dans votre pipeline
 
 - Stockez les bundles Sigstore et les attestions SLSA aux côtés des exécutables dans vos
@@ -136,5 +182,5 @@ recommandées :
 - Archivez les journaux `sigstore`/`cosign` signés pour constituer un dossier de conformité
   (ISO 27001, SecNumCloud, etc.).
 
-En combinant la vérification Sigstore, les attestations SLSA et l'analyse du SBOM CycloneDX,
+En combinant la vérification Sigstore, les attestations SLSA et l'analyse des SBOM CycloneDX et SPDX,
 vous obtenez une traçabilité complète de la chaîne de build Watcher.

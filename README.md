@@ -329,19 +329,25 @@ Pour exécuter une commande CLI, passez-la directement après l'image :
 docker run --rm -it ghcr.io/<owner>/watcher:latest plugin list
 ```
 
-### Vérifier les artefacts de signature et lister le SBOM
+### Vérifier les artefacts de signature, de provenance et les SBOM
 
 Le workflow [`docker.yml`](.github/workflows/docker.yml) publie, en plus de l'image container,
 les artefacts suivants pour chaque exécution :
 
 - `cosign-bundles/ghcr.io__<owner>__watcher__<tag>.sigstore` : bundle Sigstore de la signature
   keyless pour la référence `ghcr.io/<owner>/watcher:<tag>`.
+- `watcher-image-provenance/watcher-image.intoto.jsonl` : attestation SLSA générée via
+  [`slsa-github-generator`](https://github.com/slsa-framework/slsa-github-generator) et liée au digest
+  publié par le job `Build and publish image`.
 - `watcher-image-sbom.cdx.json` : SBOM CycloneDX généré avec `syft`, téléchargeable depuis
   l'artefact `watcher-image-sbom` ou joint à la release correspondante.
+- `watcher-image-sbom-spdx/sbom.spdx.json` : SBOM SPDX JSON produit par `syft` pour répondre aux
+  exigences de conformité des registres et scanners.
 
 Les caractères `/` et `:` du nom d'image sont remplacés par `__` pour garantir des noms de fichiers
-compatibles avec GitHub Actions. Téléchargez l'image, le bundle Sigstore et le SBOM correspondant
-au tag SemVer souhaité (`vMAJOR.MINOR.PATCH`), puis vérifiez la signature hors-ligne avec `cosign` :
+compatibles avec GitHub Actions. Téléchargez l'image, le bundle Sigstore, l'attestation et les SBOM
+correspondants au tag SemVer souhaité (`vMAJOR.MINOR.PATCH`), puis vérifiez la signature hors-ligne
+avec `cosign` :
 
 ```bash
 cosign verify \
@@ -358,6 +364,34 @@ SHA256 de l'image. Vous pouvez récupérer ce digest via `docker buildx imagetoo
 Pour les images construites depuis `main`, remplacez l'identité du certificat par
 `https://github.com/<owner>/Watcher/.github/workflows/docker.yml@refs/heads/main` et utilisez le
 digest correspondant (affiché par `docker pull` ou `crane digest`).
+
+L'attestation SLSA permet de relier cryptographiquement ce digest au workflow GitHub Actions.
+Téléchargez l'artefact `watcher-image-provenance` puis vérifiez-le avec
+[`slsa-verifier`](https://github.com/slsa-framework/slsa-verifier) :
+
+```bash
+slsa-verifier verify-image \
+  --provenance watcher-image.intoto.jsonl \
+  ghcr.io/<owner>/watcher@sha256:<digest>
+```
+
+Vous pouvez également inspecter le fichier pour contrôler manuellement les champs `builder.id` et
+`buildDefinition.resolvedDependencies` :
+
+```bash
+jq '{subject, buildType: .predicate.buildType, builder: .predicate.builder.id}' \
+  watcher-image.intoto.jsonl
+```
+
+Enfin, examinez les deux SBOM fournis :
+
+```bash
+jq '.components[] | {name, version}' watcher-image-sbom.cdx.json | head
+jq '.packages[] | {name, versionInfo}' sbom.spdx.json | head
+```
+
+Le format CycloneDX reste adapté aux scanners `grype`/`trivy`, tandis que le SBOM SPDX JSON peut être
+importé dans des solutions de gouvernance qui n'acceptent que le schéma SPDX 2.3.
 
 ### Construire l'image en local
 
