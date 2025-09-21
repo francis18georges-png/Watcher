@@ -8,7 +8,8 @@ Mémoire vectorielle, curriculum adaptatif, A/B + bench et quality gate sécurit
 
 ## Version
 
-La dernière version stable est **v0.4.0** (tag `v0.4.0`, publiée le 20 septembre 2025). Consultez le
+La dernière version stable est **v0.4.0** (tag `v0.4.0`, publiée le 20 septembre 2025). Téléchargez-la
+depuis [GitHub Releases](https://github.com/<owner>/Watcher/releases/tag/v0.4.0) et consultez le
 [CHANGELOG](CHANGELOG.md) pour le détail des nouveautés et correctifs.
 
 ## Citer Watcher
@@ -62,15 +63,17 @@ des exécutables Windows, Linux et macOS, un SBOM CycloneDX par plateforme et un
 
 ### Artefacts publiés
 
-- `Watcher-Setup.zip` : archive PyInstaller Windows signée et empaquetée.
-- `Watcher-Setup.zip.sigstore` : bundle Sigstore pour vérifier la signature du binaire Windows (`sigstore verify identity --bundle ...`).
-- `Watcher-sbom.json` : inventaire CycloneDX des dépendances installées pendant le build Windows (`cyclonedx-bom` / `cyclonedx-py`).
-- `Watcher-linux-x86_64.tar.gz` : tarball PyInstaller contenant le binaire autonome Linux.
-- `Watcher-linux-sbom.json` : SBOM CycloneDX généré lors du build Linux.
-- `Watcher-macos-x86_64.zip` : archive PyInstaller macOS signée (si certificat configuré) et soumise à la notarisation Apple lorsque les secrets sont fournis.
-- `Watcher-macos-sbom.json` : SBOM CycloneDX généré lors du build macOS.
-- `Watcher-Setup.intoto.jsonl` : provenance SLSA générée par [`slsa-github-generator`](https://github.com/slsa-framework/slsa-github-generator).
-- `pip-audit-report.json` : rapport JSON de l'analyse `pip-audit` exécutée sur `requirements.txt` et `requirements-dev.txt`.
+| Fichier | Description |
+| --- | --- |
+| [`Watcher-Setup.zip`](https://github.com/<owner>/Watcher/releases/download/v0.4.0/Watcher-Setup.zip) | Archive PyInstaller Windows signée et empaquetée. |
+| [`Watcher-Setup.zip.sigstore`](https://github.com/<owner>/Watcher/releases/download/v0.4.0/Watcher-Setup.zip.sigstore) | Bundle Sigstore pour vérifier la signature du binaire Windows (`sigstore verify identity --bundle ...`). |
+| [`Watcher-sbom.json`](https://github.com/<owner>/Watcher/releases/download/v0.4.0/Watcher-sbom.json) | Inventaire CycloneDX des dépendances installées pendant le build Windows (`cyclonedx-bom` / `cyclonedx-py`). |
+| [`Watcher-linux-x86_64.tar.gz`](https://github.com/<owner>/Watcher/releases/download/v0.4.0/Watcher-linux-x86_64.tar.gz) | Tarball PyInstaller contenant le binaire autonome Linux. |
+| [`Watcher-linux-sbom.json`](https://github.com/<owner>/Watcher/releases/download/v0.4.0/Watcher-linux-sbom.json) | SBOM CycloneDX généré lors du build Linux. |
+| [`Watcher-macos-x86_64.zip`](https://github.com/<owner>/Watcher/releases/download/v0.4.0/Watcher-macos-x86_64.zip) | Archive PyInstaller macOS signée (si certificat configuré) et soumise à la notarisation Apple lorsque les secrets sont fournis. |
+| [`Watcher-macos-sbom.json`](https://github.com/<owner>/Watcher/releases/download/v0.4.0/Watcher-macos-sbom.json) | SBOM CycloneDX généré lors du build macOS. |
+| [`Watcher-Setup.intoto.jsonl`](https://github.com/<owner>/Watcher/releases/download/v0.4.0/Watcher-Setup.intoto.jsonl) | Provenance SLSA générée par [`slsa-github-generator`](https://github.com/slsa-framework/slsa-github-generator). |
+| [`pip-audit-report.json`](https://github.com/<owner>/Watcher/releases/download/v0.4.0/pip-audit-report.json) | Rapport JSON de l'analyse `pip-audit` exécutée sur `requirements.txt` et `requirements-dev.txt`. |
 
 Ces fichiers sont publiés en tant qu'artefacts de release. Téléchargez le SBOM correspondant pour auditer les composants de la
 plateforme visée et conservez la provenance `*.intoto.jsonl` pour tracer la chaîne de build ou alimenter un vérificateur SLSA.

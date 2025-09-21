@@ -7,7 +7,7 @@ contrôles d'intégrité.
 
 ## 1. Préparer le kit hors-ligne sur une machine connectée
 
-1. **Téléchargez les artefacts de release** depuis GitHub pour le tag ciblé :
+1. **Téléchargez les artefacts de release** depuis GitHub pour le tag ciblé (par exemple [v0.4.0](https://github.com/<owner>/Watcher/releases/tag/v0.4.0)) :
 
    ```bash
    mkdir -p ~/watcher-offline-kit/artifacts
