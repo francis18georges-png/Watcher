@@ -39,12 +39,47 @@ jobs:
             type=raw,value=latest,enable=${{ github.ref == 'refs/heads/main' }}
             type=ref,event=tag,pattern=v*
 
-      - name: Build and push
+      - name: Build image
         uses: docker/build-push-action@v5
         with:
           context: .
-          push: true
+          push: false
+          load: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
+
+      - name: Determine image reference
+        id: image-ref
+        run: |
+          first_tag=$(echo "${{ steps.meta.outputs.tags }}" | head -n 1)
+          echo "IMAGE_REF=$first_tag" >> $GITHUB_ENV
+          echo "value=$first_tag" >> $GITHUB_OUTPUT
+
+      - name: Scan image with Trivy
+        id: trivy-scan
+        uses: aquasecurity/trivy-action@v0.24.0
+        with:
+          image-ref: ${{ env.IMAGE_REF }}
+          format: 'sarif'
+          output: 'trivy-results.sarif'
+          severity: 'HIGH,CRITICAL'
+          exit-code: '1'
+
+      - name: Upload Trivy scan report
+        if: always() && steps.trivy-scan.outcome != 'skipped'
+        uses: actions/upload-artifact@v4
+        with:
+          name: trivy-scan-report
+          path: trivy-results.sarif
+          if-no-files-found: warn
+
+      - name: Push image
+        if: success()
+        run: |
+          while IFS= read -r tag; do
+            if [ -n "$tag" ]; then
+              docker push "$tag"
+            fi
+          done <<< "${{ steps.meta.outputs.tags }}"
