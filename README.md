@@ -271,7 +271,7 @@ et mettez à jour la configuration d'authentification associée.
 ## Installation
 
 1. Cloner ce dépôt.
-2. Créer et activer un environnement Python 3.12 :
+2. Créer et activer un environnement Python 3.10 ou supérieur :
 
    ```bash
    python -m venv .venv
@@ -415,9 +415,10 @@ Les volumes présentés ci-dessus fonctionnent également avec l'image locale (`
 ## Environnement de développement
 
 Un dossier `.devcontainer/` est fourni pour disposer d'un environnement prêt à l'emploi
-dans VS Code ou GitHub Codespaces. Il utilise l'image Python 3.12 officielle,
-préconfigure les caches `pip` et `DVC` sur des volumes persistants et installe
-automatiquement les dépendances du projet ainsi que les hooks `pre-commit`.
+dans VS Code ou GitHub Codespaces. Il utilise l'image Python 3.12 officielle
+(le projet restant compatible à partir de Python 3.10), préconfigure les caches
+`pip` et `DVC` sur des volumes persistants et installe automatiquement les
+dépendances du projet ainsi que les hooks `pre-commit`.
 
 Pour ouvrir le projet dans un devcontainer :
 

@@ -10,7 +10,7 @@ inapproprié aux mainteneurs.
 
 ## Préparer son environnement
 
-- **Python 3.12** : créez un environnement virtuel dédié (`python -m venv .venv`).
+- **Python 3.10 ou supérieur** : créez un environnement virtuel dédié (`python -m venv .venv`).
 - **Dépendances projet** : installez les requirements de base et de développement :
   ```bash
   pip install -r requirements.txt
