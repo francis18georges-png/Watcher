@@ -30,10 +30,9 @@ cffconvert --validate --format bibtex --outfile watcher.bib
 ## Documentation
 
 La documentation technique est générée avec [MkDocs Material](https://squidfunk.github.io/mkdocs-material/)
-et publiée via l'environnement **github-pages** du dépôt.
-Activez GitHub Pages dans les paramètres du dépôt (source : **GitHub Actions**) puis cliquez sur
-« View deployment » depuis l'onglet **Deployments → github-pages** pour accéder au site public généré
-par `deploy-docs.yml`.
+et publiée via l'environnement **github-pages** du dépôt. Consultez la dernière version compilée sur
+[https://francis18georges-png.github.io/Watcher/](https://francis18georges-png.github.io/Watcher/),
+déployée automatiquement par `deploy-docs.yml`.
 
 Pour la prévisualiser localement :
 
