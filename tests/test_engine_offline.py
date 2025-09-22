@@ -1,6 +1,10 @@
 """Regression tests for the engine offline mode integration."""
 
+import socket
 from types import SimpleNamespace
+
+import pytest
+from pytest_socket import SocketBlockedError
 
 from config import get_settings
 
@@ -31,3 +35,15 @@ def test_engine_offline_skips_embedding_calls(monkeypatch, tmp_path):
 
     assert calls["count"] == 0
     assert np.array_equal(vec, np.zeros(1, dtype=np.float32))
+
+
+def test_engine_offline_blocks_network(tmp_path):
+    engine = Engine.__new__(Engine)
+    engine.settings = get_settings()
+    engine.mem = Memory(tmp_path / "mem_offline_network.db")
+    engine.client = SimpleNamespace(set_offline=lambda _offline: None)
+
+    engine.set_offline(True)
+
+    with pytest.raises(SocketBlockedError):
+        socket.create_connection(("example.com", 80), timeout=0.1)
