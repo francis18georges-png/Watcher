@@ -36,9 +36,10 @@ mode d'exploitation de la plate-forme.
 
 ## Accès à la documentation publiée
 
-Lorsque le workflow GitHub Actions **Deploy MkDocs site** est exécuté sur la branche `main`, la version statique la plus
-récente est accessible via l'environnement **github-pages** du dépôt. Ouvrez l'onglet **Deployments → github-pages** puis
-cliquez sur « View deployment » pour consulter le site public.
+La version statique la plus récente est accessible à l'adresse
+[https://francis18georges-png.github.io/Watcher/](https://francis18georges-png.github.io/Watcher/).
+Elle est déployée automatiquement par le workflow GitHub Actions **Deploy MkDocs site** sur l'environnement
+**github-pages** après chaque push sur `main`.
 
 !!! info "URL personnalisée"
     Si un domaine personnalisé est configuré, mettez à jour le champ `site_url` dans `mkdocs.yml` et ajoutez un fichier
