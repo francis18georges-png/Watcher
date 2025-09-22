@@ -7,12 +7,12 @@ contrôles d'intégrité.
 
 ## 1. Préparer le kit hors-ligne sur une machine connectée
 
-1. **Téléchargez les artefacts de release** depuis GitHub pour le tag ciblé (par exemple [v0.4.0](https://github.com/<owner>/Watcher/releases/tag/v0.4.0)) :
+1. **Téléchargez les artefacts de release** depuis GitHub pour le tag ciblé (par exemple [v0.4.0](https://github.com/francis18georges-png/Watcher/releases/tag/v0.4.0)) :
 
    ```bash
    mkdir -p ~/watcher-offline-kit/artifacts
    cd ~/watcher-offline-kit/artifacts
-   gh release download <tag> --repo <owner>/Watcher
+   gh release download <tag> --repo francis18georges-png/Watcher
    ```
 
    Ce répertoire doit contenir au minimum :
@@ -76,7 +76,7 @@ tar -xzf /mnt/usb/watcher-offline-kit.tgz
    ```bash
    sigstore verify identity \
      --bundle artifacts/Watcher-Setup.zip.sigstore \
-     --certificate-identity "https://github.com/<owner>/Watcher/.github/workflows/release.yml@refs/tags/<tag>" \
+     --certificate-identity "https://github.com/francis18georges-png/Watcher/.github/workflows/release.yml@refs/tags/<tag>" \
      --certificate-oidc-issuer https://token.actions.githubusercontent.com \
      artifacts/Watcher-Setup.zip
    ```
@@ -87,7 +87,7 @@ tar -xzf /mnt/usb/watcher-offline-kit.tgz
    cosign verify-attestation \
      --type slsaprovenance \
      --bundle artifacts/Watcher-Setup.intoto.jsonl.sigstore \
-     --certificate-identity "https://github.com/<owner>/Watcher/.github/workflows/release.yml@refs/tags/<tag>" \
+     --certificate-identity "https://github.com/francis18georges-png/Watcher/.github/workflows/release.yml@refs/tags/<tag>" \
      --certificate-oidc-issuer https://token.actions.githubusercontent.com \
      artifacts/Watcher-Setup.intoto.jsonl | jq '.subject'
    ```
@@ -98,7 +98,7 @@ tar -xzf /mnt/usb/watcher-offline-kit.tgz
    cosign verify-attestation \
      --type cyclonedx \
      --bundle artifacts/Watcher-sbom.json.sigstore \
-     --certificate-identity "https://github.com/<owner>/Watcher/.github/workflows/release.yml@refs/tags/<tag>" \
+     --certificate-identity "https://github.com/francis18georges-png/Watcher/.github/workflows/release.yml@refs/tags/<tag>" \
      --certificate-oidc-issuer https://token.actions.githubusercontent.com \
      artifacts/Watcher-sbom.json | jq '.predicate.metadata'
    ```
