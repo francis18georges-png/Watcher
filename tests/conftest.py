@@ -11,6 +11,41 @@ from types import ModuleType
 
 import pytest
 
+try:  # pragma: no cover - exercised during test collection
+    import pytest_socket as socket
+except ImportError:  # pragma: no cover - fallback when dependency missing locally
+    import socket as stdlib_socket
+
+    _original_socket = stdlib_socket.socket
+    _original_create_connection = stdlib_socket.create_connection
+
+    class SocketBlockedError(RuntimeError):
+        """Raised when a test unexpectedly performs a network operation."""
+
+    def _blocked_socket(*args, **kwargs):
+        raise SocketBlockedError("Network access is disabled during tests")
+
+    def _blocked_create_connection(*args, **kwargs):
+        raise SocketBlockedError("Network access is disabled during tests")
+
+    def disable_socket() -> None:
+        stdlib_socket.socket = _blocked_socket  # type: ignore[assignment]
+        stdlib_socket.create_connection = _blocked_create_connection  # type: ignore[assignment]
+
+    def enable_socket() -> None:
+        stdlib_socket.socket = _original_socket  # type: ignore[assignment]
+        stdlib_socket.create_connection = _original_create_connection  # type: ignore[assignment]
+
+    socket = ModuleType("pytest_socket")
+    socket.disable_socket = disable_socket  # type: ignore[attr-defined]
+    socket.enable_socket = enable_socket  # type: ignore[attr-defined]
+    socket.SocketBlockedError = SocketBlockedError  # type: ignore[attr-defined]
+    sys.modules.setdefault("pytest_socket", socket)
+
+pytest_plugins = ("pytest_socket",)
+
+socket.disable_socket()
+
 
 @pytest.fixture(autouse=True)
 def configure_logging() -> None:
