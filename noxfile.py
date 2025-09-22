@@ -43,7 +43,7 @@ SOURCE_DIRECTORIES = (
 SBOM_PATH = Path("dist/Watcher-sbom.json")
 SBOM_DIRECTORY = SBOM_PATH.parent
 DEFAULT_COMPARE_BRANCH = "origin/main"
-DIFF_COVER_FAIL_UNDER = 80
+DIFF_COVER_FAIL_UNDER = 100
 
 nox.options.sessions = ("lint", "typecheck", "tests", "coverage", "build", "security")
 nox.options.reuse_existing_virtualenvs = True
@@ -141,7 +141,13 @@ def security(session: nox.Session) -> None:
 def tests(session: nox.Session) -> None:
     """Run the unit test suite."""
     install_project(session)
-    session.run("pytest", "--cov=app", "--cov=config", "--cov-report=xml")
+    session.run(
+        "pytest",
+        "--cov=app",
+        "--cov=config",
+        "--cov-report=xml",
+        "--cov-fail-under=90",
+    )
 
 
 @nox.session(python=PYTHON_VERSIONS)

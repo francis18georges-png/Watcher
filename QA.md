@@ -38,6 +38,10 @@
 * Le job `Scorecard gate` rejoue l'analyse OpenSSF Scorecard pour chaque Pull Request via
   `ossf/scorecard-action@v2`. La CI échoue dès que le score global descend sous `7` afin de
   bloquer la fusion tant que les recommandations critiques ne sont pas appliquées.
+* Les jobs de tests exigent une couverture globale d'au moins `90 %` via
+  `pytest --cov-fail-under=90` exécuté dans la session Nox `tests`.
+* Le rapport de couverture différentiel doit rester à `100 %`. Le job `coverage` échoue si
+  `diff-cover` détecte une baisse (seuil configuré avec `DIFF_COVER_FAIL_UNDER=100`).
 * The Windows job invokes `./installer.ps1 -SkipOllama` to validate that the PowerShell installer succeeds
   without the Ollama models.
 * Immediately afterwards the workflow launches `./run.ps1` with an empty `DISPLAY` variable to emulate
