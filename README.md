@@ -1,7 +1,7 @@
 # Watcher
 
 ![Benchmark status badge](metrics/performance_badge.svg)
-[![OpenSSF Scorecard](https://api.securityscorecards.dev/projects/github.com/<owner>/Watcher/badge)](https://securityscorecards.dev/viewer/?uri=github.com/<owner>/Watcher)
+[![OpenSSF Scorecard](https://api.securityscorecards.dev/projects/github.com/francis18georges-png/Watcher/badge)](https://securityscorecards.dev/viewer/?uri=github.com/francis18georges-png/Watcher)
 
 Atelier local d'IA de programmation autonome (offline par défaut).
 Mémoire vectorielle, curriculum adaptatif, A/B + bench et quality gate sécurité.
@@ -10,7 +10,7 @@ Mémoire vectorielle, curriculum adaptatif, A/B + bench et quality gate sécurit
 
 La dernière version stable est **v0.4.0** (tag `v0.4.0`, publiée le 20 septembre 2025).
 
-- 📦 Téléchargement direct : [https://github.com/<owner>/Watcher/releases/tag/v0.4.0](https://github.com/<owner>/Watcher/releases/tag/v0.4.0)
+- 📦 Téléchargement direct : [https://github.com/francis18georges-png/Watcher/releases/tag/v0.4.0](https://github.com/francis18georges-png/Watcher/releases/tag/v0.4.0)
 - 🗒️ Notes complètes : voir le [CHANGELOG](CHANGELOG.md) et la [page de notes de version](docs/release_notes.md).
 - ✅ Instructions de vérification (signatures, provenance, empreintes) : détaillées ci-dessous pour chaque
   artefact publié.
@@ -49,7 +49,7 @@ avant de le publier sur l'environnement **GitHub Pages** à chaque push sur `mai
 
 Le badge OpenSSF Scorecard reflète en continu l'état de la posture de sécurité du dépôt
 (`.github/workflows/scorecard.yml`). Il est généré à partir de l'API publique
-<https://api.securityscorecards.dev/projects/github.com/<owner>/Watcher> et renvoie vers le
+<https://api.securityscorecards.dev/projects/github.com/francis18georges-png/Watcher> et renvoie vers le
 rapport détaillé sur <https://securityscorecards.dev>. Un run planifié hebdomadaire publie les
 résultats sur le tableau de bord OpenSSF, tandis que chaque Pull Request bénéficie d'une analyse
 à jour dans GitHub Actions.
@@ -76,16 +76,16 @@ des exécutables Windows, Linux et macOS, un SBOM CycloneDX par plateforme et un
 
 | Fichier | Description |
 | --- | --- |
-| [`Watcher-Setup.zip`](https://github.com/<owner>/Watcher/releases/download/v0.4.0/Watcher-Setup.zip) | Archive PyInstaller Windows signée et empaquetée. |
-| [`Watcher-Setup.zip.sigstore`](https://github.com/<owner>/Watcher/releases/download/v0.4.0/Watcher-Setup.zip.sigstore) | Bundle Sigstore pour vérifier la signature du binaire Windows (`sigstore verify identity --bundle ...`). |
-| [`Watcher-sbom.json`](https://github.com/<owner>/Watcher/releases/download/v0.4.0/Watcher-sbom.json) | Inventaire CycloneDX des dépendances installées pendant le build Windows (`cyclonedx-bom` / `cyclonedx-py`). |
-| [`Watcher-linux-x86_64.tar.gz`](https://github.com/<owner>/Watcher/releases/download/v0.4.0/Watcher-linux-x86_64.tar.gz) | Tarball PyInstaller contenant le binaire autonome Linux. |
-| [`Watcher-linux-sbom.json`](https://github.com/<owner>/Watcher/releases/download/v0.4.0/Watcher-linux-sbom.json) | SBOM CycloneDX généré lors du build Linux. |
-| [`Watcher-macos-x86_64.zip`](https://github.com/<owner>/Watcher/releases/download/v0.4.0/Watcher-macos-x86_64.zip) | Archive PyInstaller macOS signée (si certificat configuré) et soumise à la notarisation Apple lorsque les secrets sont fournis. |
-| [`Watcher-macos-sbom.json`](https://github.com/<owner>/Watcher/releases/download/v0.4.0/Watcher-macos-sbom.json) | SBOM CycloneDX généré lors du build macOS. |
-| [`Watcher-Setup.intoto.jsonl`](https://github.com/<owner>/Watcher/releases/download/v0.4.0/Watcher-Setup.intoto.jsonl) | Provenance SLSA générée par [`slsa-github-generator`](https://github.com/slsa-framework/slsa-github-generator) (atteste la supply chain du binaire Windows). |
+| [`Watcher-Setup.zip`](https://github.com/francis18georges-png/Watcher/releases/download/v0.4.0/Watcher-Setup.zip) | Archive PyInstaller Windows signée et empaquetée. |
+| [`Watcher-Setup.zip.sigstore`](https://github.com/francis18georges-png/Watcher/releases/download/v0.4.0/Watcher-Setup.zip.sigstore) | Bundle Sigstore pour vérifier la signature du binaire Windows (`sigstore verify identity --bundle ...`). |
+| [`Watcher-sbom.json`](https://github.com/francis18georges-png/Watcher/releases/download/v0.4.0/Watcher-sbom.json) | Inventaire CycloneDX des dépendances installées pendant le build Windows (`cyclonedx-bom` / `cyclonedx-py`). |
+| [`Watcher-linux-x86_64.tar.gz`](https://github.com/francis18georges-png/Watcher/releases/download/v0.4.0/Watcher-linux-x86_64.tar.gz) | Tarball PyInstaller contenant le binaire autonome Linux. |
+| [`Watcher-linux-sbom.json`](https://github.com/francis18georges-png/Watcher/releases/download/v0.4.0/Watcher-linux-sbom.json) | SBOM CycloneDX généré lors du build Linux. |
+| [`Watcher-macos-x86_64.zip`](https://github.com/francis18georges-png/Watcher/releases/download/v0.4.0/Watcher-macos-x86_64.zip) | Archive PyInstaller macOS signée (si certificat configuré) et soumise à la notarisation Apple lorsque les secrets sont fournis. |
+| [`Watcher-macos-sbom.json`](https://github.com/francis18georges-png/Watcher/releases/download/v0.4.0/Watcher-macos-sbom.json) | SBOM CycloneDX généré lors du build macOS. |
+| [`Watcher-Setup.intoto.jsonl`](https://github.com/francis18georges-png/Watcher/releases/download/v0.4.0/Watcher-Setup.intoto.jsonl) | Provenance SLSA générée par [`slsa-github-generator`](https://github.com/slsa-framework/slsa-github-generator) (atteste la supply chain du binaire Windows). |
 | `watcher-*.whl` / `watcher-*.tar.gz` | Paquets Python (wheel + source) publiés dans la section *Assets* (installables via `pip`). |
-| [`pip-audit-report.json`](https://github.com/<owner>/Watcher/releases/download/v0.4.0/pip-audit-report.json) | Rapport JSON de l'analyse `pip-audit` exécutée sur `requirements.txt` et `requirements-dev.txt`. |
+| [`pip-audit-report.json`](https://github.com/francis18georges-png/Watcher/releases/download/v0.4.0/pip-audit-report.json) | Rapport JSON de l'analyse `pip-audit` exécutée sur `requirements.txt` et `requirements-dev.txt`. |
 
 ### Vérifier les artefacts publiés
 
@@ -94,7 +94,7 @@ release `v0.4.0` :
 
 ```bash
 # 1. Télécharger tous les fichiers nécessaires (binaire + SBOM + provenance)
-RELEASE="https://github.com/<owner>/Watcher/releases/download/v0.4.0"
+RELEASE="https://github.com/francis18georges-png/Watcher/releases/download/v0.4.0"
 wget "$RELEASE/Watcher-Setup.zip" \
      "$RELEASE/Watcher-Setup.zip.sigstore" \
      "$RELEASE/Watcher-Setup.intoto.jsonl" \
@@ -103,14 +103,14 @@ wget "$RELEASE/Watcher-Setup.zip" \
 # 2. Vérifier la signature Sigstore (Windows)
 sigstore verify identity \
   --bundle Watcher-Setup.zip.sigstore \
-  --certificate-identity "https://github.com/<owner>/Watcher/.github/workflows/release.yml@refs/tags/v0.4.0" \
+  --certificate-identity "https://github.com/francis18georges-png/Watcher/.github/workflows/release.yml@refs/tags/v0.4.0" \
   --certificate-oidc-issuer https://token.actions.githubusercontent.com \
   Watcher-Setup.zip
 
 # 3. Vérifier la provenance SLSA (attestation supply chain)
 slsa-verifier verify-artifact \
   --provenance Watcher-Setup.intoto.jsonl \
-  --source-uri github.com/<owner>/Watcher \
+  --source-uri github.com/francis18georges-png/Watcher \
   --source-tag v0.4.0 \
   Watcher-Setup.zip
 
@@ -143,12 +143,12 @@ plateforme visée et conservez la provenance `*.intoto.jsonl` pour tracer la cha
    ```powershell
    sigstore verify identity `
      --bundle Watcher-Setup.zip.sigstore `
-     --certificate-identity "https://github.com/<owner>/Watcher/.github/workflows/release.yml@refs/tags/<tag>" `
+     --certificate-identity "https://github.com/francis18georges-png/Watcher/.github/workflows/release.yml@refs/tags/<tag>" `
      --certificate-oidc-issuer https://token.actions.githubusercontent.com `
      Watcher-Setup.zip
    ```
 
-   Remplacez `<owner>` par l'organisation ou l'utilisateur GitHub hébergeant ce dépôt et `<tag>` par la version téléchargée.
+   Remplacez `<tag>` par la version téléchargée. Si vous validez un fork, adaptez l'identité du certificat pour refléter votre dépôt ; pour la distribution officielle, l'identité doit rester `https://github.com/francis18georges-png/Watcher/.github/workflows/release.yml@refs/tags/<tag>`.
    La commande échoue si la signature ne provient pas du workflow officiel exécuté sur GitHub Actions.
 4. Extrayez l'archive (clic droit → *Extraire tout...* ou `Expand-Archive` sous PowerShell) puis lancez `Watcher.exe`.
    Conservez le dossier d'extraction tel quel : il contient la configuration (`config/`), les prompts LLM et les fichiers
@@ -307,7 +307,7 @@ Les fichiers d'environnement (`*.env`), les journaux (`*.log`) et les environnem
 ## Exécution via Docker
 
 Une image container officielle est construite par le workflow [`docker.yml`](.github/workflows/docker.yml)
-et publiée sur le registre GitHub Container Registry sous `ghcr.io/<owner>/watcher`.
+et publiée sur le registre GitHub Container Registry sous `ghcr.io/francis18georges-png/watcher`.
 
 ### Utiliser l'image publiée
 
@@ -324,7 +324,7 @@ docker run --rm -it \
   -v watcher-data:/app/data \
   -v watcher-memory:/app/memory \
   -v watcher-logs:/app/logs \
-  ghcr.io/<owner>/watcher:latest --help
+  ghcr.io/francis18georges-png/watcher:latest --help
 ```
 
 Copiez le dossier `config/` du dépôt si vous souhaitez le personnaliser avant de le monter en lecture
@@ -334,7 +334,7 @@ Copiez le dossier `config/` du dépôt si vous souhaitez le personnaliser avant 
 Pour exécuter une commande CLI, passez-la directement après l'image :
 
 ```bash
-docker run --rm -it ghcr.io/<owner>/watcher:latest plugin list
+docker run --rm -it ghcr.io/francis18georges-png/watcher:latest plugin list
 ```
 
 ### Vérifier les artefacts de signature, de provenance et les SBOM
@@ -342,8 +342,8 @@ docker run --rm -it ghcr.io/<owner>/watcher:latest plugin list
 Le workflow [`docker.yml`](.github/workflows/docker.yml) publie, en plus de l'image container,
 les artefacts suivants pour chaque exécution :
 
-- `cosign-bundles/ghcr.io__<owner>__watcher__<tag>.sigstore` : bundle Sigstore de la signature
-  keyless pour la référence `ghcr.io/<owner>/watcher:<tag>`.
+- `cosign-bundles/ghcr.io__francis18georges-png__watcher__<tag>.sigstore` : bundle Sigstore de la signature
+  keyless pour la référence `ghcr.io/francis18georges-png/watcher:<tag>`.
 - `watcher-image-provenance/watcher-image.intoto.jsonl` : attestation SLSA générée via
   [`slsa-github-generator`](https://github.com/slsa-framework/slsa-github-generator) et liée au digest
   publié par le job `Build and publish image`.
@@ -359,18 +359,18 @@ avec `cosign` :
 
 ```bash
 cosign verify \
-  --bundle ghcr.io__<owner>__watcher__<tag>.sigstore \
-  --certificate-identity "https://github.com/<owner>/Watcher/.github/workflows/docker.yml@refs/tags/<tag>" \
+  --bundle ghcr.io__francis18georges-png__watcher__<tag>.sigstore \
+  --certificate-identity "https://github.com/francis18georges-png/Watcher/.github/workflows/docker.yml@refs/tags/<tag>" \
   --certificate-oidc-issuer https://token.actions.githubusercontent.com \
-  ghcr.io/<owner>/watcher@sha256:<digest>
+  ghcr.io/francis18georges-png/watcher@sha256:<digest>
 ```
 
 Remplacez `<tag>` par la version téléchargée (par exemple `v0.4.0`) et `<digest>` par l'empreinte
 SHA256 de l'image. Vous pouvez récupérer ce digest via `docker buildx imagetools inspect`
-(`docker buildx imagetools inspect ghcr.io/<owner>/watcher:<tag> --format '{{.Digest}}'`).
+(`docker buildx imagetools inspect ghcr.io/francis18georges-png/watcher:<tag> --format '{{.Digest}}'`).
 
 Pour les images construites depuis `main`, remplacez l'identité du certificat par
-`https://github.com/<owner>/Watcher/.github/workflows/docker.yml@refs/heads/main` et utilisez le
+`https://github.com/francis18georges-png/Watcher/.github/workflows/docker.yml@refs/heads/main` et utilisez le
 digest correspondant (affiché par `docker pull` ou `crane digest`).
 
 L'attestation SLSA permet de relier cryptographiquement ce digest au workflow GitHub Actions.
@@ -380,7 +380,7 @@ Téléchargez l'artefact `watcher-image-provenance` puis vérifiez-le avec
 ```bash
 slsa-verifier verify-image \
   --provenance watcher-image.intoto.jsonl \
-  ghcr.io/<owner>/watcher@sha256:<digest>
+  ghcr.io/francis18georges-png/watcher@sha256:<digest>
 ```
 
 Vous pouvez également inspecter le fichier pour contrôler manuellement les champs `builder.id` et

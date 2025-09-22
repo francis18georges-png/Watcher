@@ -52,13 +52,12 @@ Watcher-sbom.json.sigstore
    ```bash
    sigstore verify identity \
      --bundle Watcher-Setup.zip.sigstore \
-     --certificate-identity "https://github.com/<owner>/Watcher/.github/workflows/release.yml@refs/tags/<tag>" \
+     --certificate-identity "https://github.com/francis18georges-png/Watcher/.github/workflows/release.yml@refs/tags/<tag>" \
      --certificate-oidc-issuer https://token.actions.githubusercontent.com \
      Watcher-Setup.zip
    ```
 
-   - Remplacez `<owner>` par l'organisation ou l'utilisateur GitHub hébergeant Watcher.
-   - Substituez `<tag>` par la version téléchargée (`vMAJOR.MINOR.PATCH`).
+   - Substituez `<tag>` par la version téléchargée (`vMAJOR.MINOR.PATCH`). Pour un fork, adaptez l'URL `https://github.com/francis18georges-png/Watcher/...` à votre dépôt ; pour la distribution officielle, conservez l'identité `francis18georges-png`.
    - La commande échoue si le bundle ne provient pas du workflow officiel `release.yml`.
 
 3. Répétez la vérification pour les archives Linux et macOS (`Watcher-linux-x86_64.tar.gz`,
@@ -75,7 +74,7 @@ Watcher-sbom.json.sigstore
    ```bash
    cosign verify-attestation \
      --type slsaprovenance \
-     --certificate-identity "https://github.com/<owner>/Watcher/.github/workflows/release.yml@refs/tags/<tag>" \
+     --certificate-identity "https://github.com/francis18georges-png/Watcher/.github/workflows/release.yml@refs/tags/<tag>" \
      --certificate-oidc-issuer https://token.actions.githubusercontent.com \
      --bundle Watcher-Setup.intoto.jsonl.sigstore \
      Watcher-Setup.intoto.jsonl | jq '.'
@@ -100,7 +99,7 @@ recommandées pour les releases officielles :
    ```bash
    sigstore verify identity \
      --bundle Watcher-sbom.json.sigstore \
-     --certificate-identity "https://github.com/<owner>/Watcher/.github/workflows/release.yml@refs/tags/<tag>" \
+     --certificate-identity "https://github.com/francis18georges-png/Watcher/.github/workflows/release.yml@refs/tags/<tag>" \
      --certificate-oidc-issuer https://token.actions.githubusercontent.com \
      Watcher-sbom.json
    ```
@@ -111,7 +110,7 @@ recommandées pour les releases officielles :
    ```bash
    cosign verify-attestation \
      --type cyclonedx \
-     --certificate-identity "https://github.com/<owner>/Watcher/.github/workflows/release.yml@refs/tags/<tag>" \
+     --certificate-identity "https://github.com/francis18georges-png/Watcher/.github/workflows/release.yml@refs/tags/<tag>" \
      --certificate-oidc-issuer https://token.actions.githubusercontent.com \
      --bundle Watcher-sbom.json.sigstore \
      Watcher-sbom.json | jq '.predicate' | less
@@ -140,7 +139,7 @@ jq '.packages[] | {name, versionInfo, licenseDeclared}' sbom.spdx.json | head
 ```
 
 Vérifiez que le champ `documentNamespace` contient le digest SHA256 de l'image téléchargée et que
-les entrées `externalRefs` pointent bien vers `ghcr.io/<owner>/watcher@sha256:<digest>`.
+les entrées `externalRefs` pointent bien vers `ghcr.io/francis18georges-png/watcher@sha256:<digest>`.
 
 Pour conserver un lien de confiance, archivez ce SBOM avec le bundle de signature de l'image et
 l'attestation SLSA décrite ci-dessous.
@@ -157,7 +156,7 @@ avec [`slsa-github-generator`](https://github.com/slsa-framework/slsa-github-gen
    ```bash
    slsa-verifier verify-image \
      --provenance watcher-image.intoto.jsonl \
-     ghcr.io/<owner>/watcher@sha256:<digest>
+     ghcr.io/francis18georges-png/watcher@sha256:<digest>
    ```
 
    Le digest passé en argument doit correspondre à celui vérifié avec `cosign verify`.
