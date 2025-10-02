@@ -8,22 +8,29 @@ référençant les pages GitHub Releases correspondantes.
 
 | Version | Date | Points clés | Lien GitHub Releases |
 | --- | --- | --- | --- |
-| v0.4.0 | 20 septembre 2025 | - Configurer les versions Python ciblées par Nox et CI.<br>- Ajouter des property tests compatibles numpy-stub.<br>- Améliorer les workflows de release et de conteneurisation. | [Release v0.4.0 (GitHub)](https://github.com/francis18georges-png/Watcher/releases/tag/v0.4.0) |
+| v0.4.0 | À venir | - Configurer les versions Python ciblées par Nox et CI.<br>- Ajouter des property tests compatibles numpy-stub.<br>- Améliorer les workflows de release et de conteneurisation. | À venir |
 
 !!! info "Suivre les prochaines versions"
     Ajoutez une nouvelle ligne à ce tableau et un bloc dédié dès qu'un tag `vMAJOR.MINOR.PATCH`
     est poussé.
 
-## v0.4.0 — 2025-09-20
+## v0.4.0 — en préparation
+
+!!! warning "Release GitHub en préparation"
+    La publication officielle de la version `v0.4.0` n'est pas encore disponible sur GitHub.
+    Les liens directs et la date finale seront ajoutés dès que le tag sera créé.
 
 - 🛠️ Configuration explicite des versions Python ciblées par Nox et par la CI.
 - ✅ Ajout de property tests compatibles avec les stubs numpy.
 - 🚀 Optimisations des workflows de release et de build de conteneurs.
 - 📚 Documentation du blocage réseau dans la configuration par défaut.
 
-➤ [Consulter la release GitHub](https://github.com/francis18georges-png/Watcher/releases/tag/v0.4.0)
+➤ Lien GitHub : à venir
 
 ### Vérifier les artefacts de la release v0.4.0
+
+Ces vérifications seront possibles une fois que la publication GitHub sera en ligne. Les
+commandes ci-dessous sont conservées à titre de checklist.
 
 1. Téléchargez les binaires et métadonnées depuis la release officielle :
 
