@@ -47,43 +47,43 @@ jobs:
         run: |
           set -euo pipefail
           python - <<'PY'
-import os
-import pathlib
-import subprocess
+            import os
+            import pathlib
+            import subprocess
 
-workspace = pathlib.Path(os.environ["GITHUB_WORKSPACE"])
-(workspace / ".pyinstaller").mkdir(parents=True, exist_ok=True)
+            workspace = pathlib.Path(os.environ["GITHUB_WORKSPACE"])
+            (workspace / ".pyinstaller").mkdir(parents=True, exist_ok=True)
 
-ref_candidates = []
-ref = os.environ.get("GITHUB_REF")
-if ref:
-    ref_candidates.append(ref)
-ref_name = os.environ.get("GITHUB_REF_NAME")
-if ref_name:
-    ref_candidates.append(f"refs/tags/{ref_name}")
-ref_candidates.append("HEAD")
+            ref_candidates = []
+            ref = os.environ.get("GITHUB_REF")
+            if ref:
+                ref_candidates.append(ref)
+            ref_name = os.environ.get("GITHUB_REF_NAME")
+            if ref_name:
+                ref_candidates.append(f"refs/tags/{ref_name}")
+            ref_candidates.append("HEAD")
 
-epoch = None
-for candidate in ref_candidates:
-    try:
-        value = subprocess.check_output([
-            "git",
-            "log",
-            "-1",
-            "--format=%ct",
-            candidate,
-        ], text=True).strip()
-    except subprocess.CalledProcessError:
-        continue
-    if value:
-        epoch = value
-        break
+            epoch = None
+            for candidate in ref_candidates:
+                try:
+                    value = subprocess.check_output([
+                        "git",
+                        "log",
+                        "-1",
+                        "--format=%ct",
+                        candidate,
+                    ], text=True).strip()
+                except subprocess.CalledProcessError:
+                    continue
+                if value:
+                    epoch = value
+                    break
 
-if epoch is None:
-    raise SystemExit("Unable to determine SOURCE_DATE_EPOCH")
+            if epoch is None:
+                raise SystemExit("Unable to determine SOURCE_DATE_EPOCH")
 
-with open(os.environ["GITHUB_ENV"], "a", encoding="utf-8") as fh:
-    fh.write(f"SOURCE_DATE_EPOCH={epoch}\n")
+            with open(os.environ["GITHUB_ENV"], "a", encoding="utf-8") as fh:
+                fh.write(f"SOURCE_DATE_EPOCH={epoch}\n")
 PY
 
       - name: Install build dependencies
@@ -155,43 +155,43 @@ PY
         run: |
           set -euo pipefail
           python - <<'PY'
-import os
-import pathlib
-import subprocess
+            import os
+            import pathlib
+            import subprocess
 
-workspace = pathlib.Path(os.environ["GITHUB_WORKSPACE"])
-(workspace / ".pyinstaller").mkdir(parents=True, exist_ok=True)
+            workspace = pathlib.Path(os.environ["GITHUB_WORKSPACE"])
+            (workspace / ".pyinstaller").mkdir(parents=True, exist_ok=True)
 
-ref_candidates = []
-ref = os.environ.get("GITHUB_REF")
-if ref:
-    ref_candidates.append(ref)
-ref_name = os.environ.get("GITHUB_REF_NAME")
-if ref_name:
-    ref_candidates.append(f"refs/tags/{ref_name}")
-ref_candidates.append("HEAD")
+            ref_candidates = []
+            ref = os.environ.get("GITHUB_REF")
+            if ref:
+                ref_candidates.append(ref)
+            ref_name = os.environ.get("GITHUB_REF_NAME")
+            if ref_name:
+                ref_candidates.append(f"refs/tags/{ref_name}")
+            ref_candidates.append("HEAD")
 
-epoch = None
-for candidate in ref_candidates:
-    try:
-        value = subprocess.check_output([
-            "git",
-            "log",
-            "-1",
-            "--format=%ct",
-            candidate,
-        ], text=True).strip()
-    except subprocess.CalledProcessError:
-        continue
-    if value:
-        epoch = value
-        break
+            epoch = None
+            for candidate in ref_candidates:
+                try:
+                    value = subprocess.check_output([
+                        "git",
+                        "log",
+                        "-1",
+                        "--format=%ct",
+                        candidate,
+                    ], text=True).strip()
+                except subprocess.CalledProcessError:
+                    continue
+                if value:
+                    epoch = value
+                    break
 
-if epoch is None:
-    raise SystemExit("Unable to determine SOURCE_DATE_EPOCH")
+            if epoch is None:
+                raise SystemExit("Unable to determine SOURCE_DATE_EPOCH")
 
-with open(os.environ["GITHUB_ENV"], "a", encoding="utf-8") as fh:
-    fh.write(f"SOURCE_DATE_EPOCH={epoch}\n")
+            with open(os.environ["GITHUB_ENV"], "a", encoding="utf-8") as fh:
+                fh.write(f"SOURCE_DATE_EPOCH={epoch}\n")
 PY
 
       - name: Install build dependencies
@@ -313,43 +313,43 @@ PY
         run: |
           set -euo pipefail
           python - <<'PY'
-import os
-import pathlib
-import subprocess
+            import os
+            import pathlib
+            import subprocess
 
-workspace = pathlib.Path(os.environ["GITHUB_WORKSPACE"])
-(workspace / ".pyinstaller").mkdir(parents=True, exist_ok=True)
+            workspace = pathlib.Path(os.environ["GITHUB_WORKSPACE"])
+            (workspace / ".pyinstaller").mkdir(parents=True, exist_ok=True)
 
-ref_candidates = []
-ref = os.environ.get("GITHUB_REF")
-if ref:
-    ref_candidates.append(ref)
-ref_name = os.environ.get("GITHUB_REF_NAME")
-if ref_name:
-    ref_candidates.append(f"refs/tags/{ref_name}")
-ref_candidates.append("HEAD")
+            ref_candidates = []
+            ref = os.environ.get("GITHUB_REF")
+            if ref:
+                ref_candidates.append(ref)
+            ref_name = os.environ.get("GITHUB_REF_NAME")
+            if ref_name:
+                ref_candidates.append(f"refs/tags/{ref_name}")
+            ref_candidates.append("HEAD")
 
-epoch = None
-for candidate in ref_candidates:
-    try:
-        value = subprocess.check_output([
-            "git",
-            "log",
-            "-1",
-            "--format=%ct",
-            candidate,
-        ], text=True).strip()
-    except subprocess.CalledProcessError:
-        continue
-    if value:
-        epoch = value
-        break
+            epoch = None
+            for candidate in ref_candidates:
+                try:
+                    value = subprocess.check_output([
+                        "git",
+                        "log",
+                        "-1",
+                        "--format=%ct",
+                        candidate,
+                    ], text=True).strip()
+                except subprocess.CalledProcessError:
+                    continue
+                if value:
+                    epoch = value
+                    break
 
-if epoch is None:
-    raise SystemExit("Unable to determine SOURCE_DATE_EPOCH")
+            if epoch is None:
+                raise SystemExit("Unable to determine SOURCE_DATE_EPOCH")
 
-with open(os.environ["GITHUB_ENV"], "a", encoding="utf-8") as fh:
-    fh.write(f"SOURCE_DATE_EPOCH={epoch}\n")
+            with open(os.environ["GITHUB_ENV"], "a", encoding="utf-8") as fh:
+                fh.write(f"SOURCE_DATE_EPOCH={epoch}\n")
 PY
 
       - name: Install build dependencies
