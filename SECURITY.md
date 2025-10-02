@@ -12,15 +12,9 @@ Les forks, versions communautaires modifiées ou binaires reconstruits par des t
 
 ## Signaler une vulnérabilité
 
-Merci de privilégier des canaux privés pour tout signalement de vulnérabilité afin de limiter le risque d'exploitation avant qu'un correctif ne soit disponible. Utilisez en priorité le bouton **Report a vulnerability** de l'onglet *Security* du dépôt GitHub, qui ouvre le formulaire de signalement privé intégré.
+Merci de privilégier des canaux privés pour tout signalement de vulnérabilité afin de limiter le risque d'exploitation avant qu'un correctif ne soit disponible. Utilisez le bouton **Report a vulnerability** de l'onglet *Security* du dépôt GitHub, qui ouvre le formulaire de signalement privé intégré. Ce formulaire GitHub est actuellement l'unique canal supervisé par l'équipe sécurité.
 
-Si ce canal n'est pas accessible, vous pouvez utiliser l'un des moyens suivants :
-
-- 📧 **Email chiffré PGP** : security@watcher.dev — clé publique : https://watcher.dev/security/pgp.asc (empreinte `8A20 5D9E 3A1B F236 B179  5AA0 E2F0 3F1B 9D0F 4A17`).
-- 🛡️ **Formulaire privé** : https://watcher.dev/security/report.
-- 🐞 **HackerOne** : https://hackerone.com/watcher (programme privé, invitez `Watcher Security Team`).
-
-Si vous devez partager de gros fichiers ou des captures d'écran, indiquez-le et nous vous fournirons un espace de dépôt sécurisé.
+Si vous devez partager de gros fichiers ou des captures d'écran, signalez-le dans le formulaire et nous vous fournirons un espace de dépôt sécurisé lors du suivi.
 
 ## Délais de réponse
 
@@ -49,4 +43,4 @@ Les sujets suivants ne sont pas éligibles à des SLA ni à des récompenses év
 - vulnérabilités sur des versions abandonnées ou des forks communautaires ;
 - divulgation d'informations déjà publiques ou provenant de sources tierces compromises.
 
-Nous restons disponibles pour répondre à vos questions à l'adresse security@watcher.dev.
+Nous restons disponibles pour répondre à vos questions via le suivi GitHub associé à votre signalement.
