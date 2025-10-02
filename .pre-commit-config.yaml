@@ -35,3 +35,12 @@ repos:
       - id: end-of-file-fixer
         name: Ensure text files end with a trailing newline
         types: [text]
+  - repo: https://github.com/rhysd/actionlint
+    rev: v1.7.1
+    hooks:
+      - id: actionlint
+        files: ^\.github/workflows/.*\.yml$
+  - repo: https://github.com/adrienverge/yamllint
+    rev: v1.35.1
+    hooks:
+      - id: yamllint
