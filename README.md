@@ -8,12 +8,12 @@ Mémoire vectorielle, curriculum adaptatif, A/B + bench et quality gate sécurit
 
 ## Version
 
-La dernière version stable est **v0.4.0** (tag `v0.4.0`, publiée le 20 septembre 2025).
+La prochaine version stable sera **v0.4.0**. La publication GitHub Releases est en cours de préparation et
+sera annoncée ici dès qu'elle sera disponible.
 
-- 📦 Téléchargement direct : [https://github.com/francis18georges-png/Watcher/releases/tag/v0.4.0](https://github.com/francis18georges-png/Watcher/releases/tag/v0.4.0)
 - 🗒️ Notes complètes : voir le [CHANGELOG](CHANGELOG.md) et la [page de notes de version](docs/release_notes.md).
-- ✅ Instructions de vérification (signatures, provenance, empreintes) : détaillées ci-dessous pour chaque
-  artefact publié.
+- ✅ Instructions de vérification (signatures, provenance, empreintes) : détaillées ci-dessous et à
+  appliquer dès que les artefacts seront publiés.
 
 ## Citer Watcher
 
@@ -73,27 +73,29 @@ des exécutables Windows, Linux et macOS, un SBOM CycloneDX par plateforme et un
 
 ### Artefacts publiés
 
-| Fichier | Description |
+Les artefacts générés par le workflow `release.yml` seront listés ici dès la mise en ligne de la release
+`v0.4.0`. Chaque build fournit :
+
+| Fichier (à venir) | Description |
 | --- | --- |
-| [`Watcher-Setup.zip`](https://github.com/francis18georges-png/Watcher/releases/download/v0.4.0/Watcher-Setup.zip) | Archive PyInstaller Windows signée et empaquetée. |
-| [`Watcher-Setup.zip.sigstore`](https://github.com/francis18georges-png/Watcher/releases/download/v0.4.0/Watcher-Setup.zip.sigstore) | Bundle Sigstore pour vérifier la signature du binaire Windows (`sigstore verify identity --bundle ...`). |
-| [`Watcher-sbom.json`](https://github.com/francis18georges-png/Watcher/releases/download/v0.4.0/Watcher-sbom.json) | Inventaire CycloneDX des dépendances installées pendant le build Windows (`cyclonedx-bom` / `cyclonedx-py`). |
-| [`Watcher-linux-x86_64.tar.gz`](https://github.com/francis18georges-png/Watcher/releases/download/v0.4.0/Watcher-linux-x86_64.tar.gz) | Tarball PyInstaller contenant le binaire autonome Linux. |
-| [`Watcher-linux-sbom.json`](https://github.com/francis18georges-png/Watcher/releases/download/v0.4.0/Watcher-linux-sbom.json) | SBOM CycloneDX généré lors du build Linux. |
-| [`Watcher-macos-x86_64.zip`](https://github.com/francis18georges-png/Watcher/releases/download/v0.4.0/Watcher-macos-x86_64.zip) | Archive PyInstaller macOS signée (si certificat configuré) et soumise à la notarisation Apple lorsque les secrets sont fournis. |
-| [`Watcher-macos-sbom.json`](https://github.com/francis18georges-png/Watcher/releases/download/v0.4.0/Watcher-macos-sbom.json) | SBOM CycloneDX généré lors du build macOS. |
-| [`Watcher-Setup.intoto.jsonl`](https://github.com/francis18georges-png/Watcher/releases/download/v0.4.0/Watcher-Setup.intoto.jsonl) | Provenance SLSA générée par [`slsa-github-generator`](https://github.com/slsa-framework/slsa-github-generator) (atteste la supply chain du binaire Windows). |
+| `Watcher-Setup.zip` | Archive PyInstaller Windows signée et empaquetée. |
+| `Watcher-Setup.zip.sigstore` | Bundle Sigstore pour vérifier la signature du binaire Windows (`sigstore verify identity --bundle ...`). |
+| `Watcher-sbom.json` | Inventaire CycloneDX des dépendances installées pendant le build Windows (`cyclonedx-bom` / `cyclonedx-py`). |
+| `Watcher-linux-x86_64.tar.gz` | Tarball PyInstaller contenant le binaire autonome Linux. |
+| `Watcher-linux-sbom.json` | SBOM CycloneDX généré lors du build Linux. |
+| `Watcher-macos-x86_64.zip` | Archive PyInstaller macOS signée (si certificat configuré) et soumise à la notarisation Apple lorsque les secrets sont fournis. |
+| `Watcher-macos-sbom.json` | SBOM CycloneDX généré lors du build macOS. |
+| `Watcher-Setup.intoto.jsonl` | Provenance SLSA générée par [`slsa-github-generator`](https://github.com/slsa-framework/slsa-github-generator) (atteste la supply chain du binaire Windows). |
 | `watcher-*.whl` / `watcher-*.tar.gz` | Paquets Python (wheel + source) publiés dans la section *Assets* (installables via `pip`). |
-| [`pip-audit-report.json`](https://github.com/francis18georges-png/Watcher/releases/download/v0.4.0/pip-audit-report.json) | Rapport JSON de l'analyse `pip-audit` exécutée sur `requirements.txt` et `requirements-dev.txt`. |
+| `pip-audit-report.json` | Rapport JSON de l'analyse `pip-audit` exécutée sur `requirements.txt` et `requirements-dev.txt`. |
 
 ### Vérifier les artefacts publiés
 
-Avant toute installation, validez l'authenticité et l'intégrité des binaires téléchargés depuis la
-release `v0.4.0` :
+Une fois la release `v0.4.0` publiée, validez l'authenticité et l'intégrité des binaires téléchargés :
 
 ```bash
 # 1. Télécharger tous les fichiers nécessaires (binaire + SBOM + provenance)
-RELEASE="https://github.com/francis18georges-png/Watcher/releases/download/v0.4.0"
+RELEASE="https://github.com/francis18georges-png/Watcher/releases/download/<VERSION>"
 wget "$RELEASE/Watcher-Setup.zip" \
      "$RELEASE/Watcher-Setup.zip.sigstore" \
      "$RELEASE/Watcher-Setup.intoto.jsonl" \
@@ -102,7 +104,7 @@ wget "$RELEASE/Watcher-Setup.zip" \
 # 2. Vérifier la signature Sigstore (Windows)
 sigstore verify identity \
   --bundle Watcher-Setup.zip.sigstore \
-  --certificate-identity "https://github.com/francis18georges-png/Watcher/.github/workflows/release.yml@refs/tags/v0.4.0" \
+  --certificate-identity "https://github.com/francis18georges-png/Watcher/.github/workflows/release.yml@refs/tags/<VERSION>" \
   --certificate-oidc-issuer https://token.actions.githubusercontent.com \
   Watcher-Setup.zip
 
@@ -110,13 +112,14 @@ sigstore verify identity \
 slsa-verifier verify-artifact \
   --provenance Watcher-Setup.intoto.jsonl \
   --source-uri github.com/francis18georges-png/Watcher \
-  --source-tag v0.4.0 \
+  --source-tag <VERSION> \
   Watcher-Setup.zip
 
 # 4. Calculer/valider les empreintes
 sha256sum Watcher-Setup.zip Watcher-linux-x86_64.tar.gz Watcher-macos-x86_64.zip
 ```
 
+- Remplacez `<VERSION>` par le tag SemVer effectivement publié (ex. `v0.4.0`).
 - Pour Linux/macOS, comparez le `sha256sum` obtenu avec les empreintes publiées dans la release.
 - Les SBOM (`Watcher-*-sbom.json`) peuvent être explorés avec `jq`, importés dans un scanner CycloneDX ou
   validés via `cyclonedx-py validate Watcher-sbom.json`.
