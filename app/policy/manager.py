@@ -126,14 +126,33 @@ class PolicyManager:
         if not isinstance(defaults, dict):
             return data
 
-        legacy_keys = {"offline", "require_consent"}
-        keys_to_remove = legacy_keys.intersection(defaults)
-        if not keys_to_remove:
-            return data
-
-        cleaned_defaults = {
-            key: value for key, value in defaults.items() if key not in keys_to_remove
+        legacy_aliases = {
+            # ``consent_required`` and ``offline_mode`` were used in early
+            # prototypes before the schema settled on ``require_consent`` and
+            # ``offline``.  Preserve the value provided by the user instead of
+            # discarding it.
+            "consent_required": "require_consent",
+            "offline_mode": "offline",
         }
+        legacy_drop = {
+            # ``auto_approve`` was removed in favour of the explicit
+            # allowlist/ledger flow.
+            "auto_approve",
+        }
+
+        cleaned_defaults: dict[str, Any] = {}
+        for key, value in defaults.items():
+            if key in legacy_drop:
+                continue
+
+            target = legacy_aliases.get(key, key)
+            # If both the legacy alias and the new key are present, keep the
+            # explicit modern key.
+            if target in cleaned_defaults and target != key:
+                continue
+
+            cleaned_defaults[target] = value
+
         normalised = dict(data)
         normalised["defaults"] = cleaned_defaults
         return normalised

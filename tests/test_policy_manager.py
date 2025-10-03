@@ -68,6 +68,29 @@ def test_policy_manager_multiple_scopes_same_domain(tmp_path: Path) -> None:
     assert scopes == {"web", "api"}
 
 
+def test_read_policy_preserves_boolean_defaults(tmp_path: Path) -> None:
+    home = tmp_path / "home"
+    home.mkdir()
+
+    configurator = FirstRunConfigurator(home=home)
+    configurator.run(auto=True, download_models=False)
+
+    policy_path = home / ".watcher" / "policy.yaml"
+    policy_data = yaml.safe_load(policy_path.read_text(encoding="utf-8"))
+    policy_data.setdefault("defaults", {})["offline"] = False
+    policy_data["defaults"]["require_consent"] = False
+    policy_path.write_text(
+        yaml.safe_dump(policy_data, sort_keys=False),
+        encoding="utf-8",
+    )
+
+    manager = PolicyManager(home=home)
+    policy = manager._read_policy()
+
+    assert policy.defaults.offline is False
+    assert policy.defaults.require_consent is False
+
+
 def test_read_policy_preserves_unknown_defaults_keys(tmp_path: Path) -> None:
     home = tmp_path / "home"
     home.mkdir()
