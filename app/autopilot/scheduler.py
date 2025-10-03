@@ -222,6 +222,17 @@ class AutopilotScheduler:
             if engine is not None:
                 engine.set_offline(True)
             raise AutopilotError(message) from exc
+        if policy.defaults.kill_switch:
+            if self.state.enabled:
+                self._log("warning", "Kill-switch activé – autopilot suspendu.")
+            self.state.enabled = False
+            self.state.online = False
+            self.state.current_topic = None
+            self.state.last_reason = "kill-switch"
+            self._save_state()
+            if engine is not None:
+                engine.set_offline(True)
+            return self.state
         usage = self._resource_probe.snapshot()
         self.state.last_cpu_percent = usage.cpu_percent
         self.state.last_ram_mb = usage.ram_mb
