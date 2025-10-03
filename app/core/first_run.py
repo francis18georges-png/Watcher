@@ -326,7 +326,7 @@ class FirstRunConfigurator:
 
         value = os.environ.get("WATCHER_AUTOSTART")
         if value is None:
-            return False
+            return True
 
         value = value.strip().lower()
         return value not in {"", "0", "false", "no", "off"}
@@ -342,15 +342,17 @@ class FirstRunConfigurator:
         ]
 
     def _configure_windows_autostart(self) -> None:
-        command = self._autopilot_command_parts()
-        command_string = subprocess.list2cmdline(command)
+        run_once_command = subprocess.list2cmdline(["watcher", "init", "--auto"])
+        autopilot_command = subprocess.list2cmdline(
+            ["watcher", "autopilot", "run", "--noninteractive"]
+        )
 
-        script_value = command_string.replace("'", "''")
+        script_value = run_once_command.replace("'", "''")
         powershell_script = textwrap.dedent(
             f"""
             $path = 'HKCU:\\Software\\Microsoft\\Windows\\CurrentVersion\\RunOnce'
             New-Item -Path $path -Force | Out-Null
-            Set-ItemProperty -Path $path -Name 'WatcherAutopilot' -Type String -Value '{script_value}' -Force
+            Set-ItemProperty -Path $path -Name 'WatcherInit' -Type String -Value '{script_value}' -Force
             """
         ).strip()
 
@@ -375,9 +377,9 @@ class FirstRunConfigurator:
                     "/TN",
                     "Watcher Autopilot",
                     "/TR",
-                    command_string,
+                    autopilot_command,
                     "/SC",
-                    "HOURLY",
+                    "ONLOGON",
                     "/F",
                 ],
                 check=True,
@@ -420,8 +422,9 @@ class FirstRunConfigurator:
             Description=Watcher Autopilot orchestrator schedule
 
             [Timer]
-            OnBootSec=5m
+            OnBootSec=30s
             OnUnitActiveSec=1h
+            Persistent=true
             Unit=watcher-autopilot.service
 
             [Install]
@@ -432,6 +435,14 @@ class FirstRunConfigurator:
             "\n".join(line.rstrip() for line in timer_body.splitlines()) + "\n",
             encoding="utf-8",
         )
+
+        try:
+            subprocess.run(
+                ["systemctl", "--user", "daemon-reload"],
+                check=True,
+            )
+        except (OSError, subprocess.CalledProcessError):
+            pass
 
         try:
             subprocess.run(
