@@ -200,14 +200,14 @@ jobs:
         include:
           - os: ubuntu-latest
             display-name: Linux
-            artifact-suffix: linux-x86_64
-            sbom-name: Watcher-linux-sbom.json
-            archive-name: Watcher-linux-x86_64.tar.gz
+            artifact_suffix: linux-x86_64
+            sbom_name: Watcher-linux-sbom.json
+            archive_name: Watcher-linux-x86_64.tar.gz
           - os: macos-latest
             display-name: macOS
-            artifact-suffix: macos-x86_64
-            sbom-name: Watcher-macos-sbom.json
-            archive-name: Watcher-macos-x86_64.zip
+            artifact_suffix: macos-x86_64
+            sbom_name: Watcher-macos-sbom.json
+            archive_name: Watcher-macos-x86_64.zip
     steps:
       - name: Validate SemVer tag
         shell: bash
@@ -277,7 +277,7 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p dist
-          SBOM_FILE="dist/${{ matrix.sbom-name }}"
+          SBOM_FILE="dist/${{ matrix.sbom_name }}"
           cyclonedx-py environment --format json --output-file "$SBOM_FILE"
           echo "SBOM_FILE=$SBOM_FILE" >> "$GITHUB_ENV"
 
@@ -290,7 +290,7 @@ jobs:
             echo "Expected PyInstaller output '$DIST_DIR' was not found." >&2
             exit 1
           fi
-          ARCHIVE="dist/${{ matrix.archive-name }}"
+          ARCHIVE="dist/${{ matrix.archive_name }}"
           case "${{ matrix.os }}" in
             ubuntu-latest)
               tar --sort=name \
@@ -311,7 +311,7 @@ jobs:
           echo "ARCHIVE_FILE=$ARCHIVE" >> "$GITHUB_ENV"
 
       - name: Normalize archive metadata
-        if: endsWith(matrix.archive-name, '.zip')
+        if: endsWith(matrix.archive_name, '.zip')
         shell: bash
         run: |
           set -euo pipefail
@@ -352,7 +352,7 @@ jobs:
       - name: Upload release artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: release-${{ matrix.artifact-suffix }}
+          name: release-${{ matrix.artifact_suffix }}
           if-no-files-found: error
           path: |
             ${{ env.ARCHIVE_FILE }}
