@@ -23,6 +23,14 @@ def test_first_run_creates_expected_files(tmp_path: Path, monkeypatch: pytest.Mo
     home.mkdir()
     configurator = FirstRunConfigurator(home=home)
 
+    recorded: dict[str, object] = {}
+
+    def _fake_autostart(**kwargs):
+        recorded.update(kwargs)
+        return True
+
+    monkeypatch.setattr("app.core.first_run.configure_autostart", _fake_autostart)
+
     config_path = configurator.run(fully_auto=True, download_models=False)
 
     assert config_path == home / ".watcher" / "config.toml"
@@ -40,6 +48,9 @@ def test_first_run_creates_expected_files(tmp_path: Path, monkeypatch: pytest.Mo
     assert ledger_path.exists()
     ledger_content = ledger_path.read_text(encoding="utf-8")
     assert '"type": "metadata"' in ledger_content
+
+    assert recorded.get("home") == home
+    assert recorded.get("consent_granted") is False
 
 
 def test_user_config_overrides_settings(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:

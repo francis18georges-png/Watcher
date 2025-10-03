@@ -11,6 +11,7 @@ from typing import Callable, Iterable, Sequence
 
 from app.policy.manager import PolicyError, PolicyManager
 from app.policy.schema import Policy, TimeWindow, _parse_window
+from app.utils import autostart
 
 try:  # pragma: no cover - optional dependency
     import psutil  # type: ignore[import-not-found]
@@ -153,6 +154,7 @@ class AutopilotScheduler:
         engine=None,
         now: datetime | None = None,
     ) -> AutopilotState:
+        self._ensure_not_disabled(engine=engine)
         normalised = self._normalise_topics(topics)
         if not normalised:
             raise AutopilotError("aucun sujet fourni")
@@ -199,6 +201,7 @@ class AutopilotScheduler:
         engine=None,
         now: datetime | None = None,
     ) -> AutopilotState:
+        self._ensure_not_disabled(engine=engine)
         now = now or self._clock()
         self.state.last_check = self._timestamp(now)
         if not self.state.enabled:
@@ -260,6 +263,22 @@ class AutopilotScheduler:
 
     # ------------------------------------------------------------------
     # Helpers
+
+    def _ensure_not_disabled(self, *, engine=None) -> None:
+        home = None
+        if self._policy_manager is not None:
+            home = self._policy_manager.home
+        if autostart.is_autostart_disabled(home=home):
+            if self.state.enabled or self.state.online:
+                self._log("warning", "Kill-switch activé – autopilot désactivé.")
+            self.state.enabled = False
+            self.state.online = False
+            self.state.current_topic = None
+            self.state.last_reason = "kill-switch"
+            self._save_state()
+            if engine is not None:
+                engine.set_offline(True)
+            raise AutopilotError("Kill-switch activé pour l'autopilot.")
 
     def _load_state(self) -> AutopilotState:
         if self.state_path.exists():
