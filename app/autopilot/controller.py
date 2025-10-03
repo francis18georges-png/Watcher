@@ -348,7 +348,7 @@ class AutopilotController:
         *,
         scheduler: AutopilotScheduler,
         pipeline: IngestPipeline,
-        crawler: DiscoveryCrawler,
+        crawler: DiscoveryCrawler | None = None,
         scraper: Scraper | None = None,
         throttle_seconds: float = 1.0,
         report_path: Path | None = None,
@@ -358,6 +358,10 @@ class AutopilotController:
     ) -> None:
         self.scheduler = scheduler
         self.pipeline = pipeline
+        if crawler is None:
+            from app.autopilot.discovery import DefaultDiscoveryCrawler
+
+            crawler = DefaultDiscoveryCrawler()
         self.crawler = crawler
         self.scraper = scraper or HTTPScraper()
         self._throttle = max(0.0, float(throttle_seconds))

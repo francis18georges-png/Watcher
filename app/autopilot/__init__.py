@@ -9,6 +9,7 @@ from .controller import (
     MultiSourceVerifier,
     ReportGenerator,
 )
+from .discovery import DefaultDiscoveryCrawler
 from .scheduler import (
     AutopilotError,
     AutopilotLogEntry,
@@ -26,6 +27,7 @@ __all__ = [
     "AutopilotScheduler",
     "AutopilotState",
     "ConsentGate",
+    "DefaultDiscoveryCrawler",
     "DiscoveryResult",
     "LedgerView",
     "MultiSourceVerifier",
