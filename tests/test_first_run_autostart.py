@@ -6,7 +6,6 @@ from pathlib import Path
 from typing import Any
 
 import pytest
-from unittest.mock import ANY
 
 from app.core.first_run import FirstRunConfigurator
 
@@ -24,7 +23,7 @@ def test_autostart_creates_systemd_units(
     home = tmp_path / "home"
     home.mkdir()
 
-    monkeypatch.setenv("WATCHER_AUTOSTART", "1")
+    monkeypatch.delenv("WATCHER_AUTOSTART", raising=False)
     monkeypatch.delenv("WATCHER_DISABLE", raising=False)
     monkeypatch.setattr("app.core.first_run.platform.system", lambda: "Linux")
     monkeypatch.setattr("app.core.first_run.sys.executable", "/opt/python/bin/python3")
@@ -50,7 +49,15 @@ def test_autostart_creates_systemd_units(
 
     assert timer_path.exists()
     timer_content = timer_path.read_text(encoding="utf-8")
+    assert "OnBootSec=30s" in timer_content
     assert "OnUnitActiveSec=1h" in timer_content
+    assert "Persistent=true" in timer_content
+
+    assert [
+        "systemctl",
+        "--user",
+        "daemon-reload",
+    ] in calls
 
     assert [
         "systemctl",
@@ -67,7 +74,7 @@ def test_autostart_creates_windows_definitions(
     home = tmp_path / "home"
     home.mkdir()
 
-    monkeypatch.setenv("WATCHER_AUTOSTART", "1")
+    monkeypatch.delenv("WATCHER_AUTOSTART", raising=False)
     monkeypatch.delenv("WATCHER_DISABLE", raising=False)
     monkeypatch.setattr("app.core.first_run.platform.system", lambda: "Windows")
     monkeypatch.setattr("app.core.first_run.sys.executable", r"C:\\Watcher\\python.exe")
@@ -80,13 +87,16 @@ def test_autostart_creates_windows_definitions(
     configurator = FirstRunConfigurator(home=home)
     configurator.run(auto=True, download_models=False)
 
-    assert ["powershell", "-NoProfile", "-Command", ANY] in calls
+    powershell_call = next(call for call in calls if call and call[0] == "powershell")
+    assert "watcher init --auto" in powershell_call[-1]
+    assert "WatcherInit" in powershell_call[-1]
+
     schtasks_call = next(call for call in calls if call and call[0] == "schtasks")
     assert "/Create" in schtasks_call
     assert "Watcher Autopilot" in schtasks_call
+    assert "/SC" in schtasks_call and "ONLOGON" in schtasks_call
     assert any(
-        "python.exe" in part and "autopilot run --noninteractive" in part
-        for part in schtasks_call
+        "watcher autopilot run --noninteractive" in part for part in schtasks_call
     )
 
 
