@@ -1,11 +1,12 @@
 from __future__ import annotations
-
 from pathlib import Path
 
 import yaml
 
+import pytest
+
 from app.core.first_run import FirstRunConfigurator
-from app.policy.manager import PolicyManager
+from app.policy.manager import PolicyError, PolicyManager
 
 
 def test_policy_manager_approve_and_revoke(tmp_path: Path) -> None:
@@ -65,3 +66,24 @@ def test_policy_manager_multiple_scopes_same_domain(tmp_path: Path) -> None:
 
     scopes = {entry["scope"] for entry in allowlist if entry["domain"] == "example.com"}
     assert scopes == {"web", "api"}
+
+
+def test_read_policy_preserves_unknown_defaults_keys(tmp_path: Path) -> None:
+    home = tmp_path / "home"
+    home.mkdir()
+
+    configurator = FirstRunConfigurator(home=home)
+    configurator.run(auto=True, download_models=False)
+
+    policy_path = home / ".watcher" / "policy.yaml"
+    policy_data = yaml.safe_load(policy_path.read_text(encoding="utf-8"))
+    policy_data.setdefault("defaults", {})["unexpected"] = "nope"
+    policy_path.write_text(
+        yaml.safe_dump(policy_data, sort_keys=False),
+        encoding="utf-8",
+    )
+
+    manager = PolicyManager(home=home)
+
+    with pytest.raises(PolicyError):
+        manager._read_policy()

@@ -5,9 +5,11 @@ from __future__ import annotations
 import hashlib
 from datetime import datetime
 from pathlib import Path
-from typing import Iterable
+from typing import Any, Iterable
 
 import yaml
+
+from pydantic import ValidationError
 
 from .ledger import ConsentLedger, LedgerError
 from .schema import DomainRule, Policy
@@ -34,7 +36,13 @@ class PolicyManager:
             data = yaml.safe_load(text) or {}
         except yaml.YAMLError as exc:  # pragma: no cover - defensive
             raise PolicyError("policy.yaml is not valid YAML") from exc
-        return Policy.model_validate(data)
+
+        normalised = self._normalise_defaults(data)
+
+        try:
+            return Policy.model_validate(normalised)
+        except ValidationError as exc:
+            raise PolicyError("policy.yaml is invalid") from exc
 
     def _write_policy(self, policy: Policy) -> None:
         data = policy.to_dict()
@@ -112,4 +120,21 @@ class PolicyManager:
             scope=scope,
             policy_hash=self._policy_hash(),
         )
+
+    def _normalise_defaults(self, data: dict[str, Any]) -> dict[str, Any]:
+        defaults = data.get("defaults")
+        if not isinstance(defaults, dict):
+            return data
+
+        legacy_keys = {"offline", "require_consent"}
+        keys_to_remove = legacy_keys.intersection(defaults)
+        if not keys_to_remove:
+            return data
+
+        cleaned_defaults = {
+            key: value for key, value in defaults.items() if key not in keys_to_remove
+        }
+        normalised = dict(data)
+        normalised["defaults"] = cleaned_defaults
+        return normalised
 
