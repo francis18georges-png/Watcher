@@ -1,13 +1,22 @@
-"""LLM client that prefers a locally running Ollama server."""
+"""LLM client capable of running fully offline via ``llama.cpp``."""
 
 from __future__ import annotations
 
+import os
 import http.client
 import json
 import logging
+import threading
+from pathlib import Path
 from urllib.parse import urlparse
 
 from config import get_settings
+
+
+try:  # pragma: no cover - optional dependency
+    from llama_cpp import Llama  # type: ignore[import-not-found]
+except Exception:  # pragma: no cover - optional dependency
+    Llama = None  # type: ignore[assignment]
 
 
 def validate_prompt(prompt: str) -> str:
@@ -105,11 +114,44 @@ class Client:
         if ctx is not None and ctx < 1:
             raise ValueError("ctx must be a positive integer")
 
-        self.model = model or llm_cfg.model
+        backend = llm_cfg.backend.strip().lower()
+        llm_model = model or llm_cfg.model
+
+        # ``model`` previously referred to the remote identifier. We still honour
+        # this usage by switching to the Ollama backend if the provided value
+        # resembles an Ollama reference.
+        if "://" in llm_model or (
+            ":" in llm_model and not any(sep in llm_model for sep in ("/", "\\"))
+        ):
+            backend = "ollama"
+
+        if backend in {"llama.cpp", "llama-cpp", "llamacpp"}:
+            backend = "llama.cpp"
+        elif backend != "ollama":
+            raise ValueError(f"Unsupported LLM backend: {backend}")
+
+        self.backend = backend
+        self.model = llm_model
         self.host = host or llm_cfg.host
         self.ctx = ctx if ctx is not None else llm_cfg.ctx
         self.fallback_phrase = fallback_phrase or llm_cfg.fallback_phrase
+        self.temperature = float(llm_cfg.temperature)
+        self.max_tokens = int(llm_cfg.max_tokens)
+        self.system_prompt = llm_cfg.system_prompt
+        self.model_path = (
+            settings.paths.resolve(llm_cfg.model_path)
+            if backend == "llama.cpp"
+            else llm_cfg.model_path
+        )
+        threads = llm_cfg.threads
+        self.threads = (
+            threads
+            if threads is not None
+            else max(1, os.cpu_count() or 1)
+        )
         self._offline = False
+        self._llama_lock = threading.RLock()
+        self._llama_model: Llama | None = None
 
     def set_offline(self, offline: bool) -> None:
         """Enable or disable offline mode for the client."""
@@ -130,21 +172,76 @@ class Client:
         """
 
         trace: list[str] = []
-        if self._offline:
+        backend = getattr(self, "backend", "ollama")
+        if self._offline and backend != "llama.cpp":
             trace.extend(["offline", "fallback"])
             return f"{self.fallback_phrase}: {prompt}", " -> ".join(trace)
 
         try:  # pragma: no cover - network path
-            responses: list[str] = []
-            for idx, chunk in enumerate(chunk_prompt(prompt)):
-                trace.append(f"ollama:{idx}")
-                responses.append(
-                    generate_ollama(chunk, host=self.host, model=self.model)
-                )
+            if backend == "llama.cpp":
+                response = self._generate_llama_cpp(prompt, separator, trace)
+            else:
+                response = self._generate_ollama(prompt, separator, trace)
             trace.append("success")
-            return separator.join(responses), " -> ".join(trace)
+            return response, " -> ".join(trace)
         except Exception as exc:
             trace.append(f"error:{exc.__class__.__name__}")
             trace.append("fallback")
             logging.exception("Failed to generate response: %s", exc)
             return f"{self.fallback_phrase}: {prompt}", " -> ".join(trace)
+
+    # ------------------------------------------------------------------
+    # Backend specific helpers
+
+    def _generate_ollama(
+        self, prompt: str, separator: str, trace: list[str]
+    ) -> str:
+        responses: list[str] = []
+        for idx, chunk in enumerate(chunk_prompt(prompt)):
+            trace.append(f"ollama:{idx}")
+            responses.append(
+                generate_ollama(chunk, host=self.host, model=self.model)
+            )
+        return separator.join(responses)
+
+    def _ensure_llama(self) -> Llama:
+        if Llama is None:  # pragma: no cover - dependency missing
+            raise RuntimeError(
+                "llama-cpp-python is required but not installed. "
+                "Ajoutez 'llama-cpp-python' à vos dépendances."
+            )
+
+        model_path = Path(self.model_path)
+        if not model_path.is_file():
+            raise FileNotFoundError(
+                f"Le modèle llama.cpp est introuvable: {model_path}"
+            )
+
+        with self._llama_lock:
+            if self._llama_model is None:
+                kwargs = {
+                    "model_path": str(model_path),
+                    "n_ctx": int(self.ctx or 2048),
+                    "n_threads": int(self.threads),
+                }
+                self._llama_model = Llama(**kwargs)
+        return self._llama_model
+
+    def _generate_llama_cpp(
+        self, prompt: str, separator: str, trace: list[str]
+    ) -> str:
+        llama = self._ensure_llama()
+        responses: list[str] = []
+        for idx, chunk in enumerate(chunk_prompt(prompt)):
+            trace.append(f"llama.cpp:{idx}")
+            completion = llama.create_chat_completion(
+                messages=[
+                    {"role": "system", "content": self.system_prompt},
+                    {"role": "user", "content": chunk},
+                ],
+                temperature=self.temperature,
+                max_tokens=self.max_tokens,
+            )
+            choice = completion["choices"][0]["message"]["content"]
+            responses.append(str(choice).strip())
+        return separator.join(responses)

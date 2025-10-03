@@ -9,7 +9,7 @@ from app.utils import np
 
 from config import get_settings
 
-from app.tools.embeddings import embed_ollama
+from app.tools.embeddings import embed_local, embed_ollama
 from app.core.logging_setup import get_logger
 
 
@@ -378,11 +378,18 @@ class Memory:
     def _embed(self, text: str, use_cache: bool = True) -> np.ndarray:
         """Return embedding for ``text`` using a simple in-memory cache."""
         if self._offline:
-            return self._zero_vector
+            vecs = embed_local([text])
+            return vecs[0] if vecs else self._zero_vector
         if use_cache and text in self._embed_cache:
             return self._embed_cache[text]
         vecs = embed_ollama([text])
-        vec = vecs[0].astype("float32") if vecs else np.zeros(1, dtype=np.float32)
+        if not vecs:
+            vecs = embed_local([text])
+        vec = (
+            vecs[0].astype("float32")
+            if vecs
+            else np.zeros(1, dtype=np.float32)
+        )
         if use_cache:
             self._embed_cache[text] = vec
         return vec

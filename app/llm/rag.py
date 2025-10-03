@@ -1,36 +1,39 @@
-"""Minimal RAG pipeline skeleton.
-
-- retrieve top passages from vector store
-- call an LLM (placeholder) with context + prompt
-"""
+"""RAG helper relying on the local vector store and llama.cpp."""
 
 from __future__ import annotations
+
 import logging
-from typing import List
+from typing import Sequence
 
 from app.embeddings.store import SimpleVectorStore
+from app.llm.client import Client
 
 logger = logging.getLogger(__name__)
 
 
-def build_prompt(question: str, passages: List[str]) -> str:
+def build_prompt(question: str, passages: Sequence[str]) -> str:
     context = "\n\n".join(
-        f"PASSAGE {i + 1}:\n{content}" for i, content in enumerate(passages)
+        f"PASSAGE {i + 1}:\n{content}" for i, content in enumerate(passages) if content
     )
+    header = "Contexte:\n" + context if context else "Contexte: (aucun)"
     return (
-        f"Contexte:\n{context}\n\nQuestion: {question}\n"
-        "Réponds en t'expliquant si tu utilises les passages."
+        f"{header}\n\nQuestion: {question}\n"
+        "Réponds en expliquant brièvement quelles sources tu utilises."
     )
 
 
-def fake_llm(prompt: str) -> str:
-    return "RÉPONSE_SIMULÉE: " + prompt[:300]
-
-
-def answer_question(question: str, k: int = 3):
-    vs = SimpleVectorStore()
-    hits = vs.search(question, k=k)
-    passages = [item[0].get("text", "") for item in hits] if hits else []
+def answer_question(
+    question: str,
+    k: int = 3,
+    *,
+    client: Client | None = None,
+    store: SimpleVectorStore | None = None,
+) -> str:
+    vector_store = store or SimpleVectorStore()
+    hits = vector_store.search(question, k=k)
+    passages = [item[0].get("text", "") for item in hits if item[0].get("text")]
     prompt = build_prompt(question, passages)
     logger.debug("Prompt length %d", len(prompt))
-    return fake_llm(prompt)
+    llm = client or Client()
+    answer, _ = llm.generate(prompt, separator="\n")
+    return answer

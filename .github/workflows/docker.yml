@@ -159,6 +159,8 @@ jobs:
     with:
       image: ghcr.io/${{ github.repository_owner }}/watcher
       digest: ${{ needs.build-and-push.outputs.image-digest }}
+      registry-username: ${{ github.actor }}
+      registry-password: ${{ secrets.GITHUB_TOKEN }}
 
   normalize-provenance:
     name: Publish provenance artifact

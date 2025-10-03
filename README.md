@@ -8,12 +8,42 @@ Mémoire vectorielle, curriculum adaptatif, A/B + bench et quality gate sécurit
 
 ## Version
 
-La prochaine version stable sera **v0.4.0**. La publication GitHub Releases est en cours de préparation et
-sera annoncée ici dès qu'elle sera disponible.
+Les binaires et paquets signés sont publiés sur la page
+[GitHub Releases](https://github.com/francis18georges-png/Watcher/releases/latest).
+La version stable actuelle est `v0.4.0` ; utilisez toujours ce lien `releases/latest`
+pour éviter les 404 lorsque de nouvelles versions sont mises en ligne.
 
 - 🗒️ Notes complètes : voir le [CHANGELOG](CHANGELOG.md) et la [page de notes de version](docs/release_notes.md).
 - ✅ Instructions de vérification (signatures, provenance, empreintes) : détaillées ci-dessous et à
-  appliquer dès que les artefacts seront publiés.
+  appliquer pour chaque artefact téléchargé.
+
+## Démarrage hors ligne en 3 étapes
+
+1. **Installer les dépendances Python** (environnement virtuel recommandé) :
+
+   ```bash
+   pip install -r requirements.txt
+   ```
+
+2. **Préparer les modèles locaux** (LLM + embeddings) grâce au script dédié :
+
+   ```bash
+   scripts/setup-local-models.sh
+   # Les fichiers sont placés dans models/llm/ et models/embeddings/
+   ```
+
+   Le script télécharge par défaut le modèle `SmolLM-135M-Instruct` au format GGUF et le
+   modèle d'embedding `all-MiniLM-L6-v2`. Utilisez `--help` pour personnaliser les chemins
+   ou forcer un re-téléchargement.
+
+3. **Lancer l'agent entièrement offline** :
+
+   ```bash
+   watcher run --offline --prompt "Analyse ce dépôt et résume les modules principaux."
+   ```
+
+   La commande appelle le backend `llama.cpp` local, la mémoire vectorielle SQLite et les
+   outils sandboxés (`app/core/sandbox.py`). Les traces sont visibles dans `logs/`.
 
 ## Citer Watcher
 
