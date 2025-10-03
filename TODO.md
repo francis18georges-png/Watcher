@@ -9,3 +9,6 @@ P0 - critique, P1 - important, P2 - amélioration future
 5. [P2] Étendre la couverture des métriques de performance (temps de réponse, couverture de tests)
 6. [P2] Documenter des objectifs chiffrés pour la qualité du code
 
+7. [P0] Livrer un parcours first-run `watcher init --auto` vérifiant les modèles offline (voir `docs/autonomy_gap_analysis.md`)
+8. [P0] Implémenter policy/consentement, autopilot sandboxé et ingestion vérifiée multi-sources
+9. [P0] Corriger les workflows Release/Docker, publier v0.4.0 avec artefacts signés et activer la documentation
