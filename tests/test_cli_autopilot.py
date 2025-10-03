@@ -3,7 +3,15 @@ from types import SimpleNamespace
 import pytest
 
 from app import cli
-from app.autopilot import AutopilotRunResult, AutopilotState
+from app.autopilot import (
+    AutopilotRunResult,
+    AutopilotState,
+    DefaultDiscoveryCrawler,
+    DiscoveryResult,
+)
+from app.ingest.pipeline import RawDocument
+from app.policy.schema import DomainRule
+from app.scrapers.http import ScrapeResult
 
 
 class DummyEngine:
@@ -120,11 +128,16 @@ def test_cli_autopilot_run_success(monkeypatch, capsys):
     crawler = SimpleNamespace(name="crawler")
     run_calls: list[list[str]] = []
 
+    http_instance = SimpleNamespace(name="http")
+    sitemap_instance = SimpleNamespace(name="sitemap")
+    github_instance = SimpleNamespace(name="github")
+
     class DummyController:
-        def __init__(self, *, scheduler, pipeline, crawler):  # pragma: no cover - tested via CLI
+        def __init__(self, *, scheduler, pipeline, crawler, scraper):  # pragma: no cover - tested via CLI
             assert scheduler is scheduler_instance
             assert pipeline is pipeline_instance
             assert crawler is crawler_instance
+            assert scraper is http_instance
 
         def run(self, topics=None):  # pragma: no cover - executed in tests
             run_calls.append(list(topics or []))
@@ -140,9 +153,29 @@ def test_cli_autopilot_run_success(monkeypatch, capsys):
 
     monkeypatch.setattr(cli, "AutopilotScheduler", lambda: scheduler_instance)
     monkeypatch.setattr(cli, "_build_autopilot_pipeline", lambda: pipeline_instance)
-    monkeypatch.setattr(
-        cli, "_build_autopilot_crawler", lambda *, noninteractive: crawler_instance
-    )
+
+    def fake_http():  # pragma: no cover - helper used in test
+        return http_instance
+
+    def fake_sitemap(http):  # pragma: no cover - helper used in test
+        assert http is http_instance
+        return sitemap_instance
+
+    def fake_github(http):  # pragma: no cover - helper used in test
+        assert http is http_instance
+        return github_instance
+
+    def fake_crawler_builder(*, noninteractive, http=None, sitemap=None, github=None):  # pragma: no cover - helper used in test
+        assert noninteractive is False
+        assert http is http_instance
+        assert sitemap is sitemap_instance
+        assert github is github_instance
+        return crawler_instance
+
+    monkeypatch.setattr(cli, "HTTPScraper", fake_http)
+    monkeypatch.setattr(cli, "SitemapScraper", fake_sitemap)
+    monkeypatch.setattr(cli, "GitHubScraper", fake_github)
+    monkeypatch.setattr(cli, "_build_autopilot_crawler", fake_crawler_builder)
     monkeypatch.setattr(cli, "AutopilotController", DummyController)
     monkeypatch.setattr("builtins.input", lambda _: "o")
 
@@ -162,11 +195,16 @@ def test_cli_autopilot_run_blocked(monkeypatch, capsys):
     pipeline = SimpleNamespace(name="pipeline")
     crawler = SimpleNamespace(name="crawler")
 
+    http_instance = SimpleNamespace(name="http")
+    sitemap_instance = SimpleNamespace(name="sitemap")
+    github_instance = SimpleNamespace(name="github")
+
     class DummyController:
-        def __init__(self, *, scheduler, pipeline, crawler):  # pragma: no cover - tested via CLI
+        def __init__(self, *, scheduler, pipeline, crawler, scraper):  # pragma: no cover - tested via CLI
             assert scheduler is scheduler_instance
             assert pipeline is pipeline_instance
             assert crawler is crawler_instance
+            assert scraper is http_instance
 
         def run(self, topics=None):  # pragma: no cover - executed in tests
             assert topics is None
@@ -176,11 +214,30 @@ def test_cli_autopilot_run_blocked(monkeypatch, capsys):
     pipeline_instance = pipeline
     crawler_instance = crawler
 
+    def fake_http():  # pragma: no cover - helper used in test
+        return http_instance
+
+    def fake_sitemap(http):  # pragma: no cover - helper used in test
+        assert http is http_instance
+        return sitemap_instance
+
+    def fake_github(http):  # pragma: no cover - helper used in test
+        assert http is http_instance
+        return github_instance
+
+    def fake_crawler_builder(*, noninteractive, http=None, sitemap=None, github=None):  # pragma: no cover - helper used in test
+        assert noninteractive is True
+        assert http is http_instance
+        assert sitemap is sitemap_instance
+        assert github is github_instance
+        return crawler_instance
+
     monkeypatch.setattr(cli, "AutopilotScheduler", lambda: scheduler_instance)
     monkeypatch.setattr(cli, "_build_autopilot_pipeline", lambda: pipeline_instance)
-    monkeypatch.setattr(
-        cli, "_build_autopilot_crawler", lambda *, noninteractive: crawler_instance
-    )
+    monkeypatch.setattr(cli, "HTTPScraper", fake_http)
+    monkeypatch.setattr(cli, "SitemapScraper", fake_sitemap)
+    monkeypatch.setattr(cli, "GitHubScraper", fake_github)
+    monkeypatch.setattr(cli, "_build_autopilot_crawler", fake_crawler_builder)
     monkeypatch.setattr(cli, "AutopilotController", DummyController)
     monkeypatch.setattr(
         "builtins.input",
@@ -193,3 +250,129 @@ def test_cli_autopilot_run_blocked(monkeypatch, capsys):
     captured = capsys.readouterr()
     assert "Cycle autopilot terminé: 0 source(s) ingérée(s)" in captured.out
     assert "Cycle interrompu: kill-switch" in captured.out
+
+
+def test_cli_autopilot_run_noninteractive_ingests_discovered(monkeypatch, tmp_path):
+    pipeline_calls: list[list[RawDocument]] = []
+
+    class DummyPipeline:
+        def __init__(self) -> None:
+            self.min_sources = 2
+            self.allowed_licences = {"CC-BY-4.0"}
+            self.store = SimpleNamespace(path=None)
+
+        def ingest(self, documents, seen_digests=None):  # pragma: no cover - executed in test
+            batch = list(documents)
+            pipeline_calls.append(batch)
+            return len(batch)
+
+    pipeline = DummyPipeline()
+
+    def build_pipeline():  # pragma: no cover - helper used in test
+        return pipeline
+
+    monkeypatch.setattr(cli, "_build_autopilot_pipeline", build_pipeline)
+
+    defaults = SimpleNamespace(require_consent=False, kill_switch=False)
+    allowlist = [
+        DomainRule(
+            domain="example.com",
+            categories=[],
+            bandwidth_mb=50,
+            time_budget_minutes=60,
+            allow_subdomains=True,
+            scope="web",
+        ),
+        DomainRule(
+            domain="example.org",
+            categories=[],
+            bandwidth_mb=50,
+            time_budget_minutes=60,
+            allow_subdomains=True,
+            scope="web",
+        ),
+    ]
+    network = SimpleNamespace(
+        allowlist=allowlist,
+        allowed_windows=[],
+        bandwidth_mb=100,
+        time_budget_minutes=120,
+    )
+    policy = SimpleNamespace(defaults=defaults, network=network)
+    state = AutopilotState(enabled=True, online=True, queue=["example"], last_reason="ok")
+
+    class StubScheduler:
+        def __init__(self) -> None:
+            self._policy_loader = lambda: policy
+            self._policy_manager = SimpleNamespace(config_dir=tmp_path, ledger_path=None)
+            self.state = state
+
+        def evaluate(self, *, engine=None, now=None):  # pragma: no cover - executed in test
+            return self.state
+
+        def enable(self, topics, *, engine=None, now=None):  # pragma: no cover - defensive
+            self.state.queue = list(topics)
+            return self.state
+
+    monkeypatch.setattr(cli, "AutopilotScheduler", StubScheduler)
+
+    discovered = [
+        DiscoveryResult(
+            url="https://example.com/article", title="Example", summary="Sample", licence="CC-BY-4.0"
+        ),
+        DiscoveryResult(
+            url="https://example.org/article", title="Example mirror", summary="Sample", licence="CC-BY-4.0"
+        ),
+    ]
+
+    def fake_discover(self, topics, rules):  # pragma: no cover - helper used in test
+        return list(discovered)
+
+    monkeypatch.setattr(DefaultDiscoveryCrawler, "discover", fake_discover)
+
+    fetch_calls: list[str] = []
+
+    class DummyScraper:
+        def fetch(self, url, *, respect_robots=True):  # pragma: no cover - executed in test
+            fetch_calls.append(url)
+            return ScrapeResult(
+                url=url,
+                content="Shared body",
+                raw_content=b"content",
+                content_hash=None,
+                license="CC-BY-4.0",
+                headers={},
+                etag=None,
+                last_modified=None,
+                is_duplicate=False,
+            )
+
+    dummy_scraper = DummyScraper()
+
+    from app.autopilot.controller import AutopilotController as RealController
+
+    def build_controller(*, scheduler, pipeline, crawler, scraper):  # pragma: no cover - helper used in test
+        return RealController(
+            scheduler=scheduler,
+            pipeline=pipeline,
+            crawler=crawler,
+            scraper=dummy_scraper,
+            throttle_seconds=0.0,
+        )
+
+    monkeypatch.setattr(cli, "AutopilotController", build_controller)
+    monkeypatch.setattr(
+        "builtins.input",
+        lambda _: (_ for _ in ()).throw(AssertionError("should not prompt")),
+    )
+
+    exit_code = cli.main(["autopilot", "run", "--noninteractive"])
+
+    assert exit_code == 0
+    assert fetch_calls == ["https://example.com/article", "https://example.org/article"]
+    assert len(pipeline_calls) == 1
+    ingested = pipeline_calls[0]
+    assert [doc.url for doc in ingested] == [
+        "https://example.com/article",
+        "https://example.org/article",
+    ]
