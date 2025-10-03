@@ -45,7 +45,7 @@ SBOM_DIRECTORY = SBOM_PATH.parent
 DEFAULT_COMPARE_BRANCH = "origin/main"
 DIFF_COVER_FAIL_UNDER = 100
 
-nox.options.sessions = ("lint", "typecheck", "tests", "coverage", "build", "security")
+nox.options.sessions = ("lint", "typecheck", "tests", "coverage", "build", "security", "policy")
 nox.options.reuse_existing_virtualenvs = True
 
 
@@ -201,3 +201,10 @@ def build(session: nox.Session) -> None:
     """Build the project wheel and source distribution."""
     install_project(session, "build")
     session.run("python", "-m", "build")
+
+
+@nox.session(python="3.12")
+def policy(session: nox.Session) -> None:
+    """Run static policy checks covering offline and release requirements."""
+
+    session.run("python", "scripts/static_policy_checks.py")

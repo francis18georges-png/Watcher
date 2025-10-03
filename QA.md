@@ -52,6 +52,8 @@
   `pytest --cov-fail-under=90` exécuté dans la session Nox `tests`.
 * Le rapport de couverture différentiel doit rester à `100 %`. Le job `coverage` échoue si
   `diff-cover` détecte une baisse (seuil configuré avec `DIFF_COVER_FAIL_UNDER=100`).
+* Exécutez `nox -s policy` pour valider hors-ligne les exigences de diffusion : cohérence de version,
+  documentation offline, configuration multi-arch Docker et permissions de token pour la release.
 * The Windows job invokes `./installer.ps1 -SkipOllama` to validate that the PowerShell installer succeeds
   without the Ollama models.
 * Immediately afterwards the workflow launches `./run.ps1` with an empty `DISPLAY` variable to emulate
