@@ -463,7 +463,8 @@ def main(argv: Sequence[str] | None = None) -> int:
                     )
                 if args.topics:
                     topics = _parse_topics(args.topics)
-                    missing = [topic for topic in topics if topic not in state.queue]
+                    queue_topics = {entry.topic for entry in state.queue}
+                    missing = [topic for topic in topics if topic not in queue_topics]
                     if missing:
                         print(
                             "Sujets absents de la file: " + ", ".join(missing)
@@ -545,8 +546,17 @@ def _parse_topics(raw: str | Sequence[str] | None) -> list[str]:
     return topics
 
 
-def _format_queue(queue: Sequence[str]) -> str:
-    return ", ".join(queue) if queue else "vide"
+def _format_queue(queue) -> str:
+    if not queue:
+        return "vide"
+    labels: list[str] = []
+    for entry in queue:
+        topic = getattr(entry, "topic", None)
+        if isinstance(topic, str) and topic:
+            labels.append(topic)
+        else:
+            labels.append(str(entry))
+    return ", ".join(labels) if labels else "vide"
 
 
 def _format_autopilot_wait_message(state) -> str:

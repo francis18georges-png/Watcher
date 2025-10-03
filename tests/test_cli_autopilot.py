@@ -3,7 +3,7 @@ from types import SimpleNamespace
 import pytest
 
 from app import cli
-from app.autopilot import AutopilotRunResult, AutopilotState
+from app.autopilot import AutopilotRunResult, AutopilotState, TopicQueueEntry
 
 
 class DummyEngine:
@@ -25,7 +25,12 @@ class DummyScheduler:
         self.enable_calls: list[list[str]] = []
         self.disable_calls: list[list[str] | None] = []
         self.evaluate_calls = 0
-        self._enable_state = enable_state or AutopilotState(enabled=True, online=True, queue=["foo"], last_reason="ok")
+        self._enable_state = enable_state or AutopilotState(
+            enabled=True,
+            online=True,
+            queue=[TopicQueueEntry(topic="foo")],
+            last_reason="ok",
+        )
         self._disable_state = disable_state or AutopilotState(enabled=False, online=False, queue=[])
         self._evaluate_state = evaluate_state or self._enable_state
 
@@ -35,7 +40,7 @@ class DummyScheduler:
         if engine is not None:
             engine.set_offline(not self._enable_state.online)
         state = AutopilotState(**self._enable_state.to_dict())
-        state.queue = list(values)
+        state.queue = [TopicQueueEntry(topic=value) for value in values]
         state.current_topic = values[0] if values else None
         return state
 

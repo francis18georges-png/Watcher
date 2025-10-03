@@ -417,7 +417,8 @@ class AutopilotController:
         )
         verifier = MultiSourceVerifier(min_sources=self.pipeline.min_sources)
 
-        discovered = list(self.crawler.discover(topics or state.queue, allowed.values()))
+        active_topics = topics or state.topics
+        discovered = list(self.crawler.discover(active_topics, allowed.values()))
         collected: list[tuple[RawDocument, str]] = []
         skipped: list[str] = []
 

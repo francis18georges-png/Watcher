@@ -7,7 +7,7 @@ import logging
 from dataclasses import dataclass, field
 from datetime import datetime, time
 from pathlib import Path
-from typing import Callable, Iterable, Sequence
+from typing import Any, Callable, Mapping, Sequence
 
 from app.policy.manager import PolicyError, PolicyManager
 from app.policy.schema import Policy, TimeWindow, _parse_window
@@ -19,6 +19,15 @@ except ImportError:  # pragma: no cover - fallback
 
 
 LOGGER = logging.getLogger(__name__)
+
+
+def _coerce_score(value: Any) -> float | None:
+    if value is None:
+        return None
+    try:
+        return float(value)
+    except (TypeError, ValueError):  # pragma: no cover - defensive
+        return None
 
 
 @dataclass
@@ -61,12 +70,102 @@ class AutopilotLogEntry:
 
 
 @dataclass
+class TopicScore:
+    """Scoring metadata attached to a queued topic."""
+
+    utility: float | None = None
+    confidence: float | None = None
+    cost: float | None = None
+
+    def to_dict(self) -> dict[str, float]:
+        payload: dict[str, float] = {}
+        if self.utility is not None:
+            payload["utility"] = float(self.utility)
+        if self.confidence is not None:
+            payload["confidence"] = float(self.confidence)
+        if self.cost is not None:
+            payload["cost"] = float(self.cost)
+        return payload
+
+    @classmethod
+    def from_mapping(cls, data: Mapping[str, Any] | None) -> "TopicScore":
+        if data is None:
+            return cls()
+        return cls(
+            utility=_coerce_score(data.get("utility")),
+            confidence=_coerce_score(data.get("confidence")),
+            cost=_coerce_score(data.get("cost")),
+        )
+
+    def merge(self, other: "TopicScore") -> "TopicScore":
+        return TopicScore(
+            utility=other.utility if other.utility is not None else self.utility,
+            confidence=other.confidence if other.confidence is not None else self.confidence,
+            cost=other.cost if other.cost is not None else self.cost,
+        )
+
+    @property
+    def utility_value(self) -> float:
+        return float(self.utility) if self.utility is not None else 0.0
+
+    @property
+    def confidence_value(self) -> float:
+        return float(self.confidence) if self.confidence is not None else 0.0
+
+    @property
+    def cost_value(self) -> float:
+        return float(self.cost) if self.cost is not None else 0.0
+
+
+@dataclass
+class TopicQueueEntry:
+    """Queue entry storing a topic alongside its scoring metadata."""
+
+    topic: str
+    score: TopicScore = field(default_factory=TopicScore)
+
+    def to_dict(self) -> dict[str, object]:
+        payload: dict[str, object] = {"topic": self.topic}
+        score_payload = self.score.to_dict()
+        if score_payload:
+            payload["score"] = score_payload
+        return payload
+
+    @classmethod
+    def from_data(cls, data: Mapping[str, Any] | str) -> "TopicQueueEntry" | None:
+        if isinstance(data, str):
+            topic = data.strip()
+            return cls(topic=topic) if topic else None
+        topic_value = data.get("topic") or data.get("name")
+        if topic_value is None:
+            return None
+        topic = str(topic_value).strip()
+        if not topic:
+            return None
+        score_data = data.get("score") if isinstance(data.get("score"), Mapping) else data
+        score = TopicScore.from_mapping(score_data if isinstance(score_data, Mapping) else None)
+        return cls(topic=topic, score=score)
+
+    def merge(self, other: "TopicQueueEntry") -> None:
+        self.score = self.score.merge(other.score)
+
+    @property
+    def sort_key(self) -> tuple[float, float, float, str]:
+        return (
+            -self.score.utility_value,
+            -self.score.confidence_value,
+            self.score.cost_value,
+            self.topic,
+        )
+
+
+@dataclass
 class AutopilotState:
     """Persisted autopilot scheduler state."""
 
     enabled: bool = False
     online: bool = False
-    queue: list[str] = field(default_factory=list)
+    queue: list[TopicQueueEntry] = field(default_factory=list)
     current_topic: str | None = None
     last_check: str | None = None
     last_reason: str | None = None
@@ -74,11 +173,14 @@ class AutopilotState:
     last_cpu_percent: float | None = None
     last_ram_mb: float | None = None
 
+    def __post_init__(self) -> None:
+        self.queue = self._coerce_queue(self.queue)
+
     def to_dict(self) -> dict[str, object]:
         return {
             "enabled": self.enabled,
             "online": self.online,
-            "queue": list(self.queue),
+            "queue": [entry.to_dict() for entry in self.queue],
             "current_topic": self.current_topic,
             "last_check": self.last_check,
             "last_reason": self.last_reason,
@@ -96,7 +198,7 @@ class AutopilotState:
         return cls(
             enabled=bool(data.get("enabled", False)),
             online=bool(data.get("online", False)),
-            queue=list(data.get("queue", [])),  # type: ignore[arg-type]
+            queue=cls._coerce_queue(data.get("queue", [])),
             current_topic=data.get("current_topic"),  # type: ignore[arg-type]
             last_check=data.get("last_check"),  # type: ignore[arg-type]
             last_reason=data.get("last_reason"),  # type: ignore[arg-type]
@@ -104,6 +206,30 @@ class AutopilotState:
             last_cpu_percent=data.get("last_cpu_percent"),  # type: ignore[arg-type]
             last_ram_mb=data.get("last_ram_mb"),  # type: ignore[arg-type]
         )
+
+    @staticmethod
+    def _coerce_queue(value: object) -> list[TopicQueueEntry]:
+        if not value:
+            return []
+        entries: list[TopicQueueEntry] = []
+        if isinstance(value, list):
+            for item in value:
+                if isinstance(item, TopicQueueEntry):
+                    entries.append(item)
+                    continue
+                if isinstance(item, dict):
+                    entry = TopicQueueEntry.from_data(item)
+                elif isinstance(item, str):
+                    entry = TopicQueueEntry.from_data(item)
+                else:
+                    entry = None
+                if entry is not None:
+                    entries.append(entry)
+        return entries
+
+    @property
+    def topics(self) -> list[str]:
+        return [entry.topic for entry in self.queue]
 
 
 class AutopilotError(RuntimeError):
@@ -148,7 +274,7 @@ class AutopilotScheduler:
 
     def enable(
         self,
-        topics: Sequence[str] | str,
+        topics: Sequence[object] | str,
         *,
         engine=None,
         now: datetime | None = None,
@@ -156,30 +282,48 @@ class AutopilotScheduler:
         normalised = self._normalise_topics(topics)
         if not normalised:
             raise AutopilotError("aucun sujet fourni")
-        for topic in normalised:
-            if topic not in self.state.queue:
-                self.state.queue.append(topic)
+        existing = {entry.topic: entry for entry in self.state.queue}
+        for entry in normalised:
+            current = existing.get(entry.topic)
+            if current is None:
+                new_entry = TopicQueueEntry(
+                    topic=entry.topic,
+                    score=TopicScore(
+                        utility=entry.score.utility,
+                        confidence=entry.score.confidence,
+                        cost=entry.score.cost,
+                    ),
+                )
+                self.state.queue.append(new_entry)
+                existing[entry.topic] = new_entry
+            else:
+                current.merge(entry)
+        self._sort_queue()
         self.state.enabled = True
-        self._log("info", f"Activation avec {', '.join(normalised)}")
+        self._log("info", f"Activation avec {', '.join(entry.topic for entry in normalised)}")
         return self.evaluate(engine=engine, now=now)
 
     def disable(
         self,
-        topics: Sequence[str] | str | None = None,
+        topics: Sequence[object] | str | None = None,
         *,
         engine=None,
         now: datetime | None = None,
     ) -> AutopilotState:
         normalised = self._normalise_topics(topics) if topics else []
         if normalised:
-            removed = {topic for topic in normalised if topic in self.state.queue}
+            topics_to_remove = {entry.topic for entry in normalised}
+            removed = {entry.topic for entry in self.state.queue if entry.topic in topics_to_remove}
             if removed:
                 self._log("info", f"Sujets retirés: {', '.join(sorted(removed))}")
-            self.state.queue = [topic for topic in self.state.queue if topic not in removed]
+            self.state.queue = [
+                entry for entry in self.state.queue if entry.topic not in topics_to_remove
+            ]
         else:
             if self.state.queue:
                 self._log("info", "File d'attente vidée.")
             self.state.queue.clear()
+        self._sort_queue()
         if self.state.enabled:
             self.state.enabled = False
             self.state.online = False
@@ -239,7 +383,7 @@ class AutopilotScheduler:
         allowed = self._is_within_window(policy.network.allowed_windows, now)
         budgets_ok = self._within_budgets(policy, usage)
         if self.state.queue:
-            self.state.current_topic = self.state.queue[0]
+            self.state.current_topic = self.state.queue[0].topic
         else:
             self.state.current_topic = None
         reason = None
@@ -276,6 +420,7 @@ class AutopilotScheduler:
         if self.state_path.exists():
             data = json.loads(self.state_path.read_text(encoding="utf-8"))
             state = AutopilotState.from_dict(data)
+            state.queue.sort(key=lambda entry: entry.sort_key)
             return state
         state = AutopilotState()
         self._save_state(state)
@@ -298,23 +443,78 @@ class AutopilotScheduler:
     def _timestamp(self, value: datetime) -> str:
         return value.replace(microsecond=0).isoformat()
 
-    def _normalise_topics(self, topics: Sequence[str] | str | None) -> list[str]:
+    def _normalise_topics(self, topics: Sequence[object] | str | None) -> list[TopicQueueEntry]:
         if topics is None:
             return []
+
+        entries: dict[str, TopicQueueEntry] = {}
+
+        def _clone(entry: TopicQueueEntry) -> TopicQueueEntry:
+            return TopicQueueEntry(
+                topic=entry.topic,
+                score=TopicScore(
+                    utility=entry.score.utility,
+                    confidence=entry.score.confidence,
+                    cost=entry.score.cost,
+                ),
+            )
+
+        def _merge(entry: TopicQueueEntry | None) -> None:
+            if entry is None or not entry.topic:
+                return
+            existing = entries.get(entry.topic)
+            if existing is None:
+                entries[entry.topic] = _clone(entry)
+            else:
+                existing.merge(entry)
+
+        def _handle_candidate(candidate: object) -> None:
+            if isinstance(candidate, TopicQueueEntry):
+                _merge(candidate)
+                return
+            if isinstance(candidate, str):
+                for segment in candidate.split(","):
+                    cleaned = segment.strip()
+                    if cleaned:
+                        _merge(TopicQueueEntry(topic=cleaned))
+                return
+            if isinstance(candidate, Mapping):
+                _merge(TopicQueueEntry.from_data(candidate))
+                return
+            if isinstance(candidate, Sequence) and not isinstance(candidate, (str, bytes)):
+                candidate_list = list(candidate)
+                if not candidate_list:
+                    return
+                topic = str(candidate_list[0]).strip()
+                if not topic:
+                    return
+                score_value = candidate_list[1] if len(candidate_list) > 1 else None
+                if isinstance(score_value, TopicScore):
+                    score = TopicScore(
+                        utility=score_value.utility,
+                        confidence=score_value.confidence,
+                        cost=score_value.cost,
+                    )
+                elif isinstance(score_value, Mapping):
+                    score = TopicScore.from_mapping(score_value)
+                else:
+                    score = TopicScore()
+                _merge(TopicQueueEntry(topic=topic, score=score))
+                return
+            text = str(candidate).strip()
+            if text:
+                _merge(TopicQueueEntry(topic=text))
+
         if isinstance(topics, str):
-            raw_items: Iterable[str] = topics.split(",")
+            _handle_candidate(topics)
         else:
-            raw_items = []
-            for topic in topics:
-                raw_items.extend(str(topic).split(","))
-        cleaned: list[str] = []
-        for item in raw_items:
-            normalised = item.strip()
-            if not normalised:
-                continue
-            if normalised not in cleaned:
-                cleaned.append(normalised)
-        return cleaned
+            for item in topics:
+                _handle_candidate(item)
+
+        return list(entries.values())
+
+    def _sort_queue(self) -> None:
+        self.state.queue.sort(key=lambda entry: entry.sort_key)
 
     def _is_within_window(self, windows: Sequence[TimeWindow], now: datetime) -> bool:
         if not windows:
