@@ -11,6 +11,7 @@ from typing import Iterable, Sequence
 
 from config import get_settings
 
+from app.bootstrap import auto_configure_if_needed
 from app.autopilot import AutopilotError, AutopilotScheduler
 from app.core.engine import Engine
 from app.core.first_run import FirstRunConfigurator
@@ -55,6 +56,7 @@ def _iter_plugins() -> list[plugins.Plugin]:
 def main(argv: Sequence[str] | None = None) -> int:
     """Entry point for the :mod:`watcher` command."""
 
+    auto_configure_if_needed()
     settings = get_settings()
     parser = argparse.ArgumentParser(
         prog="watcher",
