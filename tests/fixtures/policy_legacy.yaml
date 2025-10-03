@@ -1,0 +1,31 @@
+version: 1
+subject:
+  hostname: localhost
+  generated_at: 2024-01-01T00:00:00Z
+defaults:
+  offline: true
+  require_consent: true
+  kill_switch: false
+network:
+  allowed_windows:
+    - days: [mon, tue, wed, thu, fri]
+      window: "09:00-18:00"
+  allowlist: []
+  bandwidth_mb: 128
+  time_budget_minutes: 15
+budgets:
+  cpu_percent: 75
+  ram_mb: 4096
+categories:
+  allowed:
+    - documentation
+    - code
+models:
+  llm:
+    name: llama-test
+    sha256: deadbeef
+    license: example
+  embedding:
+    name: embed-test
+    sha256: feedface
+    license: example
