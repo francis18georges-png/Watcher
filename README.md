@@ -37,7 +37,19 @@ attendu.
    modèle d'embedding `all-MiniLM-L6-v2`. Utilisez `--help` pour personnaliser les chemins
    ou forcer un re-téléchargement.
 
-3. **Lancer l'agent entièrement offline** :
+3. **Initialiser votre espace utilisateur (~/.watcher)** :
+
+   ```bash
+   watcher init --fully-auto
+   ```
+
+   La commande détecte le matériel disponible (CPU/GPU), prépare un `config.toml`
+   et une `policy.yaml` dans `~/.watcher/` puis active le mode offline par défaut.
+   Les modèles restent gérés par `scripts/setup-local-models.sh` : les chemins
+   générés pointent vers `~/.watcher/models/` afin de séparer les données
+   utilisateur du dépôt Git.
+
+4. **Lancer l'agent entièrement offline** :
 
    ```bash
    watcher run --offline --prompt "Analyse ce dépôt et résume les modules principaux."
@@ -52,6 +64,8 @@ attendu.
 
 ### Commandes CLI stables
 
+- `watcher init --fully-auto` : crée `~/.watcher/config.toml`, une politique par
+  défaut et un journal de consentement sans interaction.
 - `watcher run` : exécute un scénario minimaliste (prompt libre) en respectant le mode
   offline. Le drapeau `--model` permet de basculer dynamiquement vers un autre fichier GGUF.
 - `watcher ask "question"` : interroge l'index vectoriel local (namespace configurable) et
