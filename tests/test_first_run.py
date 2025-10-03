@@ -6,6 +6,7 @@ from pathlib import Path
 
 import pytest
 
+from app import cli
 from app.bootstrap import auto_configure_if_needed
 from app.core.first_run import FirstRunConfigurator
 from config import get_settings
@@ -92,4 +93,43 @@ def test_bootstrap_auto_configures_when_sentinel_present(
     auto_configure_if_needed(home=home)
 
     assert configurator.config_path.exists()
+    assert not configurator.sentinel_path.exists()
+
+
+def test_bootstrap_creates_config_when_missing(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    home = tmp_path / "home"
+
+    monkeypatch.setenv("WATCHER_BOOTSTRAP_SKIP_MODELS", "1")
+
+    auto_configure_if_needed(home=home)
+
+    configurator = FirstRunConfigurator(home=home)
+    assert configurator.config_path.exists()
+    assert configurator.policy_path.exists()
+    assert not configurator.sentinel_path.exists()
+
+
+def test_cli_startup_bootstraps_clean_home(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    home = tmp_path / "home"
+    home.mkdir()
+
+    monkeypatch.setenv("HOME", str(home))
+    monkeypatch.setenv("USERPROFILE", str(home))
+    monkeypatch.setenv("WATCHER_BOOTSTRAP_SKIP_MODELS", "1")
+
+    get_settings.cache_clear()  # type: ignore[attr-defined]
+    try:
+        exit_code = cli.main(["policy", "show"])
+    finally:
+        get_settings.cache_clear()  # type: ignore[attr-defined]
+
+    assert exit_code == 0
+
+    configurator = FirstRunConfigurator(home=home)
+    assert configurator.config_path.exists()
+    assert configurator.policy_path.exists()
     assert not configurator.sentinel_path.exists()
