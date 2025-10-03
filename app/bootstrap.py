@@ -9,13 +9,21 @@ from app.core.first_run import FirstRunConfigurator
 
 
 def auto_configure_if_needed(home: Path | None = None) -> None:
-    """Run the first-run configurator when the sentinel is present."""
+    """Ensure the user configuration exists before continuing."""
 
     configurator = FirstRunConfigurator(home=home)
+    skip_models = os.environ.get("WATCHER_BOOTSTRAP_SKIP_MODELS") == "1"
+
     if not configurator.sentinel_path.exists():
+        configurator.ensure_pending()
+
+    if configurator.sentinel_path.exists():
+        configurator.run(auto=True, download_models=not skip_models)
         return
 
-    skip_models = os.environ.get("WATCHER_BOOTSTRAP_SKIP_MODELS") == "1"
+    if configurator.is_configured():
+        return
+
     configurator.run(auto=True, download_models=not skip_models)
 
 

@@ -45,6 +45,23 @@ class FirstRunConfigurator:
         self.sentinel_path = self.config_dir / "first_run"
 
     # ------------------------------------------------------------------
+    # Configuration state helpers
+    # ------------------------------------------------------------------
+    def is_configured(self) -> bool:
+        """Return :data:`True` when the user environment already exists."""
+
+        return self.config_path.exists() and self.policy_path.exists()
+
+    def ensure_pending(self) -> None:
+        """Create the first-run sentinel when configuration is missing."""
+
+        if self.is_configured() or self.sentinel_path.exists():
+            return
+
+        self.config_dir.mkdir(parents=True, exist_ok=True)
+        self.sentinel_path.write_text("pending\n", encoding="utf-8")
+
+    # ------------------------------------------------------------------
     # Hardware detection and recommendation helpers
     # ------------------------------------------------------------------
     def detect_hardware(self) -> HardwareProfile:
