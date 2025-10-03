@@ -45,3 +45,23 @@ def test_policy_manager_approve_and_revoke(tmp_path: Path) -> None:
         (home / ".watcher" / "policy.yaml").read_text(encoding="utf-8")
     )
     assert not policy_data["network"]["allowlist"]
+
+
+def test_policy_manager_multiple_scopes_same_domain(tmp_path: Path) -> None:
+    home = tmp_path / "home"
+    home.mkdir()
+
+    configurator = FirstRunConfigurator(home=home)
+    configurator.run(auto=True, download_models=False)
+
+    manager = PolicyManager(home=home)
+    manager.approve(domain="example.com", scope="web")
+    manager.approve(domain="example.com", scope="api")
+
+    policy_data = yaml.safe_load(
+        (home / ".watcher" / "policy.yaml").read_text(encoding="utf-8")
+    )
+    allowlist = policy_data["network"]["allowlist"]
+
+    scopes = {entry["scope"] for entry in allowlist if entry["domain"] == "example.com"}
+    assert scopes == {"web", "api"}
