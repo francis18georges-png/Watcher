@@ -25,6 +25,7 @@ data/
 memory/
 datasets/cache/
 models/
+!app/assets/models/
 
 # Coverage artifacts
 .coverage

@@ -20,6 +20,7 @@ dependencies = [
     "SQLAlchemy==2.0.32",
     "alembic==1.13.2",
     "llama-cpp-python==0.2.88",
+    "PyYAML==6.0.2",
 ]
 classifiers = [
     "Development Status :: 4 - Beta",
@@ -51,6 +52,6 @@ include-package-data = true
 license-files = ["LICENSE"]
 
 [tool.setuptools.package-data]
-"app" = ["plugins.toml"]
+"app" = ["plugins.toml", "assets/models/*"]
 "config" = ["*.toml", "*.yml", "*.json"]
 

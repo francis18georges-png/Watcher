@@ -23,7 +23,7 @@ def test_first_run_creates_expected_files(tmp_path: Path, monkeypatch: pytest.Mo
     home.mkdir()
     configurator = FirstRunConfigurator(home=home)
 
-    config_path = configurator.run(fully_auto=True)
+    config_path = configurator.run(fully_auto=True, download_models=False)
 
     assert config_path == home / ".watcher" / "config.toml"
     assert config_path.exists()
@@ -33,11 +33,13 @@ def test_first_run_creates_expected_files(tmp_path: Path, monkeypatch: pytest.Mo
 
     policy_path = home / ".watcher" / "policy.yaml"
     assert policy_path.exists()
-    assert "version: 1" in policy_path.read_text(encoding="utf-8")
+    content = policy_path.read_text(encoding="utf-8")
+    assert "version: 1" in content
 
     ledger_path = home / ".watcher" / "consent-ledger.jsonl"
     assert ledger_path.exists()
-    assert ledger_path.read_text(encoding="utf-8").startswith("# consent ledger")
+    ledger_content = ledger_path.read_text(encoding="utf-8")
+    assert '"type": "metadata"' in ledger_content
 
 
 def test_user_config_overrides_settings(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:

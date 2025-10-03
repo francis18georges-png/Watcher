@@ -3,18 +3,18 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from datetime import datetime
 from pathlib import Path
+from secrets import token_bytes
 from typing import Any
 
+import json
 import os
 import platform
 import shutil
 import textwrap
 
-
-_DEFAULT_LLM_MODEL = "smollm-135m-instruct.Q4_0.gguf"
-_DEFAULT_EMBED_MODEL = "all-MiniLM-L6-v2"
-
+from app.core.model_registry import ensure_models, select_models
 
 @dataclass(slots=True)
 class HardwareProfile:
@@ -65,7 +65,9 @@ class FirstRunConfigurator:
     # ------------------------------------------------------------------
     # Public API
     # ------------------------------------------------------------------
-    def run(self, fully_auto: bool = False) -> Path:
+    def run(
+        self, fully_auto: bool = False, download_models: bool = True
+    ) -> Path:
         """Generate configuration files and return the created path.
 
         Parameters
@@ -75,19 +77,32 @@ class FirstRunConfigurator:
             defaults are written immediately.  The non-interactive path is the
             only behaviour currently implemented which keeps the command
             scriptable for CI and automated deployments.
+        download_models:
+            When :data:`True`, all required model artifacts are downloaded or
+            copied from embedded fallbacks before writing the configuration.
         """
 
         profile = self.detect_hardware()
         self.config_dir.mkdir(parents=True, exist_ok=True)
-        self._write_config(profile)
-        self._write_policy()
+        selection = select_models(profile.cpu_threads, profile.has_gpu)
+        if download_models:
+            self._download_models(selection)
+        self._write_config(profile, selection)
+        self._write_policy(selection)
         self._ensure_consent_ledger()
         return self.config_path
 
     # ------------------------------------------------------------------
     # File writers
     # ------------------------------------------------------------------
-    def _write_config(self, profile: HardwareProfile) -> None:
+    def _download_models(self, selection: dict[str, Any]) -> None:
+        models_dir = self.config_dir / "models"
+        ensure_models(models_dir / "llm", [selection["llm"]])
+        ensure_models(models_dir / "embeddings", [selection["embedding"]])
+
+    def _write_config(
+        self, profile: HardwareProfile, selection: dict[str, Any]
+    ) -> None:
         data_dir = self.config_dir / "data"
         models_dir = self.config_dir / "models"
         llm_dir = models_dir / "llm"
@@ -98,18 +113,20 @@ class FirstRunConfigurator:
                 "data_dir": str(data_dir),
                 "memory_dir": str(self.config_dir / "memory"),
                 "logs_dir": str(self.config_dir / "logs"),
+                "models_dir": str(models_dir),
             },
             "llm": {
                 "backend": profile.backend,
                 "ctx": profile.context_window,
                 "threads": profile.cpu_threads // 2 or 1,
-                "model_path": str(llm_dir / _DEFAULT_LLM_MODEL),
+                "model_path": str(llm_dir / selection["llm"].name),
+                "model_sha256": selection["llm"].sha256,
+                "model_license": selection["llm"].license,
             },
             "memory": {
                 "db_path": str(self.config_dir / "memory" / "mem.db"),
-                "embed_model_path": str(
-                    emb_dir / _DEFAULT_EMBED_MODEL / "sentence_bert_config.json"
-                ),
+                "embed_model_path": str(emb_dir / selection["embedding"].name),
+                "embed_model_sha256": selection["embedding"].sha256,
             },
             "intelligence": {
                 "mode": "offline",
@@ -117,36 +134,54 @@ class FirstRunConfigurator:
             "dev": {
                 "logging": "info",
             },
+            "security": {
+                "sandbox_root": str(self.config_dir / "workspace"),
+                "consent_ledger": str(self.consent_ledger),
+            },
         }
 
         toml_text = self._toml_dump(config)
         self.config_path.write_text(toml_text, encoding="utf-8")
 
-    def _write_policy(self) -> None:
+    def _write_policy(self, selection: dict[str, Any]) -> None:
         if self.policy_path.exists():
             return
 
         hostname = platform.node() or "localhost"
+        now = datetime.utcnow().isoformat(timespec="seconds") + "Z"
         policy = textwrap.dedent(
             f"""
             version: 1
-            subject: {hostname}
+            subject:
+              hostname: {hostname}
+              generated_at: {now}
             defaults:
-              allow_offline: true
-              require_confirm: true
-            scopes:
-              web:
-                allow: false
-                allowed_domains: []
-                bandwidth_mb: 10
-                time_budget_minutes: 2
-              git:
-                allow: false
-                allowed_repositories: []
-              filesystem:
-                allow: true
-                allowed_paths:
-                  - {self.config_dir}
+              offline: true
+              require_consent: true
+              kill_switch: false
+            network:
+              allowed_windows:
+                - days: [mon, tue, wed, thu, fri]
+                  window: "09:00-18:00"
+              allowlist: []
+              bandwidth_mb: 128
+              time_budget_minutes: 15
+            budgets:
+              cpu_percent: 75
+              ram_mb: 4096
+            categories:
+              allowed:
+                - documentation
+                - code
+            models:
+              llm:
+                name: {selection["llm"].name}
+                sha256: {selection["llm"].sha256}
+                license: {selection["llm"].license}
+              embedding:
+                name: {selection["embedding"].name}
+                sha256: {selection["embedding"].sha256}
+                license: {selection["embedding"].license}
             """
         ).strip()
         self.policy_path.write_text(policy + "\n", encoding="utf-8")
@@ -154,8 +189,16 @@ class FirstRunConfigurator:
     def _ensure_consent_ledger(self) -> None:
         if self.consent_ledger.exists():
             return
-        header = "# consent ledger - append-only log of granted permissions\n"
-        self.consent_ledger.write_text(header, encoding="utf-8")
+        metadata = {
+            "type": "metadata",
+            "version": 1,
+            "created_at": datetime.utcnow().isoformat(timespec="seconds") + "Z",
+            "secret_hex": token_bytes(32).hex(),
+        }
+        self.consent_ledger.write_text(
+            json.dumps(metadata, ensure_ascii=False) + "\n",
+            encoding="utf-8",
+        )
 
     # ------------------------------------------------------------------
     # Minimal TOML encoder (avoids external dependencies)

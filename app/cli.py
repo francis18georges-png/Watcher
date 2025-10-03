@@ -15,6 +15,7 @@ from app.core.first_run import FirstRunConfigurator
 from app.core.reproducibility import set_seed
 from app.embeddings.store import SimpleVectorStore
 from app.llm import rag
+from app.policy.manager import PolicyError, PolicyManager
 from app.tools import plugins
 
 
@@ -93,12 +94,58 @@ def main(argv: Sequence[str] | None = None) -> int:
         ),
     )
     init_parser.add_argument(
-        "--fully-auto",
+        "--auto",
         action="store_true",
         help=(
-            "Désactive les interactions et écrit immédiatement une configuration"
-            " basée sur la détection matérielle."
+            "Exécute l'initialisation sans interaction, détecte le matériel et"
+            " télécharge les modèles déclarés."
         ),
+    )
+
+    policy_parser = sub.add_parser(
+        "policy",
+        help="Afficher ou modifier la politique de collecte et de scraping",
+    )
+    policy_sub = policy_parser.add_subparsers(dest="policy_command", required=True)
+    policy_sub.add_parser("show", help="Afficher policy.yaml")
+    approve_parser = policy_sub.add_parser(
+        "approve",
+        help="Accorder l'accès à un domaine dans la allowlist",
+    )
+    approve_parser.add_argument("--domain", required=True, help="Nom de domaine")
+    approve_parser.add_argument(
+        "--scope",
+        default="web",
+        help="Portée (ex: web, git)",
+    )
+    approve_parser.add_argument(
+        "--categories",
+        nargs="*",
+        default=None,
+        help="Catégories autorisées pour ce domaine",
+    )
+    approve_parser.add_argument(
+        "--bandwidth",
+        type=int,
+        default=None,
+        help="Budget bande passante en Mo",
+    )
+    approve_parser.add_argument(
+        "--time-budget",
+        type=int,
+        default=None,
+        help="Budget temps (minutes)",
+    )
+
+    revoke_parser = policy_sub.add_parser(
+        "revoke",
+        help="Révoquer un domaine préalablement approuvé",
+    )
+    revoke_parser.add_argument("--domain", required=True, help="Nom de domaine")
+    revoke_parser.add_argument(
+        "--scope",
+        default=None,
+        help="Portée à révoquer (par défaut toutes)",
     )
 
     run_parser = sub.add_parser(
@@ -191,9 +238,35 @@ def main(argv: Sequence[str] | None = None) -> int:
 
     if args.command == "init":
         configurator = FirstRunConfigurator()
-        path = configurator.run(fully_auto=args.fully_auto)
+        path = configurator.run(fully_auto=args.auto, download_models=True)
         print(f"Configuration utilisateur écrite dans {path}")
         return 0
+
+    if args.command == "policy":
+        manager = PolicyManager()
+        try:
+            if args.policy_command == "show":
+                print(manager.show().rstrip())
+                return 0
+            if args.policy_command == "approve":
+                rule = manager.approve(
+                    domain=args.domain,
+                    scope=args.scope,
+                    categories=args.categories,
+                    bandwidth_mb=args.bandwidth,
+                    time_budget_minutes=args.time_budget,
+                )
+                print(
+                    "Autorisation enregistrée pour "
+                    f"{rule.domain} ({rule.scope})"
+                )
+                return 0
+            if args.policy_command == "revoke":
+                manager.revoke(args.domain, scope=args.scope)
+                print(f"Autorisation révoquée pour {args.domain}")
+                return 0
+        except PolicyError as exc:
+            parser.error(str(exc))
 
     if args.command == "run":
         engine = Engine()
