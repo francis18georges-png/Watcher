@@ -7,7 +7,7 @@ contrôles d'intégrité.
 
 ## 1. Préparer le kit hors-ligne sur une machine connectée
 
-1. **Téléchargez les artefacts de release** depuis GitHub pour le tag ciblé (le lien [releases/latest](https://github.com/francis18georges-png/Watcher/releases/latest) pointe toujours vers la version en cours) :
+1. **Téléchargez les artefacts de release** depuis GitHub pour le tag ciblé (le lien [releases/latest](https://github.com/francis18georges-png/Watcher/releases/latest) pointe vers la dernière version publiée ; tant qu'aucune release n'est disponible le lien renvoie 404) :
 
    ```bash
    mkdir -p ~/watcher-offline-kit/artifacts
@@ -25,7 +25,7 @@ contrôles d'intégrité.
    Le CLI `gh` facilite le téléchargement groupé ; à défaut, récupérez les mêmes fichiers via
    l'interface web ou `curl -L -O`.
 
-2. **Constituez un miroir PyPI minimal** contenant les dépendances Python nécessaires :
+2. **Constituez un miroir PyPI minimal** contenant les dépendances Python nécessaires et préparez les modèles hors-ligne :
 
    ```bash
    cd ~/watcher-offline-kit
@@ -34,6 +34,10 @@ contrôles d'intégrité.
    pip install --upgrade pip wheel
    pip download -r /workspace/Watcher/requirements.txt --dest ./pypi-mirror
    pip download -r /workspace/Watcher/requirements-dev.txt --dest ./pypi-mirror
+   cd /workspace/Watcher
+   scripts/setup-local-models.sh \
+     --model-dir ~/watcher-offline-kit/models/llm \
+     --embeddings-dir ~/watcher-offline-kit/models/embeddings
    deactivate
    ```
 
@@ -122,13 +126,15 @@ artefacts validés.
    - Linux : `tar -xzf Watcher-linux-x86_64.tar.gz -C /opt/watcher` puis `ln -sf /opt/watcher/Watcher /usr/local/bin/watcher`.
    - macOS : `unzip Watcher-macos-x86_64.zip` et placez l'application dans `/Applications`.
 
-3. **Configurer l'environnement** :
+3. **Configurer l'environnement et initialiser les index locaux** :
 
    - Dupliquez `example.env` en `.env` et renseignez les clés API locales.
    - Mettez à jour les chemins de stockage dans `config/settings.yaml` pour pointer vers des
      répertoires internes à l'enclave.
    - Activez, si nécessaire, le mode `offline` dans la configuration afin de désactiver les
-     intégrations nécessitant Internet.
+     intégrations nécessitant Internet (`watcher mode offline`).
+   - Lancez `watcher ingest /chemin/vers/docs --namespace production` pour indexer vos
+     documents avant d'utiliser `watcher ask` hors-ligne.
 
 ## 4. Mettre à jour le kit hors-ligne
 

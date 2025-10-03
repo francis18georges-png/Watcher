@@ -10,7 +10,6 @@ model = "smollm-135m-instruct-Q4_0"
 host = "127.0.0.1:11434"
 model_path = "models/llm/smollm-135m-instruct.Q4_0.gguf"
 ctx = 2048
-threads = null
 max_tokens = 256
 temperature = 0.2
 system_prompt = "Tu es Watcher, un assistant de développement Python fonctionnant hors ligne. Fournis des réponses concises et fiables."

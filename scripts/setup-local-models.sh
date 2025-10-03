@@ -71,6 +71,16 @@ if downloaded.resolve() != target.resolve():
         target.unlink()
     downloaded.rename(target)
 PY
+  python - <<'PY'
+from hashlib import sha256
+from pathlib import Path
+
+target = Path("${LLM_TARGET}")
+digest = sha256(target.read_bytes()).hexdigest()
+sha_file = target.with_suffix(target.suffix + ".sha256")
+sha_file.write_text(f"{digest}  {target.name}\n", encoding="utf-8")
+print(f"SHA256({target.name})={digest}")
+PY
 else
   echo "Modèle llama.cpp déjà présent (${LLM_TARGET})."
 fi
