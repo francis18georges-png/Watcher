@@ -1,0 +1,63 @@
+"""Tests for the first-run configurator helper."""
+
+from __future__ import annotations
+
+from pathlib import Path
+
+import pytest
+
+from app.core.first_run import FirstRunConfigurator
+from config import get_settings
+
+
+def _override_home(monkeypatch: pytest.MonkeyPatch, home: Path) -> None:
+    monkeypatch.setenv("HOME", str(home))
+    # When running under CI the ``HOME`` variable is honoured by
+    # :func:`Path.home` on POSIX platforms.  ``USERPROFILE`` is the equivalent
+    # for Windows runners.
+    monkeypatch.setenv("USERPROFILE", str(home))
+
+
+def test_first_run_creates_expected_files(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    home = tmp_path / "home"
+    home.mkdir()
+    configurator = FirstRunConfigurator(home=home)
+
+    config_path = configurator.run(fully_auto=True)
+
+    assert config_path == home / ".watcher" / "config.toml"
+    assert config_path.exists()
+    content = config_path.read_text(encoding="utf-8")
+    assert "[llm]" in content
+    assert "model_path" in content
+
+    policy_path = home / ".watcher" / "policy.yaml"
+    assert policy_path.exists()
+    assert "version: 1" in policy_path.read_text(encoding="utf-8")
+
+    ledger_path = home / ".watcher" / "consent-ledger.jsonl"
+    assert ledger_path.exists()
+    assert ledger_path.read_text(encoding="utf-8").startswith("# consent ledger")
+
+
+def test_user_config_overrides_settings(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    home = tmp_path / "home"
+    (home / ".watcher").mkdir(parents=True)
+    (home / ".watcher" / "config.toml").write_text(
+        """
+        [llm]
+        ctx = 1024
+        """.strip()
+        + "\n",
+        encoding="utf-8",
+    )
+
+    _override_home(monkeypatch, home)
+
+    # ``get_settings`` caches results.  Ensure we start from a clean slate.
+    get_settings.cache_clear()  # type: ignore[attr-defined]
+    try:
+        settings = get_settings()
+        assert settings.llm.ctx == 1024
+    finally:
+        get_settings.cache_clear()  # type: ignore[attr-defined]

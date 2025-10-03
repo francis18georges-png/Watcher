@@ -11,6 +11,7 @@ from typing import Iterable, Sequence
 from config import get_settings
 
 from app.core.engine import Engine
+from app.core.first_run import FirstRunConfigurator
 from app.core.reproducibility import set_seed
 from app.embeddings.store import SimpleVectorStore
 from app.llm import rag
@@ -82,6 +83,22 @@ def main(argv: Sequence[str] | None = None) -> int:
         "mode",
         choices=("offline", "online"),
         help="Mode cible: 'offline' désactive les appels réseaux, 'online' les réactive.",
+    )
+
+    init_parser = sub.add_parser(
+        "init",
+        help=(
+            "Initialiser l'environnement utilisateur (~/.watcher) avec une"
+            " configuration auto-générée."
+        ),
+    )
+    init_parser.add_argument(
+        "--fully-auto",
+        action="store_true",
+        help=(
+            "Désactive les interactions et écrit immédiatement une configuration"
+            " basée sur la détection matérielle."
+        ),
     )
 
     run_parser = sub.add_parser(
@@ -170,6 +187,12 @@ def main(argv: Sequence[str] | None = None) -> int:
         engine = Engine()
         engine.set_offline(offline)
         print(f"Mode intelligence défini sur {settings.intelligence.mode}")
+        return 0
+
+    if args.command == "init":
+        configurator = FirstRunConfigurator()
+        path = configurator.run(fully_auto=args.fully_auto)
+        print(f"Configuration utilisateur écrite dans {path}")
         return 0
 
     if args.command == "run":

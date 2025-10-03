@@ -135,6 +135,15 @@ class _TomlSettingsSource(PydanticBaseSettingsSource):
                 logger.warning(
                     "Profile configuration file not found: %s", profile_path
                 )
+
+        user_path = Path.home() / ".watcher" / "config.toml"
+        if user_path.exists():
+            try:
+                user_data = _read_toml(user_path)
+            except FileNotFoundError:
+                user_data = {}
+            else:
+                data = _deep_merge(data, user_data)
         self._data = data
         return data
 
