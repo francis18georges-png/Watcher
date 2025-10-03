@@ -35,6 +35,16 @@
 
 ## Continuous Integration
 
+* Le job `Workflow lint` valide tous les workflows via `actionlint` et `yamllint` avant
+  d'autoriser les autres jobs. Reproduisez-le localement avec :
+
+  ```bash
+  bash <(curl -sSfL https://raw.githubusercontent.com/rhysd/actionlint/main/scripts/download-actionlint.bash)
+  python3 -m pip install --user --upgrade yamllint
+  ./actionlint -color
+  yamllint .github/workflows
+  ```
+
 * Le job `Scorecard gate` rejoue l'analyse OpenSSF Scorecard pour chaque Pull Request via
   `ossf/scorecard-action@v2`. La CI échoue dès que le score global descend sous `7` afin de
   bloquer la fusion tant que les recommandations critiques ne sont pas appliquées.
