@@ -12,9 +12,22 @@ import json
 import os
 import platform
 import shutil
-import textwrap
+import yaml
 
 from app.core.model_registry import ensure_models, select_models
+from app.policy.schema import (
+    Budgets,
+    Categories,
+    Defaults,
+    ModelEntry,
+    ModelsSection,
+    NetworkBudget,
+    NetworkSection,
+    NetworkWindow,
+    Policy,
+    Subject,
+    TimeWindow,
+)
 
 @dataclass(slots=True)
 class HardwareProfile:
@@ -148,43 +161,53 @@ class FirstRunConfigurator:
             return
 
         hostname = platform.node() or "localhost"
-        now = datetime.utcnow().isoformat(timespec="seconds") + "Z"
-        policy = textwrap.dedent(
-            f"""
-            version: 1
-            subject:
-              hostname: {hostname}
-              generated_at: {now}
-            defaults:
-              offline: true
-              require_consent: true
-              kill_switch: false
-            network:
-              allowed_windows:
-                - days: [mon, tue, wed, thu, fri]
-                  window: "09:00-18:00"
-              allowlist: []
-              bandwidth_mb: 128
-              time_budget_minutes: 15
-            budgets:
-              cpu_percent: 75
-              ram_mb: 4096
-            categories:
-              allowed:
-                - documentation
-                - code
-            models:
-              llm:
-                name: {selection["llm"].name}
-                sha256: {selection["llm"].sha256}
-                license: {selection["llm"].license}
-              embedding:
-                name: {selection["embedding"].name}
-                sha256: {selection["embedding"].sha256}
-                license: {selection["embedding"].license}
-            """
-        ).strip()
-        self.policy_path.write_text(policy + "\n", encoding="utf-8")
+        now = datetime.utcnow()
+        kill_switch = self.config_dir / "kill-switch"
+        policy = Policy(
+            version=1,
+            autostart=False,
+            subject=Subject(hostname=hostname, generated_at=now),
+            defaults=Defaults(
+                offline_default=True,
+                require_consent=True,
+                require_corroboration=True,
+                kill_switch_file=str(kill_switch),
+            ),
+            network=NetworkSection(
+                network_windows=[
+                    NetworkWindow(
+                        cidrs=["0.0.0.0/0", "::/0"],
+                        windows=[
+                            TimeWindow(
+                                days=["mon", "tue", "wed", "thu", "fri"],
+                                window="09:00-18:00",
+                            )
+                        ],
+                    )
+                ],
+                allowlist=[],
+                budgets=NetworkBudget(bandwidth_mb=128, time_budget_minutes=15),
+            ),
+            budgets=Budgets(cpu_percent=75, ram_mb=4096),
+            categories=Categories(allowed=["documentation", "code"]),
+            models=ModelsSection(
+                llm=ModelEntry(
+                    name=selection["llm"].name,
+                    sha256=selection["llm"].sha256,
+                    license=selection["llm"].license,
+                ),
+                embedding=ModelEntry(
+                    name=selection["embedding"].name,
+                    sha256=selection["embedding"].sha256,
+                    license=selection["embedding"].license,
+                ),
+            ),
+        )
+        data = policy.to_dict()
+        yaml_text = yaml.safe_dump(data, sort_keys=False)
+        if not yaml_text.endswith("\n"):
+            yaml_text += "\n"
+        self.policy_path.write_text(yaml_text, encoding="utf-8")
 
     def _ensure_consent_ledger(self) -> None:
         if self.consent_ledger.exists():

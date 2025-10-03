@@ -41,13 +41,22 @@ class ConsentLedger:
     def metadata(self) -> dict[str, object]:
         return dict(self._metadata)
 
-    def record(self, *, action: str, domain: str, scope: str, policy_hash: str) -> None:
+    def record(
+        self,
+        *,
+        action: str,
+        domain: str,
+        scope: str,
+        policy_version: int,
+        policy_hash: str,
+    ) -> None:
         payload = {
             "type": "entry",
             "timestamp": datetime.utcnow().isoformat(timespec="seconds") + "Z",
             "action": action,
             "domain": domain,
             "scope": scope,
+            "policy_version": policy_version,
             "policy_hash": policy_hash,
         }
         message = json.dumps(payload, sort_keys=True, ensure_ascii=False).encode("utf-8")
