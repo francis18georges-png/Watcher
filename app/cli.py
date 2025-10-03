@@ -17,6 +17,7 @@ from app.autopilot import (
     AutopilotError,
     AutopilotRunResult,
     AutopilotScheduler,
+    DefaultDiscoveryCrawler,
 )
 from app.core.engine import Engine
 from app.core.first_run import FirstRunConfigurator
@@ -26,6 +27,9 @@ from app.ingest import IngestPipeline, IngestValidationError, RawDocument
 from app.llm import rag
 from app.policy.manager import PolicyError, PolicyManager
 from app.tools import plugins
+from app.scrapers.github import GitHubScraper
+from app.scrapers.http import HTTPScraper
+from app.scrapers.sitemap import SitemapScraper
 
 
 def _plugin_base() -> plugins.Location | None:
@@ -479,11 +483,20 @@ def main(argv: Sequence[str] | None = None) -> int:
                 return 1
             scheduler = AutopilotScheduler()
             pipeline = _build_autopilot_pipeline()
-            crawler = _build_autopilot_crawler(noninteractive=args.noninteractive)
+            http_scraper = HTTPScraper()
+            sitemap_scraper = SitemapScraper(http_scraper)
+            github_scraper = GitHubScraper(http_scraper)
+            crawler = _build_autopilot_crawler(
+                noninteractive=args.noninteractive,
+                http=http_scraper,
+                sitemap=sitemap_scraper,
+                github=github_scraper,
+            )
             controller = AutopilotController(
                 scheduler=scheduler,
                 pipeline=pipeline,
                 crawler=crawler,
+                scraper=http_scraper,
             )
             try:
                 result = controller.run(topics or None)
@@ -554,13 +567,6 @@ def _format_autopilot_wait_message(state) -> str:
     return f"Autopilot activé mais en attente ({reason})."
 
 
-class _DefaultCrawler:
-    """Fallback discovery crawler yielding no results."""
-
-    def discover(self, topics: Sequence[str], rules: Sequence) -> Iterable:
-        return []
-
-
 def _confirm_autopilot_run(topics: Sequence[str]) -> bool:
     label = ", ".join(topics) if topics else "la file planifiée"
     answer = input(
@@ -575,9 +581,15 @@ def _build_autopilot_pipeline() -> IngestPipeline:
     return IngestPipeline(store)
 
 
-def _build_autopilot_crawler(*, noninteractive: bool) -> _DefaultCrawler:
+def _build_autopilot_crawler(
+    *,
+    noninteractive: bool,
+    http: HTTPScraper | None = None,
+    sitemap: SitemapScraper | None = None,
+    github: GitHubScraper | None = None,
+) -> DefaultDiscoveryCrawler:
     del noninteractive
-    return _DefaultCrawler()
+    return DefaultDiscoveryCrawler(http=http, sitemap=sitemap, github=github)
 
 
 def _summarise_autopilot_result(result: AutopilotRunResult) -> list[str]:
