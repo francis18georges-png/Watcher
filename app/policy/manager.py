@@ -79,7 +79,9 @@ class PolicyManager:
             last_approved=datetime.utcnow(),
         )
         policy.network.allowlist = [
-            existing for existing in policy.network.allowlist if existing.domain != domain
+            existing
+            for existing in policy.network.allowlist
+            if existing.domain != domain or existing.scope != scope
         ]
         policy.network.allowlist.append(rule)
         self._write_policy(policy)
