@@ -3,6 +3,7 @@ from contextlib import contextmanager
 from importlib import resources
 from pathlib import Path
 from types import SimpleNamespace
+from typing import Sequence
 
 import pytest
 
@@ -159,16 +160,36 @@ def test_ingest_command_reads_files(monkeypatch, tmp_path, capsys):
     file_b = dir_b / "b.txt"
     file_b.write_text("Contenu B", encoding="utf-8")
 
-    added: list[tuple[list[str], list[dict[str, str]]]] = []
-
     class DummyStore:
         def __init__(self, namespace: str) -> None:
             self.namespace = namespace
 
-        def add(self, texts, metas) -> None:  # pragma: no cover - runtime validated
-            added.append((list(texts), list(metas)))
+    class DummyPipeline:
+        def __init__(self, store, *, min_sources: int) -> None:
+            self.store = store
+            self.min_sources = min_sources
+            self.calls: list[Sequence[cli.RawDocument]] = []
 
-    monkeypatch.setattr(cli, "SimpleVectorStore", DummyStore)
+        def ingest(self, documents, *, seen_digests):
+            self.calls.append(tuple(documents))
+            seen_digests.update({"dummy"})
+            return 1
+
+    dummy_store = DummyStore("tests")
+
+    def _build_store(namespace: str) -> DummyStore:
+        assert namespace == "tests"
+        return dummy_store
+
+    pipeline_calls: list[DummyPipeline] = []
+
+    def _build_pipeline(store, *, min_sources: int) -> DummyPipeline:
+        pipeline = DummyPipeline(store, min_sources=min_sources)
+        pipeline_calls.append(pipeline)
+        return pipeline
+
+    monkeypatch.setattr(cli, "SimpleVectorStore", _build_store)
+    monkeypatch.setattr(cli, "IngestPipeline", _build_pipeline)
 
     exit_code = cli.main(
         [
@@ -178,13 +199,19 @@ def test_ingest_command_reads_files(monkeypatch, tmp_path, capsys):
             "--namespace",
             "tests",
             "--batch-size",
-            "1",
+            "2",
         ]
     )
 
     assert exit_code == 0
-    flat_texts = [text for batch, _ in added for text in batch]
-    assert "Contenu A" in flat_texts
-    assert "Contenu B" in flat_texts
+    assert pipeline_calls
+    [pipeline] = pipeline_calls
+    assert pipeline.store is dummy_store
+    assert pipeline.min_sources == 2
+    assert len(pipeline.calls) == 1
+    captured_docs = pipeline.calls[0]
+    captured_urls = {doc.url for doc in captured_docs}
+    assert file_a.as_uri() in captured_urls
+    assert file_b.as_uri() in captured_urls
     captured = capsys.readouterr()
-    assert "namespace 'tests'" in captured.out
+    assert "extrait(s) validé(s)" in captured.out
