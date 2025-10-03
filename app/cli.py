@@ -10,6 +10,7 @@ from typing import Iterable, Sequence
 
 from config import get_settings
 
+from app.autopilot import AutopilotError, AutopilotScheduler
 from app.core.engine import Engine
 from app.core.first_run import FirstRunConfigurator
 from app.core.reproducibility import set_seed
@@ -218,6 +219,42 @@ def main(argv: Sequence[str] | None = None) -> int:
         help="Nombre maximum de documents traités par lot.",
     )
 
+    autopilot_parser = sub.add_parser(
+        "autopilot",
+        help="Gérer le scheduler autopilot supervisé",
+    )
+    autopilot_sub = autopilot_parser.add_subparsers(
+        dest="autopilot_command",
+        required=True,
+    )
+    autopilot_enable = autopilot_sub.add_parser(
+        "enable",
+        help="Activer l'autopilot avec une liste de sujets",
+    )
+    autopilot_enable.add_argument(
+        "--topics",
+        required=True,
+        help="Liste de sujets séparés par des virgules",
+    )
+    autopilot_disable = autopilot_sub.add_parser(
+        "disable",
+        help="Désactiver l'autopilot et vider éventuellement la file",
+    )
+    autopilot_disable.add_argument(
+        "--topics",
+        default=None,
+        help="Sujets à retirer de la file avant désactivation (optionnel)",
+    )
+    autopilot_status = autopilot_sub.add_parser(
+        "status",
+        help="Afficher l'état courant de l'autopilot",
+    )
+    autopilot_status.add_argument(
+        "--topics",
+        default=None,
+        help="Sujets à ajouter à la file temporairement pour inspection",
+    )
+
     args = parser.parse_args(argv)
 
     set_seed(args.seed)
@@ -332,6 +369,49 @@ def main(argv: Sequence[str] | None = None) -> int:
         )
         return 0
 
+    if args.command == "autopilot":
+        scheduler = AutopilotScheduler()
+        engine = Engine()
+        try:
+            if args.autopilot_command == "enable":
+                topics = _parse_topics(args.topics)
+                if not topics:
+                    parser.error("--topics doit contenir au moins un sujet")
+                state = scheduler.enable(topics, engine=engine)
+                message = (
+                    "Autopilot activé (en ligne)."
+                    if state.online
+                    else _format_autopilot_wait_message(state)
+                )
+                print(f"{message} File: {_format_queue(state.queue)}")
+                return 0
+            if args.autopilot_command == "disable":
+                topics = _parse_topics(args.topics) if args.topics else []
+                state = scheduler.disable(topics or None, engine=engine)
+                print(f"Autopilot désactivé. File: {_format_queue(state.queue)}")
+                return 0
+            if args.autopilot_command == "status":
+                state = scheduler.evaluate(engine=engine)
+                if state.online:
+                    print(
+                        f"Autopilot en ligne. File: {_format_queue(state.queue)}"
+                    )
+                else:
+                    print(
+                        f"Autopilot hors ligne ({state.last_reason or 'désactivé'}). "
+                        f"File: {_format_queue(state.queue)}"
+                    )
+                if args.topics:
+                    topics = _parse_topics(args.topics)
+                    missing = [topic for topic in topics if topic not in state.queue]
+                    if missing:
+                        print(
+                            "Sujets absents de la file: " + ", ".join(missing)
+                        )
+                return 0
+        except AutopilotError as exc:
+            parser.error(str(exc))
+
     parser.error("unknown command")
     return 2
 
@@ -362,3 +442,32 @@ def _iter_source_files(paths: Iterable[Path], patterns: Sequence[str]) -> Iterab
 
 if __name__ == "__main__":  # pragma: no cover - manual invocation helper
     raise SystemExit(main())
+
+
+def _parse_topics(raw: str | Sequence[str] | None) -> list[str]:
+    if raw is None:
+        return []
+    parts: list[str]
+    if isinstance(raw, str):
+        parts = raw.split(",")
+    else:
+        parts = []
+        for value in raw:
+            parts.extend(str(value).split(","))
+    topics: list[str] = []
+    for item in parts:
+        normalised = item.strip()
+        if not normalised:
+            continue
+        if normalised not in topics:
+            topics.append(normalised)
+    return topics
+
+
+def _format_queue(queue: Sequence[str]) -> str:
+    return ", ".join(queue) if queue else "vide"
+
+
+def _format_autopilot_wait_message(state) -> str:
+    reason = state.last_reason or "en attente"
+    return f"Autopilot activé mais en attente ({reason})."
