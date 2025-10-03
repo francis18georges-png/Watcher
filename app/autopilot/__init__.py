@@ -17,6 +17,8 @@ from .scheduler import (
     AutopilotState,
     ResourceProbe,
     ResourceUsage,
+    TopicQueueEntry,
+    TopicScore,
 )
 
 __all__ = [
@@ -26,6 +28,8 @@ __all__ = [
     "AutopilotLogEntry",
     "AutopilotScheduler",
     "AutopilotState",
+    "TopicQueueEntry",
+    "TopicScore",
     "ConsentGate",
     "DefaultDiscoveryCrawler",
     "DiscoveryResult",
