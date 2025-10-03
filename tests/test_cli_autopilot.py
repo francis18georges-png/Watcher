@@ -3,7 +3,7 @@ from types import SimpleNamespace
 import pytest
 
 from app import cli
-from app.autopilot import AutopilotState
+from app.autopilot import AutopilotRunResult, AutopilotState
 
 
 class DummyEngine:
@@ -112,3 +112,84 @@ def test_cli_autopilot_disable(monkeypatch, capsys):
     assert engine.offline[-1] is True
     captured = capsys.readouterr()
     assert "Autopilot désactivé" in captured.out
+
+
+def test_cli_autopilot_run_success(monkeypatch, capsys):
+    scheduler = SimpleNamespace(name="scheduler")
+    pipeline = SimpleNamespace(name="pipeline")
+    crawler = SimpleNamespace(name="crawler")
+    run_calls: list[list[str]] = []
+
+    class DummyController:
+        def __init__(self, *, scheduler, pipeline, crawler):  # pragma: no cover - tested via CLI
+            assert scheduler is scheduler_instance
+            assert pipeline is pipeline_instance
+            assert crawler is crawler_instance
+
+        def run(self, topics=None):  # pragma: no cover - executed in tests
+            run_calls.append(list(topics or []))
+            return AutopilotRunResult(
+                ingested=2,
+                skipped=["https://skipped.test/doc"],
+                blocked=["blocked.test"],
+            )
+
+    scheduler_instance = scheduler
+    pipeline_instance = pipeline
+    crawler_instance = crawler
+
+    monkeypatch.setattr(cli, "AutopilotScheduler", lambda: scheduler_instance)
+    monkeypatch.setattr(cli, "_build_autopilot_pipeline", lambda: pipeline_instance)
+    monkeypatch.setattr(
+        cli, "_build_autopilot_crawler", lambda *, noninteractive: crawler_instance
+    )
+    monkeypatch.setattr(cli, "AutopilotController", DummyController)
+    monkeypatch.setattr("builtins.input", lambda _: "o")
+
+    exit_code = cli.main(["autopilot", "run", "--topics", "foo,bar"])
+
+    assert exit_code == 0
+    assert run_calls == [["foo", "bar"]]
+    captured = capsys.readouterr()
+    assert "Cycle autopilot terminé: 2 source(s) ingérée(s)" in captured.out
+    assert "Ignorées: https://skipped.test/doc" in captured.out
+    assert "Bloquées: blocked.test" in captured.out
+    assert "Cycle interrompu" not in captured.out
+
+
+def test_cli_autopilot_run_blocked(monkeypatch, capsys):
+    scheduler = SimpleNamespace(name="scheduler")
+    pipeline = SimpleNamespace(name="pipeline")
+    crawler = SimpleNamespace(name="crawler")
+
+    class DummyController:
+        def __init__(self, *, scheduler, pipeline, crawler):  # pragma: no cover - tested via CLI
+            assert scheduler is scheduler_instance
+            assert pipeline is pipeline_instance
+            assert crawler is crawler_instance
+
+        def run(self, topics=None):  # pragma: no cover - executed in tests
+            assert topics is None
+            return AutopilotRunResult(ingested=0, skipped=[], blocked=[], reason="kill-switch")
+
+    scheduler_instance = scheduler
+    pipeline_instance = pipeline
+    crawler_instance = crawler
+
+    monkeypatch.setattr(cli, "AutopilotScheduler", lambda: scheduler_instance)
+    monkeypatch.setattr(cli, "_build_autopilot_pipeline", lambda: pipeline_instance)
+    monkeypatch.setattr(
+        cli, "_build_autopilot_crawler", lambda *, noninteractive: crawler_instance
+    )
+    monkeypatch.setattr(cli, "AutopilotController", DummyController)
+    monkeypatch.setattr(
+        "builtins.input",
+        lambda _: (_ for _ in ()).throw(AssertionError("should not prompt")),
+    )
+
+    exit_code = cli.main(["autopilot", "run", "--noninteractive"])
+
+    assert exit_code == 3
+    captured = capsys.readouterr()
+    assert "Cycle autopilot terminé: 0 source(s) ingérée(s)" in captured.out
+    assert "Cycle interrompu: kill-switch" in captured.out

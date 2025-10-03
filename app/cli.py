@@ -12,7 +12,12 @@ from typing import Iterable, Sequence
 from config import get_settings
 
 from app.bootstrap import auto_configure_if_needed
-from app.autopilot import AutopilotError, AutopilotScheduler
+from app.autopilot import (
+    AutopilotController,
+    AutopilotError,
+    AutopilotRunResult,
+    AutopilotScheduler,
+)
 from app.core.engine import Engine
 from app.core.first_run import FirstRunConfigurator
 from app.core.reproducibility import set_seed
@@ -271,6 +276,20 @@ def main(argv: Sequence[str] | None = None) -> int:
         default=None,
         help="Sujets à ajouter à la file temporairement pour inspection",
     )
+    autopilot_run = autopilot_sub.add_parser(
+        "run",
+        help="Exécuter un cycle découverte → scraping → ingestion",
+    )
+    autopilot_run.add_argument(
+        "--topics",
+        default=None,
+        help="Sujets supplémentaires (séparés par des virgules)",
+    )
+    autopilot_run.add_argument(
+        "--noninteractive",
+        action="store_true",
+        help="Désactive la confirmation interactive avant l'exécution",
+    )
 
     args = parser.parse_args(argv)
 
@@ -453,6 +472,27 @@ def main(argv: Sequence[str] | None = None) -> int:
         except AutopilotError as exc:
             parser.error(str(exc))
 
+        if args.autopilot_command == "run":
+            topics = _parse_topics(args.topics)
+            if not args.noninteractive and not _confirm_autopilot_run(topics):
+                print("Cycle annulé par l'utilisateur.")
+                return 1
+            scheduler = AutopilotScheduler()
+            pipeline = _build_autopilot_pipeline()
+            crawler = _build_autopilot_crawler(noninteractive=args.noninteractive)
+            controller = AutopilotController(
+                scheduler=scheduler,
+                pipeline=pipeline,
+                crawler=crawler,
+            )
+            try:
+                result = controller.run(topics or None)
+            except AutopilotError as exc:
+                parser.error(str(exc))
+            for line in _summarise_autopilot_result(result):
+                print(line)
+            return 0 if result.reason is None else 3
+
     parser.error("unknown command")
     return 2
 
@@ -512,3 +552,46 @@ def _format_queue(queue: Sequence[str]) -> str:
 def _format_autopilot_wait_message(state) -> str:
     reason = state.last_reason or "en attente"
     return f"Autopilot activé mais en attente ({reason})."
+
+
+class _DefaultCrawler:
+    """Fallback discovery crawler yielding no results."""
+
+    def discover(self, topics: Sequence[str], rules: Sequence) -> Iterable:
+        return []
+
+
+def _confirm_autopilot_run(topics: Sequence[str]) -> bool:
+    label = ", ".join(topics) if topics else "la file planifiée"
+    answer = input(
+        "L'exécution autopilot peut initier des requêtes réseau supervisées.\n"
+        f"Confirmer le cycle pour {label} ? [o/N] "
+    )
+    return answer.strip().lower() in {"o", "oui", "y", "yes"}
+
+
+def _build_autopilot_pipeline() -> IngestPipeline:
+    store = SimpleVectorStore(namespace="autopilot")
+    return IngestPipeline(store)
+
+
+def _build_autopilot_crawler(*, noninteractive: bool) -> _DefaultCrawler:
+    del noninteractive
+    return _DefaultCrawler()
+
+
+def _summarise_autopilot_result(result: AutopilotRunResult) -> list[str]:
+    summary = (
+        "Cycle autopilot terminé: "
+        f"{result.ingested} source(s) ingérée(s), "
+        f"{len(result.skipped)} ignorée(s), "
+        f"{len(result.blocked)} bloquée(s)."
+    )
+    lines = [summary]
+    if result.reason:
+        lines.append(f"Cycle interrompu: {result.reason}")
+    if result.skipped:
+        lines.append("Ignorées: " + ", ".join(result.skipped))
+    if result.blocked:
+        lines.append("Bloquées: " + ", ".join(result.blocked))
+    return lines
