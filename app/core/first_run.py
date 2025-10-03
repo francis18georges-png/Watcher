@@ -8,13 +8,16 @@ from pathlib import Path
 from secrets import token_bytes
 from typing import Any
 
+import hashlib
 import json
 import os
 import platform
 import shutil
+import stat
 import textwrap
 
 from app.core.model_registry import ensure_models, select_models
+from app.policy.ledger import ConsentLedger, LedgerError
 
 @dataclass(slots=True)
 class HardwareProfile:
@@ -35,6 +38,8 @@ class FirstRunConfigurator:
         self.config_path = self.config_dir / "config.toml"
         self.policy_path = self.config_dir / "policy.yaml"
         self.consent_ledger = self.config_dir / "consent-ledger.jsonl"
+        self.env_path = self.config_dir / ".env"
+        self.sentinel_path = self.config_dir / "first_run"
 
     # ------------------------------------------------------------------
     # Hardware detection and recommendation helpers
@@ -66,7 +71,11 @@ class FirstRunConfigurator:
     # Public API
     # ------------------------------------------------------------------
     def run(
-        self, fully_auto: bool = False, download_models: bool = True
+        self,
+        *,
+        auto: bool | None = None,
+        fully_auto: bool | None = None,
+        download_models: bool = True,
     ) -> Path:
         """Generate configuration files and return the created path.
 
@@ -82,31 +91,54 @@ class FirstRunConfigurator:
             copied from embedded fallbacks before writing the configuration.
         """
 
+        if auto is None:
+            auto = fully_auto if fully_auto is not None else True
+
         profile = self.detect_hardware()
         self.config_dir.mkdir(parents=True, exist_ok=True)
         selection = select_models(profile.cpu_threads, profile.has_gpu)
-        if download_models:
-            self._download_models(selection)
-        self._write_config(profile, selection)
+        model_paths = self._ensure_model_paths(selection, download_models)
+
+        self._write_config(profile, selection, model_paths)
         self._write_policy(selection)
         self._ensure_consent_ledger()
+        self._write_env(selection, model_paths)
+        self._record_initial_consent()
+
+        if self.sentinel_path.exists():
+            self.sentinel_path.unlink(missing_ok=True)
+
         return self.config_path
 
     # ------------------------------------------------------------------
     # File writers
     # ------------------------------------------------------------------
-    def _download_models(self, selection: dict[str, Any]) -> None:
-        models_dir = self.config_dir / "models"
-        ensure_models(models_dir / "llm", [selection["llm"]])
-        ensure_models(models_dir / "embeddings", [selection["embedding"]])
-
-    def _write_config(
-        self, profile: HardwareProfile, selection: dict[str, Any]
-    ) -> None:
-        data_dir = self.config_dir / "data"
+    def _ensure_model_paths(
+        self, selection: dict[str, Any], download_models: bool
+    ) -> dict[str, Path]:
         models_dir = self.config_dir / "models"
         llm_dir = models_dir / "llm"
         emb_dir = models_dir / "embeddings"
+
+        if download_models:
+            llm_path = ensure_models(llm_dir, [selection["llm"]])[0]
+            emb_path = ensure_models(emb_dir, [selection["embedding"]])[0]
+        else:
+            llm_path = selection["llm"].destination(llm_dir)
+            emb_path = selection["embedding"].destination(emb_dir)
+            llm_path.parent.mkdir(parents=True, exist_ok=True)
+            emb_path.parent.mkdir(parents=True, exist_ok=True)
+
+        return {"llm": llm_path, "embedding": emb_path}
+
+    def _write_config(
+        self,
+        profile: HardwareProfile,
+        selection: dict[str, Any],
+        model_paths: dict[str, Path],
+    ) -> None:
+        data_dir = self.config_dir / "data"
+        models_dir = self.config_dir / "models"
 
         config = {
             "paths": {
@@ -119,13 +151,13 @@ class FirstRunConfigurator:
                 "backend": profile.backend,
                 "ctx": profile.context_window,
                 "threads": profile.cpu_threads // 2 or 1,
-                "model_path": str(llm_dir / selection["llm"].name),
+                "model_path": str(model_paths["llm"]),
                 "model_sha256": selection["llm"].sha256,
                 "model_license": selection["llm"].license,
             },
             "memory": {
                 "db_path": str(self.config_dir / "memory" / "mem.db"),
-                "embed_model_path": str(emb_dir / selection["embedding"].name),
+                "embed_model_path": str(model_paths["embedding"]),
                 "embed_model_sha256": selection["embedding"].sha256,
             },
             "intelligence": {
@@ -199,6 +231,69 @@ class FirstRunConfigurator:
             json.dumps(metadata, ensure_ascii=False) + "\n",
             encoding="utf-8",
         )
+
+    def _write_env(
+        self, selection: dict[str, Any], model_paths: dict[str, Path]
+    ) -> None:
+        policy_hash = self._hash_path(self.policy_path)
+        ledger_hash = self._hash_path(self.consent_ledger)
+
+        values = {
+            "WATCHER_ENV": "production",
+            "WATCHER_HOME": str(self.config_dir),
+            "WATCHER_CONFIG_PATH": str(self.config_path),
+            "WATCHER_POLICY_PATH": str(self.policy_path),
+            "WATCHER_CONSENT_LEDGER": str(self.consent_ledger),
+            "WATCHER_LLM__MODEL_PATH": str(model_paths["llm"]),
+            "WATCHER_LLM__MODEL_SHA256": selection["llm"].sha256,
+            "WATCHER_MEMORY__EMBED_MODEL_PATH": str(model_paths["embedding"]),
+            "WATCHER_MEMORY__EMBED_MODEL_SHA256": selection["embedding"].sha256,
+            "WATCHER_POLICY__SHA256": policy_hash,
+            "WATCHER_CONSENT__SHA256": ledger_hash,
+        }
+
+        lines = ["# Auto-generated by Watcher – do not edit manually."]
+        for key in sorted(values):
+            lines.append(f"{key}={values[key]}")
+        lines.append("")
+        self.env_path.write_text("\n".join(lines), encoding="utf-8")
+        try:
+            self.env_path.chmod(stat.S_IRUSR | stat.S_IWUSR)
+        except OSError:
+            pass
+
+    def _record_initial_consent(self) -> None:
+        if not self.policy_path.exists() or not self.consent_ledger.exists():
+            return
+
+        content = self.consent_ledger.read_text(encoding="utf-8")
+        if "\n" in content:
+            lines = [line for line in content.splitlines() if line.strip()]
+        else:
+            lines = [content.strip()] if content.strip() else []
+        if any('"action": "init"' in line for line in lines[1:]):
+            return
+
+        try:
+            ledger = ConsentLedger(self.consent_ledger)
+        except LedgerError:
+            return
+
+        ledger.record(
+            action="init",
+            domain="*",
+            scope="bootstrap",
+            policy_hash=self._hash_path(self.policy_path),
+        )
+
+    def _hash_path(self, path: Path) -> str:
+        digest = hashlib.sha256()
+        with path.open("rb") as fh:
+            for chunk in iter(lambda: fh.read(8192), b""):
+                if not chunk:
+                    break
+                digest.update(chunk)
+        return digest.hexdigest()
 
     # ------------------------------------------------------------------
     # Minimal TOML encoder (avoids external dependencies)

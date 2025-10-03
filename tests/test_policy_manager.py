@@ -13,7 +13,7 @@ def test_policy_manager_approve_and_revoke(tmp_path: Path) -> None:
     home.mkdir()
 
     configurator = FirstRunConfigurator(home=home)
-    configurator.run(fully_auto=True, download_models=False)
+    configurator.run(auto=True, download_models=False)
 
     manager = PolicyManager(home=home)
     manager.approve(
@@ -35,8 +35,9 @@ def test_policy_manager_approve_and_revoke(tmp_path: Path) -> None:
         .strip()
         .splitlines()
     )
-    assert len(ledger_lines) == 2
-    assert '"action": "approve"' in ledger_lines[1]
+    assert len(ledger_lines) == 3
+    assert '"action": "init"' in ledger_lines[1]
+    assert '"action": "approve"' in ledger_lines[2]
 
     manager.revoke("example.com")
 

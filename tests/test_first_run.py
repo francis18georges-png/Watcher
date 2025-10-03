@@ -6,6 +6,7 @@ from pathlib import Path
 
 import pytest
 
+from app.bootstrap import auto_configure_if_needed
 from app.core.first_run import FirstRunConfigurator
 from config import get_settings
 
@@ -23,7 +24,11 @@ def test_first_run_creates_expected_files(tmp_path: Path, monkeypatch: pytest.Mo
     home.mkdir()
     configurator = FirstRunConfigurator(home=home)
 
-    config_path = configurator.run(fully_auto=True, download_models=False)
+    sentinel = configurator.sentinel_path
+    sentinel.parent.mkdir(parents=True, exist_ok=True)
+    sentinel.write_text("pending", encoding="utf-8")
+
+    config_path = configurator.run(auto=True, download_models=False)
 
     assert config_path == home / ".watcher" / "config.toml"
     assert config_path.exists()
@@ -40,6 +45,15 @@ def test_first_run_creates_expected_files(tmp_path: Path, monkeypatch: pytest.Mo
     assert ledger_path.exists()
     ledger_content = ledger_path.read_text(encoding="utf-8")
     assert '"type": "metadata"' in ledger_content
+    assert '"action": "init"' in ledger_content
+
+    env_path = home / ".watcher" / ".env"
+    assert env_path.exists()
+    env_content = env_path.read_text(encoding="utf-8")
+    assert "WATCHER_LLM__MODEL_SHA256" in env_content
+    assert "WATCHER_POLICY__SHA256" in env_content
+
+    assert not sentinel.exists()
 
 
 def test_user_config_overrides_settings(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -63,3 +77,19 @@ def test_user_config_overrides_settings(tmp_path: Path, monkeypatch: pytest.Monk
         assert settings.llm.ctx == 1024
     finally:
         get_settings.cache_clear()  # type: ignore[attr-defined]
+
+
+def test_bootstrap_auto_configures_when_sentinel_present(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    home = tmp_path / "home"
+    configurator = FirstRunConfigurator(home=home)
+    configurator.config_dir.mkdir(parents=True, exist_ok=True)
+    configurator.sentinel_path.write_text("pending", encoding="utf-8")
+
+    monkeypatch.setenv("WATCHER_BOOTSTRAP_SKIP_MODELS", "1")
+
+    auto_configure_if_needed(home=home)
+
+    assert configurator.config_path.exists()
+    assert not configurator.sentinel_path.exists()
