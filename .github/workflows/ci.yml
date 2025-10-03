@@ -12,8 +12,34 @@ env:
   TRIVY_CACHE_DIR: .trivy
 
 jobs:
+  workflow-lint:
+    name: Workflow lint
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install actionlint
+        shell: bash
+        run: >-
+          bash <(curl -sSfL
+          https://raw.githubusercontent.com/rhysd/actionlint/main/scripts/download-actionlint.bash)
+
+      - name: Install yamllint
+        run: |
+          python3 -m pip install --user --upgrade yamllint
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+
+      - name: Run actionlint
+        run: ./actionlint -color
+
+      - name: Run yamllint
+        run: yamllint .github/workflows
+
   determine-python:
     name: Determine Python versions
+    needs:
+      - workflow-lint
     runs-on: ubuntu-latest
     outputs:
       matrix: ${{ steps.python-versions.outputs.matrix }}
@@ -44,6 +70,8 @@ jobs:
 
   scorecard:
     name: Scorecard gate
+    needs:
+      - workflow-lint
     runs-on: ubuntu-latest
     permissions:
       contents: read
