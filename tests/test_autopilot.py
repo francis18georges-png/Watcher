@@ -5,6 +5,7 @@ from datetime import datetime
 import pytest
 
 from app.autopilot import AutopilotError, AutopilotScheduler, ResourceProbe, ResourceUsage
+from app.policy.manager import PolicyManager
 from app.policy.schema import (
     Budgets,
     Categories,
@@ -16,6 +17,7 @@ from app.policy.schema import (
     Subject,
     TimeWindow,
 )
+from app.utils import autostart
 
 
 class DummyEngine:
@@ -131,3 +133,23 @@ def test_enable_requires_topics(tmp_path):
 
     with pytest.raises(AutopilotError):
         scheduler.enable([], now=datetime(2024, 1, 1, 10, 0, 0))
+
+
+def test_scheduler_stops_when_kill_switch(tmp_path):
+    home = tmp_path / "home"
+    policy_manager = PolicyManager(home=home)
+    state_path = tmp_path / "state.json"
+    scheduler = AutopilotScheduler(
+        policy_loader=_policy,
+        policy_manager=policy_manager,
+        state_path=state_path,
+        resource_probe=DummyProbe(ResourceUsage(cpu_percent=10, ram_mb=256)),
+    )
+
+    scheduler.state.enabled = True
+    kill_switch = home / ".watcher" / autostart.KILL_SWITCH_FILENAME
+    kill_switch.parent.mkdir(parents=True)
+    kill_switch.write_text("", encoding="utf-8")
+
+    with pytest.raises(AutopilotError):
+        scheduler.evaluate(now=datetime(2024, 1, 1, 10, 0, 0))

@@ -15,6 +15,8 @@ import shutil
 import textwrap
 
 from app.core.model_registry import ensure_models, select_models
+from app.policy.manager import PolicyError, PolicyManager
+from app.utils.autostart import configure_autostart
 
 @dataclass(slots=True)
 class HardwareProfile:
@@ -90,6 +92,15 @@ class FirstRunConfigurator:
         self._write_config(profile, selection)
         self._write_policy(selection)
         self._ensure_consent_ledger()
+        if fully_auto:
+            consent = True
+            try:
+                policy = PolicyManager(home=self.home)._read_policy()
+            except PolicyError:
+                consent = False
+            else:
+                consent = not policy.defaults.require_consent
+            configure_autostart(home=self.home, consent_granted=consent)
         return self.config_path
 
     # ------------------------------------------------------------------
