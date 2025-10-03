@@ -1,5 +1,14 @@
 """Autopilot orchestration utilities."""
 
+from .controller import (
+    AutopilotController,
+    AutopilotRunResult,
+    ConsentGate,
+    DiscoveryResult,
+    LedgerView,
+    MultiSourceVerifier,
+    ReportGenerator,
+)
 from .scheduler import (
     AutopilotError,
     AutopilotLogEntry,
@@ -10,10 +19,17 @@ from .scheduler import (
 )
 
 __all__ = [
+    "AutopilotController",
     "AutopilotError",
+    "AutopilotRunResult",
     "AutopilotLogEntry",
     "AutopilotScheduler",
     "AutopilotState",
+    "ConsentGate",
+    "DiscoveryResult",
+    "LedgerView",
+    "MultiSourceVerifier",
+    "ReportGenerator",
     "ResourceProbe",
     "ResourceUsage",
 ]
