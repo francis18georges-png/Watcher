@@ -12,8 +12,11 @@ import hashlib
 import json
 import os
 import platform
+import shlex
 import shutil
 import stat
+import subprocess
+import sys
 import textwrap
 
 from app.core.model_registry import ensure_models, select_models
@@ -104,6 +107,7 @@ class FirstRunConfigurator:
         self._ensure_consent_ledger()
         self._write_env(selection, model_paths)
         self._record_initial_consent()
+        self._configure_autostart()
 
         if self.sentinel_path.exists():
             self.sentinel_path.unlink(missing_ok=True)
@@ -294,6 +298,154 @@ class FirstRunConfigurator:
                     break
                 digest.update(chunk)
         return digest.hexdigest()
+
+    # ------------------------------------------------------------------
+    # Autostart helpers
+    # ------------------------------------------------------------------
+    def _configure_autostart(self) -> None:
+        """Install OS-specific autostart configuration for the autopilot."""
+
+        if not self._should_enable_autostart():
+            return
+
+        system = platform.system()
+        if system == "Windows":
+            self._configure_windows_autostart()
+        elif system in {"Linux", "FreeBSD"}:
+            self._configure_systemd_autostart()
+
+    def _should_enable_autostart(self) -> bool:
+        """Return :data:`True` when the autopilot autostart is enabled."""
+
+        if os.environ.get("WATCHER_DISABLE"):
+            return False
+
+        kill_switch = self.config_dir / "disable"
+        if kill_switch.exists():
+            return False
+
+        value = os.environ.get("WATCHER_AUTOSTART")
+        if value is None:
+            return False
+
+        value = value.strip().lower()
+        return value not in {"", "0", "false", "no", "off"}
+
+    def _autopilot_command_parts(self) -> list[str]:
+        return [
+            sys.executable,
+            "-m",
+            "app.cli",
+            "autopilot",
+            "run",
+            "--noninteractive",
+        ]
+
+    def _configure_windows_autostart(self) -> None:
+        command = self._autopilot_command_parts()
+        command_string = subprocess.list2cmdline(command)
+
+        script_value = command_string.replace("'", "''")
+        powershell_script = textwrap.dedent(
+            f"""
+            $path = 'HKCU:\\Software\\Microsoft\\Windows\\CurrentVersion\\RunOnce'
+            New-Item -Path $path -Force | Out-Null
+            Set-ItemProperty -Path $path -Name 'WatcherAutopilot' -Type String -Value '{script_value}' -Force
+            """
+        ).strip()
+
+        try:
+            subprocess.run(
+                [
+                    "powershell",
+                    "-NoProfile",
+                    "-Command",
+                    powershell_script,
+                ],
+                check=True,
+            )
+        except (OSError, subprocess.CalledProcessError):
+            pass
+
+        try:
+            subprocess.run(
+                [
+                    "schtasks",
+                    "/Create",
+                    "/TN",
+                    "Watcher Autopilot",
+                    "/TR",
+                    command_string,
+                    "/SC",
+                    "HOURLY",
+                    "/F",
+                ],
+                check=True,
+            )
+        except (OSError, subprocess.CalledProcessError):
+            pass
+
+    def _configure_systemd_autostart(self) -> None:
+        systemd_dir = self.home / ".config" / "systemd" / "user"
+        systemd_dir.mkdir(parents=True, exist_ok=True)
+
+        service_path = systemd_dir / "watcher-autopilot.service"
+        timer_path = systemd_dir / "watcher-autopilot.timer"
+
+        command = shlex.join(self._autopilot_command_parts())
+
+        service_body = textwrap.dedent(
+            f"""
+            [Unit]
+            Description=Watcher Autopilot orchestrator
+
+            [Service]
+            Type=oneshot
+            WorkingDirectory={self.home}
+            Environment=WATCHER_HOME={self.config_dir}
+            ExecStart={command}
+
+            [Install]
+            WantedBy=default.target
+            """
+        ).strip()
+        service_path.write_text(
+            "\n".join(line.rstrip() for line in service_body.splitlines()) + "\n",
+            encoding="utf-8",
+        )
+
+        timer_body = textwrap.dedent(
+            """
+            [Unit]
+            Description=Watcher Autopilot orchestrator schedule
+
+            [Timer]
+            OnBootSec=5m
+            OnUnitActiveSec=1h
+            Unit=watcher-autopilot.service
+
+            [Install]
+            WantedBy=timers.target
+            """
+        ).strip()
+        timer_path.write_text(
+            "\n".join(line.rstrip() for line in timer_body.splitlines()) + "\n",
+            encoding="utf-8",
+        )
+
+        try:
+            subprocess.run(
+                [
+                    "systemctl",
+                    "--user",
+                    "enable",
+                    "--now",
+                    "watcher-autopilot.timer",
+                ],
+                check=True,
+            )
+        except (OSError, subprocess.CalledProcessError):
+            pass
 
     # ------------------------------------------------------------------
     # Minimal TOML encoder (avoids external dependencies)
