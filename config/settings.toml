@@ -5,10 +5,15 @@ language = "fr"
 autosave = true
 
 [llm]
-backend = "ollama"
-model = "llama3.2:3b"
+backend = "llama.cpp"
+model = "smollm-135m-instruct-Q4_0"
 host = "127.0.0.1:11434"
-ctx = 4096
+model_path = "models/llm/smollm-135m-instruct.Q4_0.gguf"
+ctx = 2048
+threads = null
+max_tokens = 256
+temperature = 0.2
+system_prompt = "Tu es Watcher, un assistant de développement Python fonctionnant hors ligne. Fournis des réponses concises et fiables."
 fallback_phrase = "Echo"
 
 [dev]
@@ -25,9 +30,10 @@ default_license = "MIT"
 [memory]
 db_path = "memory/mem.db"
 cache_size = 128
-embed_model = "nomic-embed-text"
-embed_host = "127.0.0.1:11434"
+embed_model = "sentence-transformers/all-MiniLM-L6-v2"
+embed_model_path = "models/embeddings/all-MiniLM-L6-v2"
 summary_max_tokens = 512
+retention_limit = 4096
 
 [learn]
 optimizer = "adam"

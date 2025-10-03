@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import logging
 from pathlib import Path
 from typing import Mapping
 
@@ -85,13 +84,51 @@ class UISettings(SectionSettings):
 class LLMSettings(SectionSettings):
     """Parameters for the local large language model backend."""
 
-    backend: str = Field(default="ollama", description="Backend préféré pour le LLM.")
-    model: str = Field(default="llama3.2:3b", description="Identifiant du modèle à utiliser.")
-    host: str = Field(default="127.0.0.1:11434", description="Hôte du serveur Ollama.")
-    ctx: int | None = Field(default=4096, description="Taille de fenêtre de contexte.")
-    fallback_phrase: str = Field(default="Echo", description="Préfixe utilisé en mode secours.")
+    backend: str = Field(
+        default="llama.cpp",
+        description="Backend préféré pour le LLM (ollama, llama.cpp).",
+    )
+    model: str = Field(
+        default="smollm-135m-instruct-Q4_0",
+        description="Identifiant court du modèle pour la télémétrie et les logs.",
+    )
+    host: str = Field(
+        default="127.0.0.1:11434",
+        description="Hôte du serveur Ollama (utilisé quand backend=ollama).",
+    )
+    model_path: Path = Field(
+        default=Path("models/llm/smollm-135m-instruct.Q4_0.gguf"),
+        description="Chemin du fichier GGUF pour llama.cpp.",
+    )
+    ctx: int | None = Field(
+        default=2048,
+        description="Taille de fenêtre de contexte à utiliser avec le backend local.",
+    )
+    threads: int | None = Field(
+        default=None,
+        description="Nombre de threads CPU à réserver pour llama.cpp (auto si None).",
+    )
+    max_tokens: int = Field(
+        default=256,
+        description="Nombre maximum de tokens générés par requête.",
+    )
+    temperature: float = Field(
+        default=0.2,
+        description="Température passée au moteur de génération local.",
+    )
+    system_prompt: str = Field(
+        default=(
+            "Tu es Watcher, un assistant de développement Python fonctionnant hors ligne. "
+            "Fournis des réponses concises et fiables."
+        ),
+        description="Invite système appliquée lorsque llama.cpp est utilisé.",
+    )
+    fallback_phrase: str = Field(
+        default="Echo",
+        description="Préfixe utilisé lorsque la génération échoue.",
+    )
 
-    @field_validator("backend", "model", "host", "fallback_phrase")
+    @field_validator("backend", "model", "fallback_phrase")
     @classmethod
     def _not_blank(cls, value: str) -> str:
         if not value:
@@ -103,6 +140,27 @@ class LLMSettings(SectionSettings):
     def _positive_ctx(cls, value: int | None) -> int | None:
         if value is not None and value < 1:
             raise ValueError("ctx must be a positive integer")
+        return value
+
+    @field_validator("threads")
+    @classmethod
+    def _threads_positive(cls, value: int | None) -> int | None:
+        if value is not None and value < 1:
+            raise ValueError("threads must be a positive integer when provided")
+        return value
+
+    @field_validator("max_tokens")
+    @classmethod
+    def _positive_tokens(cls, value: int) -> int:
+        if value < 1:
+            raise ValueError("max_tokens must be a positive integer")
+        return value
+
+    @field_validator("temperature")
+    @classmethod
+    def _temperature_range(cls, value: float) -> float:
+        if not 0.0 <= value <= 2.0:
+            raise ValueError("temperature must be between 0.0 and 2.0")
         return value
 
 
@@ -123,13 +181,32 @@ class PlannerSettings(SectionSettings):
 class MemorySettings(SectionSettings):
     """Vector memory and cache configuration."""
 
-    db_path: Path = Field(default=Path("memory/mem.db"), description="Chemin vers la base mémoire.")
-    cache_size: int = Field(default=128, description="Taille du cache LRU pour les réponses.")
-    embed_model: str = Field(default="nomic-embed-text", description="Modèle d'embedding préféré.")
-    embed_host: str = Field(default="127.0.0.1:11434", description="Hôte du service d'embedding.")
-    summary_max_tokens: int = Field(default=512, description="Limite de tokens pour les résumés.")
+    db_path: Path = Field(
+        default=Path("memory/mem.db"),
+        description="Chemin vers la base mémoire SQLite.",
+    )
+    cache_size: int = Field(
+        default=128,
+        description="Taille du cache LRU pour les réponses.",
+    )
+    embed_model: str = Field(
+        default="sentence-transformers/all-MiniLM-L6-v2",
+        description="Identifiant du modèle d'embedding SentenceTransformer.",
+    )
+    embed_model_path: Path = Field(
+        default=Path("models/embeddings/all-MiniLM-L6-v2"),
+        description="Chemin local vers le modèle d'embedding.",
+    )
+    summary_max_tokens: int = Field(
+        default=512,
+        description="Limite de tokens pour les résumés.",
+    )
+    retention_limit: int = Field(
+        default=4096,
+        description="Nombre maximal d'entrées conservées par type de mémoire.",
+    )
 
-    @field_validator("cache_size", "summary_max_tokens")
+    @field_validator("cache_size", "summary_max_tokens", "retention_limit")
     @classmethod
     def _positive_int(cls, value: int) -> int:
         if value < 1:

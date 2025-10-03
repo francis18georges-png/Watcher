@@ -14,6 +14,18 @@ Le tableau ci-dessous récapitule les principaux interrupteurs liés aux profils
 
 Les profils permettent d'adapter rapidement les limites ou le niveau de verbosité selon l'environnement d'exécution. Les commutateurs d'instrumentation garantissent quant à eux un cadre d'observabilité cohérent (traçabilité, réseau) quelle que soit la manière de lancer Watcher (processus principal, sandbox ou plugin).
 
+## Backend LLM et mémoire locale
+
+| Section | Clé | Description | Valeur par défaut |
+| --- | --- | --- | --- |
+| `[llm]` | `backend` | Sélection du moteur (`llama.cpp` pour offline, `ollama` pour un service réseau). | `llama.cpp` |
+| `[llm]` | `model_path` | Chemin du fichier GGUF chargé par `llama.cpp`. | `models/llm/smollm-135m-instruct.Q4_0.gguf` |
+| `[llm]` | `temperature` / `max_tokens` | Paramètres de génération locale. | `0.2` / `256` |
+| `[memory]` | `embed_model_path` | Répertoire contenant le modèle SentenceTransformer exporté par `setup-local-models.sh`. | `models/embeddings/all-MiniLM-L6-v2` |
+| `[memory]` | `retention_limit` | Nombre maximal d'entrées conservées par type dans la base SQLite `memory/mem.db`. | `4096` |
+
+Les variables d'environnement correspondantes (`WATCHER_LLM__*`, `WATCHER_MEMORY__*`) peuvent rediriger le CLI vers d'autres modèles (chemin absolu, montage réseau, etc.).
+
 ## Qualité et automatisation
 
 Les sessions Nox et la matrice Python du pipeline CI respectent la variable d'environnement `WATCHER_NOX_PYTHON`. Elle accepte une liste de versions séparées par des virgules et/ou des espaces (par exemple `"3.10, 3.11 3.12"`). Lorsque la variable est absente ou ne contient aucune version, la valeur par défaut couvre explicitement les interpréteurs pris en charge (`3.10`, `3.11` et `3.12`).

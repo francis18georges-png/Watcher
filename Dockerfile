@@ -10,6 +10,7 @@ WORKDIR /app
 RUN apt-get update \
     && apt-get install --no-install-recommends -y \
         build-essential \
+        cmake \
     && rm -rf /var/lib/apt/lists/*
 
 COPY requirements.txt ./

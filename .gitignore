@@ -24,6 +24,7 @@ __pycache__/
 data/
 memory/
 datasets/cache/
+models/
 
 # Coverage artifacts
 .coverage

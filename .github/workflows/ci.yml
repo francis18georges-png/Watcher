@@ -184,6 +184,32 @@ jobs:
         run: >-
           echo "::warning::Skipping DVC artifact pull and verification because AWS credentials are unavailable for forked pull requests."
 
+      - name: Cache offline models
+        if: runner.os == 'Linux'
+        uses: actions/cache@v4
+        with:
+          path: .cache/models
+          key: offline-models-${{ hashFiles('scripts/setup-local-models.sh') }}
+
+      - name: Install Watcher package
+        if: runner.os == 'Linux'
+        run: pip install .
+
+      - name: Prepare offline models
+        if: runner.os == 'Linux'
+        run: |
+          scripts/setup-local-models.sh \
+            --model-dir .cache/models/llm \
+            --embeddings-dir .cache/models/embeddings
+
+      - name: Offline smoke test
+        if: runner.os == 'Linux'
+        env:
+          WATCHER_LLM__MODEL_PATH: ${{ github.workspace }}/.cache/models/llm/smollm-135m-instruct.Q4_0.gguf
+          WATCHER_MEMORY__EMBED_MODEL_PATH: ${{ github.workspace }}/.cache/models/embeddings/all-MiniLM-L6-v2
+          WATCHER_INTELLIGENCE__MODE: offline
+        run: watcher run --offline --prompt "Dis bonjour et indique le mode utilisé."
+
       - name: Validate Windows installer
         if: runner.os == 'Windows'
         shell: pwsh
