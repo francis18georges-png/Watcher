@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+from datetime import datetime, timezone
 from contextlib import suppress
 from importlib import resources
 from pathlib import Path
@@ -15,6 +16,7 @@ from app.core.engine import Engine
 from app.core.first_run import FirstRunConfigurator
 from app.core.reproducibility import set_seed
 from app.embeddings.store import SimpleVectorStore
+from app.ingest import IngestPipeline, IngestValidationError, RawDocument
 from app.llm import rag
 from app.policy.manager import PolicyError, PolicyManager
 from app.tools import plugins
@@ -218,6 +220,19 @@ def main(argv: Sequence[str] | None = None) -> int:
         default=32,
         help="Nombre maximum de documents traités par lot.",
     )
+    ingest_parser.add_argument(
+        "--licence",
+        default="CC-BY-4.0",
+        help="Licence appliquée aux documents locaux (doit être compatible).",
+    )
+    ingest_parser.add_argument(
+        "--min-sources",
+        type=int,
+        default=2,
+        help=(
+            "Nombre minimal de sources distinctes nécessaires pour valider une information."
+        ),
+    )
 
     autopilot_parser = sub.add_parser(
         "autopilot",
@@ -341,31 +356,55 @@ def main(argv: Sequence[str] | None = None) -> int:
     if args.command == "ingest":
         if args.batch_size < 1:
             parser.error("--batch-size doit être >= 1")
+        if args.min_sources < 2:
+            parser.error("--min-sources doit être >= 2")
+        if args.batch_size < args.min_sources:
+            parser.error("--batch-size doit être >= --min-sources")
         patterns = args.patterns or ["*.md", "*.txt"]
         sources = [_resolve_source(Path(raw)) for raw in args.sources]
-        store = SimpleVectorStore(namespace=args.namespace)
-        total = 0
-        batch_texts: list[str] = []
-        batch_meta: list[dict[str, str]] = []
+        documents: list[RawDocument] = []
         for file in _iter_source_files(sources, patterns):
             try:
                 text = file.read_text(encoding="utf-8")
             except UnicodeDecodeError:
                 text = file.read_text(encoding="utf-8", errors="ignore")
-            text = text.strip()
-            if not text:
+            if not text.strip():
                 continue
-            batch_texts.append(text)
-            batch_meta.append({"path": str(file)})
-            total += 1
-            if len(batch_texts) >= args.batch_size:
-                store.add(batch_texts, batch_meta)
-                batch_texts.clear()
-                batch_meta.clear()
-        if batch_texts:
-            store.add(batch_texts, batch_meta)
+            try:
+                timestamp = file.stat().st_mtime
+            except OSError:
+                timestamp = None
+            published_at = (
+                datetime.fromtimestamp(timestamp, tz=timezone.utc)
+                if timestamp is not None
+                else None
+            )
+            documents.append(
+                RawDocument(
+                    url=file.as_uri(),
+                    title=file.stem,
+                    text=text,
+                    licence=args.licence,
+                    published_at=published_at,
+                )
+            )
+        if len(documents) < args.min_sources:
+            parser.error(
+                "Au moins deux sources distinctes sont requises pour l'ingestion."
+            )
+        store = SimpleVectorStore(namespace=args.namespace)
+        pipeline = IngestPipeline(
+            store,
+            min_sources=args.min_sources,
+        )
+        seen_digests: set[str] = set()
+        try:
+            total = pipeline.ingest(documents, seen_digests=seen_digests)
+        except IngestValidationError as exc:
+            parser.error(str(exc))
         print(
-            f"Ingestion terminée: {total} document(s) indexé(s) dans le namespace '{args.namespace}'."
+            "Ingestion terminée: "
+            f"{total} extrait(s) validé(s) dans le namespace '{args.namespace}'."
         )
         return 0
 
