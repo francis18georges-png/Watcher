@@ -10,7 +10,7 @@ from pathlib import Path
 from typing import Callable, Iterable, Sequence
 
 from app.policy.manager import PolicyError, PolicyManager
-from app.policy.schema import Policy, TimeWindow, _parse_window
+from app.policy.schema import NetworkWindow, Policy, TimeWindow, _parse_window
 
 try:  # pragma: no cover - optional dependency
     import psutil  # type: ignore[import-not-found]
@@ -225,7 +225,7 @@ class AutopilotScheduler:
         usage = self._resource_probe.snapshot()
         self.state.last_cpu_percent = usage.cpu_percent
         self.state.last_ram_mb = usage.ram_mb
-        allowed = self._is_within_window(policy.network.allowed_windows, now)
+        allowed = self._is_within_window(policy.network.network_windows, now)
         budgets_ok = self._within_budgets(policy, usage)
         if self.state.queue:
             self.state.current_topic = self.state.queue[0]
@@ -305,17 +305,20 @@ class AutopilotScheduler:
                 cleaned.append(normalised)
         return cleaned
 
-    def _is_within_window(self, windows: Sequence[TimeWindow], now: datetime) -> bool:
+    def _is_within_window(
+        self, windows: Sequence[NetworkWindow], now: datetime
+    ) -> bool:
         if not windows:
             return False
         weekday = now.strftime("%a").lower()[:3]
         current = now.time().replace(second=0, microsecond=0)
-        for window in windows:
-            if weekday not in window.days:
-                continue
-            start, end = self._parse_window(window.window)
-            if start <= current < end:
-                return True
+        for entry in windows:
+            for window in entry.windows:
+                if weekday not in window.days:
+                    continue
+                start, end = self._parse_window(window.window)
+                if start <= current < end:
+                    return True
         return False
 
     def _parse_window(self, value: str) -> tuple[time, time]:

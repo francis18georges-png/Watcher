@@ -11,7 +11,9 @@ from app.policy.schema import (
     Defaults,
     ModelEntry,
     ModelsSection,
+    NetworkBudget,
     NetworkSection,
+    NetworkWindow,
     Policy,
     Subject,
     TimeWindow,
@@ -41,19 +43,24 @@ def _policy() -> Policy:
     now = datetime(2024, 1, 1, 10, 0, 0)
     return Policy(
         version=1,
+        autostart=False,
         subject=Subject(hostname="test-host", generated_at=now),
         defaults=Defaults(),
         network=NetworkSection(
-            allowed_windows=[TimeWindow(days=["mon", "tue"], window="08:00-20:00")],
-            bandwidth_mb=500,
-            time_budget_minutes=120,
+            network_windows=[
+                NetworkWindow(
+                    cidrs=["0.0.0.0/0"],
+                    windows=[TimeWindow(days=["mon", "tue"], window="08:00-20:00")],
+                )
+            ],
             allowlist=[],
+            budgets=NetworkBudget(bandwidth_mb=500, time_budget_minutes=120),
         ),
         budgets=Budgets(cpu_percent=50, ram_mb=1024),
         categories=Categories(allowed=[]),
         models=ModelsSection(
-            llm=ModelEntry(name="llm", sha256="abc", license="MIT"),
-            embedding=ModelEntry(name="embed", sha256="def", license="MIT"),
+            llm=ModelEntry(name="llm", sha256="a" * 64, license="MIT"),
+            embedding=ModelEntry(name="embed", sha256="b" * 64, license="MIT"),
         ),
     )
 

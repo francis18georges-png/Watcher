@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 from datetime import datetime, time
+from ipaddress import ip_network
+from pathlib import Path
 from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
@@ -58,14 +60,49 @@ class DomainRule(BaseModel):
     scope: str = "web"
     last_approved: datetime | None = None
 
+    @field_validator("domain", "scope")
+    @classmethod
+    def _validate_non_empty(cls, value: str) -> str:
+        cleaned = value.strip()
+        if not cleaned:
+            raise ValueError("domain and scope must be non-empty")
+        return cleaned
+
+
+class NetworkBudget(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    bandwidth_mb: int = Field(ge=0)
+    time_budget_minutes: int = Field(ge=0)
+
+
+class NetworkWindow(BaseModel):
+    """Network access configuration for a set of CIDR ranges."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    cidrs: list[str] = Field(min_length=1)
+    windows: list[TimeWindow] = Field(min_length=1)
+
+    @field_validator("cidrs")
+    @classmethod
+    def _validate_cidrs(cls, value: list[str]) -> list[str]:
+        normalised: list[str] = []
+        for raw in value:
+            try:
+                network = ip_network(raw, strict=False)
+            except ValueError as exc:  # pragma: no cover - defensive
+                raise ValueError(f"invalid CIDR range: {raw!r}") from exc
+            normalised.append(network.with_prefixlen)
+        return normalised
+
 
 class NetworkSection(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    allowed_windows: list[TimeWindow]
+    network_windows: list[NetworkWindow] = Field(min_length=1)
     allowlist: list[DomainRule] = Field(default_factory=list)
-    bandwidth_mb: int = Field(ge=0)
-    time_budget_minutes: int = Field(ge=0)
+    budgets: NetworkBudget
 
 
 class Subject(BaseModel):
@@ -78,9 +115,20 @@ class Subject(BaseModel):
 class Defaults(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    offline: bool = True
+    offline_default: bool = True
     require_consent: bool = True
-    kill_switch: bool = False
+    require_corroboration: bool = True
+    kill_switch_file: str | None = None
+
+    @field_validator("kill_switch_file")
+    @classmethod
+    def _validate_kill_switch(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        path = Path(value)
+        if not path.is_absolute():
+            raise ValueError("kill_switch_file must be an absolute path")
+        return str(path)
 
 
 class Budgets(BaseModel):
@@ -103,6 +151,18 @@ class ModelEntry(BaseModel):
     sha256: str
     license: str
 
+    @field_validator("sha256")
+    @classmethod
+    def _validate_sha256(cls, value: str) -> str:
+        cleaned = value.strip().lower()
+        if len(cleaned) != 64:
+            raise ValueError("sha256 must be 64 hexadecimal characters")
+        try:
+            int(cleaned, 16)
+        except ValueError as exc:  # pragma: no cover - defensive
+            raise ValueError("sha256 must be hexadecimal") from exc
+        return cleaned
+
 
 class ModelsSection(BaseModel):
     model_config = ConfigDict(extra="forbid")
@@ -117,6 +177,7 @@ class Policy(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     version: int
+    autostart: bool
     subject: Subject
     defaults: Defaults
     network: NetworkSection

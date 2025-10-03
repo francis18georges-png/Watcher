@@ -69,12 +69,14 @@ class PolicyManager:
             scope=scope,
             categories=cats,
             bandwidth_mb=(
-                bandwidth_mb if bandwidth_mb is not None else policy.network.bandwidth_mb
+                bandwidth_mb
+                if bandwidth_mb is not None
+                else policy.network.budgets.bandwidth_mb
             ),
             time_budget_minutes=(
                 time_budget_minutes
                 if time_budget_minutes is not None
-                else policy.network.time_budget_minutes
+                else policy.network.budgets.time_budget_minutes
             ),
             last_approved=datetime.utcnow(),
         )
@@ -83,7 +85,7 @@ class PolicyManager:
         ]
         policy.network.allowlist.append(rule)
         self._write_policy(policy)
-        self._record("approve", domain=domain, scope=scope)
+        self._record("approve", domain=domain, scope=scope, version=policy.version)
         return rule
 
     def revoke(self, domain: str, scope: str | None = None) -> None:
@@ -97,9 +99,14 @@ class PolicyManager:
         if len(policy.network.allowlist) == before:
             raise PolicyError(f"aucune autorisation trouvée pour {domain}")
         self._write_policy(policy)
-        self._record("revoke", domain=domain, scope=scope or "*")
+        self._record(
+            "revoke",
+            domain=domain,
+            scope=scope or "*",
+            version=policy.version,
+        )
 
-    def _record(self, action: str, *, domain: str, scope: str) -> None:
+    def _record(self, action: str, *, domain: str, scope: str, version: int) -> None:
         try:
             ledger = ConsentLedger(self.ledger_path)
         except LedgerError as exc:  # pragma: no cover - defensive
@@ -108,6 +115,7 @@ class PolicyManager:
             action=action,
             domain=domain,
             scope=scope,
+            policy_version=version,
             policy_hash=self._policy_hash(),
         )
 
