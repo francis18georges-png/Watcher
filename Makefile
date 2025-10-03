@@ -10,7 +10,7 @@ export WATCHER_TRAINING__SEED
 export CUBLAS_WORKSPACE_CONFIG
 export TORCH_DETERMINISTIC
 
-.PHONY: format lint type security test check nox
+.PHONY: format lint type security test check nox demo-offline
 
 format:
 > ruff --fix .
@@ -34,4 +34,10 @@ check:
 
 nox:
 > nox -s lint typecheck security tests build
+
+demo-offline:
+> mkdir -p .artifacts/demo-offline
+> WATCHER_PATHS__BASE_DIR=$$(pwd)/.artifacts/demo-offline \
+> WATCHER_INTELLIGENCE__MODE=offline \
+> python -m app.cli run --offline --prompt "Présente Watcher en une phrase."
 

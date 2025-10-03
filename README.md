@@ -10,8 +10,9 @@ Mémoire vectorielle, curriculum adaptatif, A/B + bench et quality gate sécurit
 
 Les binaires et paquets signés sont publiés sur la page
 [GitHub Releases](https://github.com/francis18georges-png/Watcher/releases/latest).
-La version stable actuelle est `v0.4.0` ; utilisez toujours ce lien `releases/latest`
-pour éviter les 404 lorsque de nouvelles versions sont mises en ligne.
+Le premier tag `vMAJOR.MINOR.PATCH` déclenche automatiquement la release ;
+tant qu'aucun tag n'est publié, le lien `releases/latest` renvoie `404`, ce qui est
+attendu.
 
 - 🗒️ Notes complètes : voir le [CHANGELOG](CHANGELOG.md) et la [page de notes de version](docs/release_notes.md).
 - ✅ Instructions de vérification (signatures, provenance, empreintes) : détaillées ci-dessous et à
@@ -45,6 +46,19 @@ pour éviter les 404 lorsque de nouvelles versions sont mises en ligne.
    La commande appelle le backend `llama.cpp` local, la mémoire vectorielle SQLite et les
    outils sandboxés (`app/core/sandbox.py`). Les traces sont visibles dans `logs/`.
 
+   Pour vérifier ce parcours dans un environnement vierge, la recette `make demo-offline`
+   prépare automatiquement un espace isolé dans `.artifacts/demo-offline/` avant de lancer
+   `watcher run --offline`.
+
+### Commandes CLI stables
+
+- `watcher run` : exécute un scénario minimaliste (prompt libre) en respectant le mode
+  offline. Le drapeau `--model` permet de basculer dynamiquement vers un autre fichier GGUF.
+- `watcher ask "question"` : interroge l'index vectoriel local (namespace configurable) et
+  renvoie une réponse déterministe, y compris sans réseau grâce au fallback `Echo`.
+- `watcher ingest chemin/` : ajoute un ou plusieurs fichiers Markdown/TXT dans la mémoire
+  vectorielle persistée (`memory/vector-store.db`) en lots contrôlés via `--batch-size`.
+
 ## Citer Watcher
 
 Merci de citer ce dépôt lorsque vous réutilisez son code, ses jeux de données ou sa
@@ -60,8 +74,9 @@ cffconvert --validate --format bibtex --outfile watcher.bib
 ## Documentation
 
 La documentation technique est générée avec [MkDocs Material](https://squidfunk.github.io/mkdocs-material/)
-et publiée via l'environnement **github-pages** du dépôt. Consultez la dernière version compilée sur
-[https://francis18georges-png.github.io/Watcher/](https://francis18georges-png.github.io/Watcher/),
+et publiée via l'environnement **github-pages** du dépôt. Activez GitHub Pages (source :
+"GitHub Actions") pour rendre le site public, puis consultez
+[https://francis18georges-png.github.io/Watcher/](https://francis18georges-png.github.io/Watcher/)
 déployée automatiquement par `deploy-docs.yml`.
 
 Pour la prévisualiser localement :
@@ -103,10 +118,9 @@ des exécutables Windows, Linux et macOS, un SBOM CycloneDX par plateforme et un
 
 ### Artefacts publiés
 
-Les artefacts générés par le workflow `release.yml` seront listés ici dès la mise en ligne de la release
-`v0.4.0`. Chaque build fournit :
+Chaque tag `vMAJOR.MINOR.PATCH` produit les artefacts suivants :
 
-| Fichier (à venir) | Description |
+| Fichier | Description |
 | --- | --- |
 | `Watcher-Setup.zip` | Archive PyInstaller Windows signée et empaquetée. |
 | `Watcher-Setup.zip.sigstore` | Bundle Sigstore pour vérifier la signature du binaire Windows (`sigstore verify identity --bundle ...`). |
@@ -121,7 +135,7 @@ Les artefacts générés par le workflow `release.yml` seront listés ici dès l
 
 ### Vérifier les artefacts publiés
 
-Une fois la release `v0.4.0` publiée, validez l'authenticité et l'intégrité des binaires téléchargés :
+Validez l'authenticité et l'intégrité des artefacts téléchargés pour un tag donné :
 
 ```bash
 # 1. Télécharger tous les fichiers nécessaires (binaire + SBOM + provenance)
@@ -149,7 +163,7 @@ slsa-verifier verify-artifact \
 sha256sum Watcher-Setup.zip Watcher-linux-x86_64.tar.gz Watcher-macos-x86_64.zip
 ```
 
-- Remplacez `<VERSION>` par le tag SemVer effectivement publié (ex. `v0.4.0`).
+- Remplacez `<VERSION>` par le tag SemVer effectivement publié (ex. `v0.4.1`).
 - Pour Linux/macOS, comparez le `sha256sum` obtenu avec les empreintes publiées dans la release.
 - Les SBOM (`Watcher-*-sbom.json`) peuvent être explorés avec `jq`, importés dans un scanner CycloneDX ou
   validés via `cyclonedx-py validate Watcher-sbom.json`.
