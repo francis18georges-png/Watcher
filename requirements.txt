@@ -7,3 +7,4 @@ pydantic-settings==2.4.0
 SQLAlchemy==2.0.32
 alembic==1.13.2
 llama-cpp-python==0.2.88
+PyYAML==6.0.2
