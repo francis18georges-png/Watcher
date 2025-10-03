@@ -5,7 +5,8 @@ from __future__ import annotations
 import hashlib
 from datetime import datetime
 from pathlib import Path
-from typing import Iterable
+from copy import deepcopy
+from typing import Any, Iterable
 
 import yaml
 
@@ -34,7 +35,109 @@ class PolicyManager:
             data = yaml.safe_load(text) or {}
         except yaml.YAMLError as exc:  # pragma: no cover - defensive
             raise PolicyError("policy.yaml is not valid YAML") from exc
-        return Policy.model_validate(data)
+        normalised = self._normalise_policy_payload(data)
+        return Policy.model_validate(normalised)
+
+    def _normalise_policy_payload(self, data: Any) -> Any:
+        """Upgrade legacy ``policy.yaml`` structures to the current schema."""
+
+        if not isinstance(data, dict):
+            return data
+
+        payload = deepcopy(data)
+        schema = Policy.model_json_schema()
+        defaults_schema = (
+            schema.get("$defs", {})
+            .get("Defaults", {})
+            .get("properties", {})
+        )
+        network_schema = (
+            schema.get("$defs", {})
+            .get("NetworkSection", {})
+            .get("properties", {})
+        )
+
+        payload = self._normalise_defaults(payload, defaults_schema)
+        payload = self._normalise_network(payload, network_schema)
+        return payload
+
+    def _normalise_defaults(
+        self, payload: dict[str, Any], defaults_schema: dict[str, Any]
+    ) -> dict[str, Any]:
+        defaults = payload.get("defaults")
+        if not isinstance(defaults, dict):
+            return payload
+
+        defaults = dict(defaults)
+        expects_autostart = "autostart" in defaults_schema
+        expects_corroboration = "require_corroboration" in defaults_schema
+
+        if expects_autostart and "autostart" not in defaults:
+            offline_value = defaults.pop("offline", None)
+            default_value = defaults_schema.get("autostart", {}).get("default", False)
+            if offline_value is None:
+                autostart = default_value
+            else:
+                autostart = not bool(offline_value)
+            defaults["autostart"] = autostart
+
+        if expects_corroboration and "require_corroboration" not in defaults:
+            consent_value = defaults.pop("require_consent", None)
+            default_value = (
+                defaults_schema.get("require_corroboration", {}).get("default", True)
+            )
+            if consent_value is None:
+                corroboration = default_value
+            else:
+                corroboration = bool(consent_value)
+            defaults["require_corroboration"] = corroboration
+
+        allowed_keys = set(defaults_schema.keys())
+        if allowed_keys:
+            defaults = {key: defaults[key] for key in defaults if key in allowed_keys}
+
+        payload["defaults"] = defaults
+        return payload
+
+    def _normalise_network(
+        self, payload: dict[str, Any], network_schema: dict[str, Any]
+    ) -> dict[str, Any]:
+        network = payload.get("network")
+        if not isinstance(network, dict):
+            return payload
+
+        network = dict(network)
+        expects_windows = "windows" in network_schema
+        expects_budgets = "budgets" in network_schema
+
+        if expects_windows and "windows" not in network:
+            allowed_windows = network.pop("allowed_windows", []) or []
+            if not isinstance(allowed_windows, list):
+                allowed_windows = []
+            window_entry = {
+                "name": "default",
+                "cidrs": ["0.0.0.0/0", "::/0"],
+                "allowed_windows": allowed_windows,
+            }
+            network["windows"] = [window_entry]
+
+        if expects_budgets:
+            budgets = network.get("budgets")
+            if not isinstance(budgets, dict):
+                budgets = {}
+            for key in ("bandwidth_mb", "time_budget_minutes"):
+                if key in network:
+                    budgets[key] = network.pop(key)
+            if budgets:
+                network["budgets"] = budgets
+
+        legacy_keys = {"allowed_windows", "bandwidth_mb", "time_budget_minutes"}
+        for key in list(network):
+            if key in legacy_keys and key not in network_schema:
+                network.pop(key)
+
+        payload["network"] = network
+        return payload
 
     def _write_policy(self, policy: Policy) -> None:
         data = policy.to_dict()
