@@ -129,8 +129,11 @@ artefacts validés.
 3. **Configurer l'environnement et initialiser les index locaux** :
 
    - Dupliquez `example.env` en `.env` et renseignez les clés API locales.
-   - Mettez à jour les chemins de stockage dans `config/settings.yaml` pour pointer vers des
+   - Mettez à jour les chemins de stockage dans `config/settings.toml` pour pointer vers des
      répertoires internes à l'enclave.
+   - Utilisez [`config/policy.yaml`](../config/policy.yaml) comme référence canonique : copiez-le
+     tel quel dans `~/.watcher/` ou ajustez uniquement les champs nécessaires (fenêtres réseau,
+     budgets) avant distribution.
    - Activez, si nécessaire, le mode `offline` dans la configuration afin de désactiver les
      intégrations nécessitant Internet (`watcher mode offline`).
    - Lancez `watcher ingest /chemin/vers/docs --namespace production` pour indexer vos

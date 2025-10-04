@@ -1,0 +1,31 @@
+version: 1
+subject:
+  hostname: "{{ hostname }}"
+  generated_at: "{{ generated_at }}"
+defaults:
+  offline: true
+  require_consent: true
+  kill_switch: false
+network:
+  allowed_windows:
+    - days: [mon, tue, wed, thu, fri]
+      window: "09:00-18:00"
+  allowlist: []
+  bandwidth_mb: 128
+  time_budget_minutes: 15
+budgets:
+  cpu_percent: 75
+  ram_mb: 4096
+categories:
+  allowed:
+    - documentation
+    - code
+models:
+  llm:
+    name: demo-smollm-135m-instruct.Q4_K_M.gguf
+    sha256: 43d2819fb6bb94f514f4f099263b4526a65293fee7fdcbec8d3f12df0d48529f
+    license: Apache-2.0
+  embedding:
+    name: demo-all-MiniLM-L6-v2.tar.gz
+    sha256: a5a51b533681a69446283e3c6ce7c35bc098e0bd540c9ff56931a02c414dc054
+    license: Apache-2.0

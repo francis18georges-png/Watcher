@@ -53,5 +53,5 @@ license-files = ["LICENSE"]
 
 [tool.setuptools.package-data]
 "app" = ["plugins.toml", "assets/models/*"]
-"config" = ["*.toml", "*.yml", "*.json"]
+"config" = ["*.toml", "*.yml", "*.yaml", "*.json"]
 
