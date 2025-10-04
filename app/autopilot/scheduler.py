@@ -5,12 +5,12 @@ from __future__ import annotations
 import json
 import logging
 from dataclasses import dataclass, field
-from datetime import datetime, time
+from datetime import datetime
 from pathlib import Path
 from typing import Any, Callable, Mapping, Sequence
 
 from app.policy.manager import PolicyError, PolicyManager
-from app.policy.schema import Policy, TimeWindow, _parse_window
+from app.policy.schema import DailyWindow, Policy
 
 try:  # pragma: no cover - optional dependency
     import psutil  # type: ignore[import-not-found]
@@ -366,7 +366,8 @@ class AutopilotScheduler:
             if engine is not None:
                 engine.set_offline(True)
             raise AutopilotError(message) from exc
-        if policy.defaults.kill_switch:
+        kill_switch = policy.kill_switch_file
+        if kill_switch.exists():
             if self.state.enabled:
                 self._log("warning", "Kill-switch activé – autopilot suspendu.")
             self.state.enabled = False
@@ -380,7 +381,7 @@ class AutopilotScheduler:
         usage = self._resource_probe.snapshot()
         self.state.last_cpu_percent = usage.cpu_percent
         self.state.last_ram_mb = usage.ram_mb
-        allowed = self._is_within_window(policy.network.allowed_windows, now)
+        allowed = self._is_within_window(policy.network_windows, now)
         budgets_ok = self._within_budgets(policy, usage)
         if self.state.queue:
             self.state.current_topic = self.state.queue[0].topic
@@ -516,25 +517,20 @@ class AutopilotScheduler:
     def _sort_queue(self) -> None:
         self.state.queue.sort(key=lambda entry: entry.sort_key)
 
-    def _is_within_window(self, windows: Sequence[TimeWindow], now: datetime) -> bool:
+    def _is_within_window(
+        self, windows: Mapping[str, DailyWindow], now: datetime
+    ) -> bool:
         if not windows:
             return False
         weekday = now.strftime("%a").lower()[:3]
         current = now.time().replace(second=0, microsecond=0)
-        for window in windows:
-            if weekday not in window.days:
-                continue
-            start, end = self._parse_window(window.window)
-            if start <= current < end:
-                return True
-        return False
-
-    def _parse_window(self, value: str) -> tuple[time, time]:
-        start, end = _parse_window(value)
-        return start, end
+        window = windows.get(weekday)
+        if window is None:
+            return False
+        return window.start <= current < window.end
 
     def _within_budgets(self, policy: Policy, usage: ResourceUsage) -> bool:
-        cpu_ok = usage.cpu_percent <= policy.budgets.cpu_percent
-        ram_ok = usage.ram_mb <= policy.budgets.ram_mb
+        cpu_ok = usage.cpu_percent <= policy.budgets.cpu_percent_cap
+        ram_ok = usage.ram_mb <= policy.budgets.ram_mb_cap
         return cpu_ok and ram_ok
 

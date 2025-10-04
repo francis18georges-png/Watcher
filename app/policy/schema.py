@@ -3,46 +3,28 @@
 from __future__ import annotations
 
 from datetime import datetime, time
+from pathlib import Path
 from typing import Any
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 
-def _parse_window(value: str) -> tuple[time, time]:
-    try:
-        start_raw, end_raw = value.split("-", 1)
-        start = time.fromisoformat(start_raw)
-        end = time.fromisoformat(end_raw)
-    except Exception as exc:  # pragma: no cover - defensive
-        raise ValueError(f"invalid window specification: {value!r}") from exc
-    if start >= end:
-        raise ValueError("time window must end after it starts")
-    return start, end
+_DAYS = ("mon", "tue", "wed", "thu", "fri", "sat", "sun")
 
 
-class TimeWindow(BaseModel):
-    """Allowed network window."""
+class DailyWindow(BaseModel):
+    """Allowed network window for a single day."""
 
     model_config = ConfigDict(extra="forbid")
 
-    days: list[str] = Field(min_length=1)
-    window: str
+    start: time
+    end: time
 
-    @field_validator("days")
-    @classmethod
-    def _normalise_days(cls, value: list[str]) -> list[str]:
-        allowed = {"mon", "tue", "wed", "thu", "fri", "sat", "sun"}
-        normalised = [item.lower() for item in value]
-        invalid = sorted(set(normalised) - allowed)
-        if invalid:
-            raise ValueError(f"invalid days: {', '.join(invalid)}")
-        return normalised
-
-    @field_validator("window")
-    @classmethod
-    def _validate_window(cls, value: str) -> str:
-        _parse_window(value)
-        return value
+    @model_validator(mode="after")
+    def _validate_bounds(self) -> DailyWindow:  # pragma: no cover - exercised via Policy
+        if self.start >= self.end:
+            raise ValueError("time window must end after it starts")
+        return self
 
 
 class DomainRule(BaseModel):
@@ -59,15 +41,6 @@ class DomainRule(BaseModel):
     last_approved: datetime | None = None
 
 
-class NetworkSection(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-
-    allowed_windows: list[TimeWindow]
-    allowlist: list[DomainRule] = Field(default_factory=list)
-    bandwidth_mb: int = Field(ge=0)
-    time_budget_minutes: int = Field(ge=0)
-
-
 class Subject(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -75,19 +48,12 @@ class Subject(BaseModel):
     generated_at: datetime
 
 
-class Defaults(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-
-    offline: bool = True
-    require_consent: bool = True
-    kill_switch: bool = False
-
-
 class Budgets(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    cpu_percent: int = Field(ge=0, le=100)
-    ram_mb: int = Field(ge=0)
+    bandwidth_mb_per_day: int = Field(ge=0)
+    cpu_percent_cap: int = Field(ge=0, le=100)
+    ram_mb_cap: int = Field(ge=0)
 
 
 class Categories(BaseModel):
@@ -118,14 +84,41 @@ class Policy(BaseModel):
 
     version: int
     subject: Subject
-    defaults: Defaults
-    network: NetworkSection
+    autostart: bool
+    offline_default: bool
+    network_windows: dict[str, DailyWindow]
     budgets: Budgets
+    allowlist_domains: list[DomainRule] = Field(default_factory=list)
     categories: Categories
     models: ModelsSection
+    require_consent: bool = True
+    require_corroboration: int = Field(ge=2)
+    kill_switch_file: Path
 
     def to_dict(self) -> dict[str, Any]:
         """Serialise the policy into a JSON-compatible dictionary."""
 
-        return self.model_dump(mode="python")
+        data = self.model_dump(mode="python")
+        windows = {
+            day: {"start": window.start.strftime("%H:%M"), "end": window.end.strftime("%H:%M")}
+            for day, window in self.network_windows.items()
+        }
+        data["network_windows"] = windows
+        data["kill_switch_file"] = str(self.kill_switch_file)
+        return data
+
+    @field_validator("network_windows")
+    @classmethod
+    def _normalise_windows(
+        cls, value: dict[str, DailyWindow]
+    ) -> dict[str, DailyWindow]:
+        if not value:
+            raise ValueError("network_windows must define at least one day")
+        normalised: dict[str, DailyWindow] = {}
+        for key, window in value.items():
+            alias = key.strip().lower()
+            if alias not in _DAYS:
+                raise ValueError(f"invalid day name: {key!r}")
+            normalised[alias] = window
+        return normalised
 

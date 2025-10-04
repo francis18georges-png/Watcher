@@ -19,6 +19,8 @@ import subprocess
 import sys
 import textwrap
 
+import yaml
+
 from app.core.model_registry import ensure_models, select_models
 from app.policy.ledger import ConsentLedger, LedgerError
 
@@ -202,42 +204,70 @@ class FirstRunConfigurator:
 
         hostname = platform.node() or "localhost"
         now = datetime.utcnow().isoformat(timespec="seconds") + "Z"
-        policy = textwrap.dedent(
-            f"""
-            version: 1
-            subject:
-              hostname: {hostname}
-              generated_at: {now}
-            defaults:
-              offline: true
-              require_consent: true
-              kill_switch: false
-            network:
-              allowed_windows:
-                - days: [mon, tue, wed, thu, fri]
-                  window: "09:00-18:00"
-              allowlist: []
-              bandwidth_mb: 128
-              time_budget_minutes: 15
-            budgets:
-              cpu_percent: 75
-              ram_mb: 4096
-            categories:
-              allowed:
-                - documentation
-                - code
-            models:
-              llm:
-                name: {selection["llm"].name}
-                sha256: {selection["llm"].sha256}
-                license: {selection["llm"].license}
-              embedding:
-                name: {selection["embedding"].name}
-                sha256: {selection["embedding"].sha256}
-                license: {selection["embedding"].license}
-            """
-        ).strip()
-        self.policy_path.write_text(policy + "\n", encoding="utf-8")
+        kill_switch = str(self.config_dir / "kill-switch")
+        network_windows = {
+            day: {"start": "02:00", "end": "04:00"}
+            for day in ["mon", "tue", "wed", "thu", "fri", "sat", "sun"]
+        }
+        allowlist = [
+            {
+                "domain": "docs.python.org",
+                "categories": ["documentation"],
+                "bandwidth_mb": 200,
+                "time_budget_minutes": 0,
+                "allow_subdomains": True,
+                "scope": "web",
+            },
+            {
+                "domain": "pytorch.org",
+                "categories": ["documentation"],
+                "bandwidth_mb": 200,
+                "time_budget_minutes": 0,
+                "allow_subdomains": True,
+                "scope": "web",
+            },
+            {
+                "domain": "w3.org",
+                "categories": ["documentation"],
+                "bandwidth_mb": 200,
+                "time_budget_minutes": 0,
+                "allow_subdomains": True,
+                "scope": "web",
+            },
+        ]
+        policy = {
+            "version": 1,
+            "subject": {"hostname": hostname, "generated_at": now},
+            "autostart": True,
+            "offline_default": True,
+            "network_windows": network_windows,
+            "budgets": {
+                "bandwidth_mb_per_day": 200,
+                "cpu_percent_cap": 75,
+                "ram_mb_cap": 4096,
+            },
+            "allowlist_domains": allowlist,
+            "categories": {"allowed": ["documentation", "code"]},
+            "models": {
+                "llm": {
+                    "name": selection["llm"].name,
+                    "sha256": selection["llm"].sha256,
+                    "license": selection["llm"].license,
+                },
+                "embedding": {
+                    "name": selection["embedding"].name,
+                    "sha256": selection["embedding"].sha256,
+                    "license": selection["embedding"].license,
+                },
+            },
+            "require_consent": True,
+            "require_corroboration": 2,
+            "kill_switch_file": kill_switch,
+        }
+        self.policy_path.write_text(
+            yaml.safe_dump(policy, sort_keys=False),
+            encoding="utf-8",
+        )
 
     def _ensure_consent_ledger(self) -> None:
         if self.consent_ledger.exists():
