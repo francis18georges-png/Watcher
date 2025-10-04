@@ -6,11 +6,14 @@ mode d'exploitation de la plate-forme.
 
 ## Parcours recommandé
 
-1. Comprendre la [vue d'ensemble de l'architecture](architecture.md) pour visualiser le dialogue entre
+1. Démarrer l'instance à l'aide du [Quickstart sans commande](quickstart-sans-commande.md) qui couvre la mise en service plug-and-play.
+2. Comprendre la [vue d'ensemble de l'architecture](architecture.md) pour visualiser le dialogue entre
    orchestrateur, agents spécialisés et mémoire vectorielle.
-2. Évaluer la surface d'attaque avec le [modèle de menaces](threat-model.md) et ses diagrammes Mermaid et
+3. Évaluer la surface d'attaque avec le [modèle de menaces](threat-model.md) et ses diagrammes Mermaid et
    PlantUML.
-3. Approfondir la gouvernance via la [charte éthique](ethics.md) et les politiques opérationnelles listées ci-dessous.
+4. Consolider la gouvernance en suivant le [guide de consentement](policy-consent.md) et la [charte éthique](ethics.md).
+5. Préparer les opérations récurrentes avec le [cycle de vie de l'autopilote](autopilot.md), la [vérification des artefacts](verifier-artefacts.md)
+   et la [procédure de dépannage](depannage.md).
 
 !!! tip "Navigation rapide"
     Les onglets Material en haut de page regroupent l'architecture, la sécurité et l'exploitation. Utilisez la barre de
