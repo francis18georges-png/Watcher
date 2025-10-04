@@ -71,6 +71,7 @@ extra:
 
 nav:
   - Accueil: index.md
+  - Quickstart sans commande: quickstart-sans-commande.md
   - Architecture:
       - Vue d'ensemble: architecture.md
       - Journal de conception:
@@ -85,7 +86,11 @@ nav:
       - Notes de version: release_notes.md
       - Guide hors-ligne: offline_guide.md
   - Exploitation:
+      - Gouvernance du consentement: policy-consent.md
       - Conventions de logging: logging.md
+      - Autopilote: autopilot.md
+      - Vérifier les artefacts: verifier-artefacts.md
+      - Dépannage plug-and-play: depannage.md
       - Feuille de route: ROADMAP.md
       - Journal des modifications: CHANGELOG.md
       - Politique de fusion: merge-policy.md
