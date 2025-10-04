@@ -113,6 +113,36 @@ def test_scheduler_respects_time_windows(tmp_path):
     assert engine.offline[-1] is True
 
 
+def test_scheduler_time_window_locale_independent(tmp_path, monkeypatch):
+    usage = ResourceUsage(cpu_percent=10, ram_mb=256)
+    probe = DummyProbe(usage)
+    scheduler = AutopilotScheduler(
+        policy_loader=_policy,
+        state_path=tmp_path / "state.json",
+        resource_probe=probe,
+    )
+
+    class FrenchLocaleDatetime(datetime):
+        def strftime(self, fmt: str) -> str:  # pragma: no cover - patched in test
+            if fmt == "%a":
+                return "lun"
+            return super().strftime(fmt)
+
+    monkeypatch.setattr("app.autopilot.scheduler.datetime", FrenchLocaleDatetime)
+
+    now = FrenchLocaleDatetime(2024, 1, 1, 10, 0, 0)
+
+    state = scheduler.enable(["docs"], now=now)
+
+    assert state.online is True
+    assert state.last_reason == "ok"
+
+    follow_up = scheduler.evaluate(now=FrenchLocaleDatetime(2024, 1, 1, 12, 0, 0))
+
+    assert follow_up.online is True
+    assert follow_up.last_reason == "ok"
+
+
 def test_scheduler_respects_resource_budgets(tmp_path):
     probe = DummyProbe(ResourceUsage(cpu_percent=10, ram_mb=256))
     engine = DummyEngine()

@@ -10,7 +10,7 @@ from pathlib import Path
 from typing import Any, Callable, Mapping, Sequence
 
 from app.policy.manager import PolicyError, PolicyManager
-from app.policy.schema import Policy, TimeWindow, _parse_window
+from app.policy.schema import Policy, TimeWindow, _DAYS, _parse_window
 
 try:  # pragma: no cover - optional dependency
     import psutil  # type: ignore[import-not-found]
@@ -519,7 +519,7 @@ class AutopilotScheduler:
     def _is_within_window(self, windows: Sequence[TimeWindow], now: datetime) -> bool:
         if not windows:
             return False
-        weekday = now.strftime("%a").lower()[:3]
+        weekday = _DAYS[now.weekday()]
         current = now.time().replace(second=0, microsecond=0)
         for window in windows:
             if weekday not in window.days:
