@@ -45,6 +45,9 @@ attendu.
 
    La commande détecte le matériel disponible (CPU/GPU), prépare un `config.toml`
    et une `policy.yaml` dans `~/.watcher/` puis active le mode offline par défaut.
+   Les valeurs par défaut documentées sont publiées dans [`config/policy.yaml`](config/policy.yaml)
+   afin que les installeurs et kits hors-ligne puissent embarquer le même référentiel
+   sans exécuter la CLI.
    Les modèles restent gérés par `scripts/setup-local-models.sh` : les chemins
    générés pointent vers `~/.watcher/models/` afin de séparer les données
    utilisateur du dépôt Git.

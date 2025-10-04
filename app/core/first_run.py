@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import datetime
+from importlib import resources
 from pathlib import Path
 from secrets import token_bytes
 from typing import Any
@@ -19,6 +20,7 @@ import subprocess
 import sys
 import textwrap
 
+import yaml
 from app.core.model_registry import ensure_models, select_models
 from app.policy.ledger import ConsentLedger, LedgerError
 
@@ -196,48 +198,43 @@ class FirstRunConfigurator:
         toml_text = self._toml_dump(config)
         self.config_path.write_text(toml_text, encoding="utf-8")
 
+    def _load_baseline_policy(self) -> dict[str, Any]:
+        baseline = resources.files("config").joinpath("policy.yaml")
+        with baseline.open("r", encoding="utf-8") as stream:
+            data = yaml.safe_load(stream) or {}
+        if not isinstance(data, dict):
+            msg = "config/policy.yaml must contain a YAML mapping"
+            raise TypeError(msg)
+        return data
+
     def _write_policy(self, selection: dict[str, Any]) -> None:
         if self.policy_path.exists():
             return
 
         hostname = platform.node() or "localhost"
         now = datetime.utcnow().isoformat(timespec="seconds") + "Z"
-        policy = textwrap.dedent(
-            f"""
-            version: 1
-            subject:
-              hostname: {hostname}
-              generated_at: {now}
-            defaults:
-              offline: true
-              require_consent: true
-              kill_switch: false
-            network:
-              allowed_windows:
-                - days: [mon, tue, wed, thu, fri]
-                  window: "09:00-18:00"
-              allowlist: []
-              bandwidth_mb: 128
-              time_budget_minutes: 15
-            budgets:
-              cpu_percent: 75
-              ram_mb: 4096
-            categories:
-              allowed:
-                - documentation
-                - code
-            models:
-              llm:
-                name: {selection["llm"].name}
-                sha256: {selection["llm"].sha256}
-                license: {selection["llm"].license}
-              embedding:
-                name: {selection["embedding"].name}
-                sha256: {selection["embedding"].sha256}
-                license: {selection["embedding"].license}
-            """
-        ).strip()
-        self.policy_path.write_text(policy + "\n", encoding="utf-8")
+        policy = self._load_baseline_policy()
+
+        subject = policy.setdefault("subject", {})
+        subject["hostname"] = hostname
+        subject["generated_at"] = now
+
+        models = policy.setdefault("models", {})
+        llm = models.setdefault("llm", {})
+        llm.update(
+            name=selection["llm"].name,
+            sha256=selection["llm"].sha256,
+            license=selection["llm"].license,
+        )
+        embedding = models.setdefault("embedding", {})
+        embedding.update(
+            name=selection["embedding"].name,
+            sha256=selection["embedding"].sha256,
+            license=selection["embedding"].license,
+        )
+
+        rendered = yaml.safe_dump(policy, sort_keys=False)
+        self.policy_path.write_text(rendered, encoding="utf-8")
 
     def _ensure_consent_ledger(self) -> None:
         if self.consent_ledger.exists():
