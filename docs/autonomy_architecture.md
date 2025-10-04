@@ -194,7 +194,7 @@ class ConsentLedger:
 
     @classmethod
     def default(cls) -> "ConsentLedger":
-        ledger = Path("~/.watcher/consent-ledger.jsonl").expanduser()
+        ledger = Path("~/.watcher/consents.jsonl").expanduser()
         signer = DetachedSigner.from_env()
         return cls(ledger, signer)
 
@@ -350,6 +350,6 @@ watcher autopilot enable --topics "dev-docs,security" --profile dev-docs
 
 - **Index** : migration vers SQLite-VSS nécessite exécution de `alembic upgrade head` pour créer la table `documents` avec colonnes `licence`, `hash`, `score`.
 - **Configuration** : ancien `config.yaml` doit être remplacé par `~/.watcher/config.toml`. Un script `watcher migrate-config` convertira les clés.
-- **Consent Ledger** : créer `~/.watcher/consent-ledger.jsonl` et importer les consentements existants via `watcher policy approve --import legacy.json`.
+- **Consent Ledger** : créer `~/.watcher/consents.jsonl` et importer les consentements existants via `watcher policy approve --import legacy.json`.
 - **Scripts modèles** : utiliser `scripts/setup-local-models.sh`/`.ps1` pour télécharger et vérifier les GGUF par SHA256 ; les anciens chemins `models/` dans le repo sont obsolètes.
 ```
