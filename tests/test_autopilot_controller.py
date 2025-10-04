@@ -111,7 +111,7 @@ def _prepare_policy(home: Path, now: datetime) -> PolicyFiles:
     config_dir = home / ".watcher"
     config_dir.mkdir(parents=True, exist_ok=True)
     policy_path = config_dir / "policy.yaml"
-    ledger_path = config_dir / "consent-ledger.jsonl"
+    ledger_path = config_dir / "consents.jsonl"
     window = {"days": [now.strftime("%a").lower()[:3]], "window": "09:00-10:00"}
     allowlist = [
         {

@@ -32,7 +32,7 @@ def test_policy_manager_approve_and_revoke(tmp_path: Path) -> None:
     assert any(entry["domain"] == "example.com" for entry in allowlist)
 
     ledger_lines = (
-        (home / ".watcher" / "consent-ledger.jsonl").read_text(encoding="utf-8")
+        (home / ".watcher" / "consents.jsonl").read_text(encoding="utf-8")
         .strip()
         .splitlines()
     )

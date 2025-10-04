@@ -26,7 +26,15 @@ class PolicyManager:
         self.home = home or Path.home()
         self.config_dir = self.home / ".watcher"
         self.policy_path = self.config_dir / "policy.yaml"
-        self.ledger_path = self.config_dir / "consent-ledger.jsonl"
+        self.ledger_path = self.config_dir / "consents.jsonl"
+        legacy_ledger = self.config_dir / "consent-ledger.jsonl"
+        if legacy_ledger.exists() and not self.ledger_path.exists():
+            try:
+                legacy_ledger.replace(self.ledger_path)
+            except OSError:
+                # If the rename fails continue using the legacy path to avoid
+                # regressing behaviour for existing users.
+                self.ledger_path = legacy_ledger
 
     def _read_policy(self) -> Policy:
         if not self.policy_path.exists():

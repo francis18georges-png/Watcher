@@ -14,6 +14,8 @@ def auto_configure_if_needed(home: Path | None = None) -> None:
     configurator = FirstRunConfigurator(home=home)
     skip_models = os.environ.get("WATCHER_BOOTSTRAP_SKIP_MODELS") == "1"
 
+    configurator.migrate_legacy_state()
+
     if not configurator.sentinel_path.exists():
         configurator.ensure_pending()
 

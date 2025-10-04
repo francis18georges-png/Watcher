@@ -40,7 +40,8 @@ class FirstRunConfigurator:
         self.config_dir = self.home / ".watcher"
         self.config_path = self.config_dir / "config.toml"
         self.policy_path = self.config_dir / "policy.yaml"
-        self.consent_ledger = self.config_dir / "consent-ledger.jsonl"
+        self.consent_ledger = self.config_dir / "consents.jsonl"
+        self._legacy_consent_ledger = self.config_dir / "consent-ledger.jsonl"
         self.env_path = self.config_dir / ".env"
         self.sentinel_path = self.config_dir / "first_run"
 
@@ -121,6 +122,7 @@ class FirstRunConfigurator:
 
         self._write_config(profile, selection, model_paths)
         self._write_policy(selection)
+        self._migrate_legacy_consent_ledger()
         self._ensure_consent_ledger()
         self._write_env(selection, model_paths)
         self._record_initial_consent()
@@ -253,6 +255,21 @@ class FirstRunConfigurator:
             encoding="utf-8",
         )
 
+    def _migrate_legacy_consent_ledger(self) -> None:
+        """Move ``consent-ledger.jsonl`` to the new canonical name."""
+
+        if not self._legacy_consent_ledger.exists():
+            return
+        if self.consent_ledger.exists():
+            return
+
+        try:
+            self._legacy_consent_ledger.replace(self.consent_ledger)
+        except OSError:
+            # If the rename fails we fall back to leaving the legacy file in
+            # place so that follow-up calls can still succeed.
+            pass
+
     def _write_env(
         self, selection: dict[str, Any], model_paths: dict[str, Path]
     ) -> None:
@@ -315,6 +332,14 @@ class FirstRunConfigurator:
                     break
                 digest.update(chunk)
         return digest.hexdigest()
+
+    # ------------------------------------------------------------------
+    # Migration helpers
+    # ------------------------------------------------------------------
+    def migrate_legacy_state(self) -> None:
+        """Run migrations for legacy configuration files."""
+
+        self._migrate_legacy_consent_ledger()
 
     # ------------------------------------------------------------------
     # Autostart helpers

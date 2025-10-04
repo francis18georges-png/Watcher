@@ -42,7 +42,7 @@ def test_first_run_creates_expected_files(tmp_path: Path, monkeypatch: pytest.Mo
     content = policy_path.read_text(encoding="utf-8")
     assert "version: 1" in content
 
-    ledger_path = home / ".watcher" / "consent-ledger.jsonl"
+    ledger_path = home / ".watcher" / "consents.jsonl"
     assert ledger_path.exists()
     ledger_content = ledger_path.read_text(encoding="utf-8")
     assert '"type": "metadata"' in ledger_content
