@@ -400,29 +400,32 @@ class AutopilotController:
             policy = self._policy_loader()
         except PolicyError as exc:  # pragma: no cover - defensive
             raise AutopilotError(str(exc)) from exc
-        if policy.defaults.kill_switch:
+        kill_switch = Path(policy.kill_switch_file)
+        if kill_switch.exists():
             self._logger.warning("Kill-switch actif – exécution interrompue.")
             return AutopilotRunResult(ingested=0, reason="kill-switch")
-        if not policy.network.allowlist:
+        if not policy.allowlist_domains:
             self._logger.warning("Aucun domaine autorisé – rien à faire.")
             return AutopilotRunResult(ingested=0, reason="allowlist vide")
 
-        allowed = {rule.domain: rule for rule in policy.network.allowlist}
+        allowed = {rule.domain: rule for rule in policy.allowlist_domains}
         consented = self._ledger_view.approvals()
         gate = ConsentGate(
             allowed=allowed,
             consented=consented,
-            require_consent=policy.defaults.require_consent,
+            require_consent=policy.require_consent,
             logger=self._logger,
         )
-        verifier = MultiSourceVerifier(min_sources=self.pipeline.min_sources)
+        min_sources = max(2, int(policy.require_corroboration))
+        self.pipeline.min_sources = min_sources
+        verifier = MultiSourceVerifier(min_sources=min_sources)
 
         active_topics = topics or state.topics
         discovered = list(self.crawler.discover(active_topics, allowed.values()))
         collected: list[tuple[RawDocument, str]] = []
         skipped: list[str] = []
 
-        bandwidth_limit = float(policy.network.bandwidth_mb)
+        bandwidth_limit = float(policy.budgets.bandwidth_mb_per_day)
         total_bandwidth = 0.0
         per_domain_bandwidth: MutableMapping[str, float] = defaultdict(float)
         start_time = now
@@ -440,12 +443,12 @@ class AutopilotController:
                 rule = DomainRule(
                     domain=domain,
                     categories=[],
-                    bandwidth_mb=policy.network.bandwidth_mb,
-                    time_budget_minutes=policy.network.time_budget_minutes,
+                    bandwidth_mb=policy.budgets.bandwidth_mb_per_day,
+                    time_budget_minutes=0,
                     allow_subdomains=True,
                     scope="web",
                 )
-            if self._exceeded_time(policy, rule, start_time):
+            if self._exceeded_time(rule, start_time):
                 self._logger.warning("Budget temporel dépassé pour %s.", domain)
                 break
             self._throttle_domain(domain)
@@ -530,14 +533,14 @@ class AutopilotController:
 
     def _exceeded_time(
         self,
-        policy: Policy,
         rule: DomainRule,
         start: datetime,
     ) -> bool:
         elapsed = (self._clock() - start).total_seconds() / 60
-        if elapsed > float(policy.network.time_budget_minutes):
-            return True
-        return elapsed > float(rule.time_budget_minutes)
+        budget = float(rule.time_budget_minutes)
+        if budget <= 0:
+            return False
+        return elapsed > budget
 
     @staticmethod
     def _guess_title(text: str) -> str:

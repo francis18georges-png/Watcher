@@ -5,7 +5,7 @@ from __future__ import annotations
 import hashlib
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Iterable
+from typing import Iterable
 
 import yaml
 
@@ -37,10 +37,8 @@ class PolicyManager:
         except yaml.YAMLError as exc:  # pragma: no cover - defensive
             raise PolicyError("policy.yaml is not valid YAML") from exc
 
-        normalised = self._normalise_defaults(data)
-
         try:
-            return Policy.model_validate(normalised)
+            return Policy.model_validate(data)
         except ValidationError as exc:
             raise PolicyError("policy.yaml is invalid") from exc
 
@@ -77,34 +75,36 @@ class PolicyManager:
             scope=scope,
             categories=cats,
             bandwidth_mb=(
-                bandwidth_mb if bandwidth_mb is not None else policy.network.bandwidth_mb
+                bandwidth_mb
+                if bandwidth_mb is not None
+                else policy.budgets.bandwidth_mb_per_day
             ),
             time_budget_minutes=(
                 time_budget_minutes
                 if time_budget_minutes is not None
-                else policy.network.time_budget_minutes
+                else 0
             ),
             last_approved=datetime.utcnow(),
         )
-        policy.network.allowlist = [
+        policy.allowlist_domains = [
             existing
-            for existing in policy.network.allowlist
+            for existing in policy.allowlist_domains
             if existing.domain != domain or existing.scope != scope
         ]
-        policy.network.allowlist.append(rule)
+        policy.allowlist_domains.append(rule)
         self._write_policy(policy)
         self._record("approve", domain=domain, scope=scope)
         return rule
 
     def revoke(self, domain: str, scope: str | None = None) -> None:
         policy = self._read_policy()
-        before = len(policy.network.allowlist)
-        policy.network.allowlist = [
+        before = len(policy.allowlist_domains)
+        policy.allowlist_domains = [
             existing
-            for existing in policy.network.allowlist
+            for existing in policy.allowlist_domains
             if existing.domain != domain or (scope and existing.scope != scope)
         ]
-        if len(policy.network.allowlist) == before:
+        if len(policy.allowlist_domains) == before:
             raise PolicyError(f"aucune autorisation trouvée pour {domain}")
         self._write_policy(policy)
         self._record("revoke", domain=domain, scope=scope or "*")
@@ -120,40 +120,4 @@ class PolicyManager:
             scope=scope,
             policy_hash=self._policy_hash(),
         )
-
-    def _normalise_defaults(self, data: dict[str, Any]) -> dict[str, Any]:
-        defaults = data.get("defaults")
-        if not isinstance(defaults, dict):
-            return data
-
-        legacy_aliases = {
-            # ``consent_required`` and ``offline_mode`` were used in early
-            # prototypes before the schema settled on ``require_consent`` and
-            # ``offline``.  Preserve the value provided by the user instead of
-            # discarding it.
-            "consent_required": "require_consent",
-            "offline_mode": "offline",
-        }
-        legacy_drop = {
-            # ``auto_approve`` was removed in favour of the explicit
-            # allowlist/ledger flow.
-            "auto_approve",
-        }
-
-        cleaned_defaults: dict[str, Any] = {}
-        for key, value in defaults.items():
-            if key in legacy_drop:
-                continue
-
-            target = legacy_aliases.get(key, key)
-            # If both the legacy alias and the new key are present, keep the
-            # explicit modern key.
-            if target in cleaned_defaults and target != key:
-                continue
-
-            cleaned_defaults[target] = value
-
-        normalised = dict(data)
-        normalised["defaults"] = cleaned_defaults
-        return normalised
 

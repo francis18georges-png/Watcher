@@ -28,7 +28,7 @@ def test_policy_manager_approve_and_revoke(tmp_path: Path) -> None:
     policy_data = yaml.safe_load(
         (home / ".watcher" / "policy.yaml").read_text(encoding="utf-8")
     )
-    allowlist = policy_data["network"]["allowlist"]
+    allowlist = policy_data["allowlist_domains"]
     assert any(entry["domain"] == "example.com" for entry in allowlist)
 
     ledger_lines = (
@@ -45,7 +45,8 @@ def test_policy_manager_approve_and_revoke(tmp_path: Path) -> None:
     policy_data = yaml.safe_load(
         (home / ".watcher" / "policy.yaml").read_text(encoding="utf-8")
     )
-    assert not policy_data["network"]["allowlist"]
+    domains = {entry["domain"] for entry in policy_data["allowlist_domains"]}
+    assert "example.com" not in domains
 
 
 def test_policy_manager_multiple_scopes_same_domain(tmp_path: Path) -> None:
@@ -62,13 +63,13 @@ def test_policy_manager_multiple_scopes_same_domain(tmp_path: Path) -> None:
     policy_data = yaml.safe_load(
         (home / ".watcher" / "policy.yaml").read_text(encoding="utf-8")
     )
-    allowlist = policy_data["network"]["allowlist"]
+    allowlist = policy_data["allowlist_domains"]
 
     scopes = {entry["scope"] for entry in allowlist if entry["domain"] == "example.com"}
     assert scopes == {"web", "api"}
 
 
-def test_read_policy_preserves_boolean_defaults(tmp_path: Path) -> None:
+def test_read_policy_preserves_boolean_flags(tmp_path: Path) -> None:
     home = tmp_path / "home"
     home.mkdir()
 
@@ -77,8 +78,8 @@ def test_read_policy_preserves_boolean_defaults(tmp_path: Path) -> None:
 
     policy_path = home / ".watcher" / "policy.yaml"
     policy_data = yaml.safe_load(policy_path.read_text(encoding="utf-8"))
-    policy_data.setdefault("defaults", {})["offline"] = False
-    policy_data["defaults"]["require_consent"] = False
+    policy_data["autostart"] = False
+    policy_data["require_consent"] = False
     policy_path.write_text(
         yaml.safe_dump(policy_data, sort_keys=False),
         encoding="utf-8",
@@ -87,8 +88,8 @@ def test_read_policy_preserves_boolean_defaults(tmp_path: Path) -> None:
     manager = PolicyManager(home=home)
     policy = manager._read_policy()
 
-    assert policy.defaults.offline is False
-    assert policy.defaults.require_consent is False
+    assert policy.autostart is False
+    assert policy.require_consent is False
 
 
 def test_read_policy_preserves_unknown_defaults_keys(tmp_path: Path) -> None:
@@ -100,7 +101,10 @@ def test_read_policy_preserves_unknown_defaults_keys(tmp_path: Path) -> None:
 
     policy_path = home / ".watcher" / "policy.yaml"
     policy_data = yaml.safe_load(policy_path.read_text(encoding="utf-8"))
-    policy_data.setdefault("defaults", {})["unexpected"] = "nope"
+    policy_data.setdefault("network_windows", {})["funday"] = {
+        "start": "00:00",
+        "end": "01:00",
+    }
     policy_path.write_text(
         yaml.safe_dump(policy_data, sort_keys=False),
         encoding="utf-8",

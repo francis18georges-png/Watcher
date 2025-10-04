@@ -112,7 +112,8 @@ def _prepare_policy(home: Path, now: datetime) -> PolicyFiles:
     config_dir.mkdir(parents=True, exist_ok=True)
     policy_path = config_dir / "policy.yaml"
     ledger_path = config_dir / "consent-ledger.jsonl"
-    window = {"days": [now.strftime("%a").lower()[:3]], "window": "09:00-10:00"}
+    day = now.strftime("%a").lower()[:3]
+    windows = {day: {"start": "09:00", "end": "10:00"}}
     allowlist = [
         {
             "domain": "allowed-one.test",
@@ -136,19 +137,23 @@ def _prepare_policy(home: Path, now: datetime) -> PolicyFiles:
     policy = {
         "version": 1,
         "subject": {"hostname": "test", "generated_at": now.isoformat()},
-        "defaults": {"offline": False, "require_consent": True, "kill_switch": False},
-        "network": {
-            "allowed_windows": [window],
-            "allowlist": allowlist,
-            "bandwidth_mb": 50,
-            "time_budget_minutes": 60,
+        "autostart": True,
+        "offline_default": False,
+        "network_windows": windows,
+        "budgets": {
+            "bandwidth_mb_per_day": 50,
+            "cpu_percent_cap": 80,
+            "ram_mb_cap": 1024,
         },
-        "budgets": {"cpu_percent": 80, "ram_mb": 1024},
+        "allowlist_domains": allowlist,
         "categories": {"allowed": ["news"]},
         "models": {
             "llm": {"name": "dummy", "sha256": "0", "license": "Apache-2.0"},
             "embedding": {"name": "dummy", "sha256": "1", "license": "Apache-2.0"},
         },
+        "require_consent": True,
+        "require_corroboration": 2,
+        "kill_switch_file": str(config_dir / "kill-switch"),
     }
     policy_path.write_text(yaml.safe_dump(policy, sort_keys=False), encoding="utf-8")
     timestamp = now.isoformat(timespec="seconds") + "Z"
