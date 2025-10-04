@@ -8,6 +8,9 @@ from typing import Any
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 
+_DAYS: tuple[str, ...] = ("mon", "tue", "wed", "thu", "fri", "sat", "sun")
+
+
 def _parse_window(value: str) -> tuple[time, time]:
     try:
         start_raw, end_raw = value.split("-", 1)
@@ -31,7 +34,7 @@ class TimeWindow(BaseModel):
     @field_validator("days")
     @classmethod
     def _normalise_days(cls, value: list[str]) -> list[str]:
-        allowed = {"mon", "tue", "wed", "thu", "fri", "sat", "sun"}
+        allowed = set(_DAYS)
         normalised = [item.lower() for item in value]
         invalid = sorted(set(normalised) - allowed)
         if invalid:
