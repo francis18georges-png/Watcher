@@ -1,40 +1,61 @@
-# Cycle de vie de l'autopilote
+# Autopilote sans intervention
 
-Ce document détaille la gouvernance du mode Autopilote de Watcher. Il structure l'exploitation en trois temps : préparation, exécution surveillée et clôture, sans passer par des scripts ou commandes externes.
+Ce document décrit l'exécution autonome de Watcher après la phase `watcher init --auto`. L'objectif est de garantir une collecte
+et une ingestion 100 % locales, gouvernées par la politique `policy.yaml`, sans action manuelle.
 
-## Préparation
+## Vue d'ensemble
 
-1. Ouvrir la vue « Autopilote » et sélectionner « Configurer un nouveau scénario ».
-2. Choisir le périmètre fonctionnel (par exemple refonte d'un service, rédaction d'une analyse) et préciser la fenêtre temporelle souhaitée.
-3. Associer le scénario aux consentements pertinents en sélectionnant les fiches actives listées dans le volet latéral.
-4. Définir un budget de tâches et une limite de ressources (temps CPU, accès aux outils) via les curseurs proposés.
-5. Enregistrer le scénario. Il devient visible dans le tableau de bord avec l'état « Prêt ».
+1. **Démarrage automatique**
+   - Windows : `watcher init --auto` enregistre une entrée `RunOnce` puis crée la tâche planifiée « Watcher Autopilot » (ONLOGON)
+     qui lance `watcher autopilot run --noninteractive`.
+   - Linux : la séquence d'initialisation installe `~/.config/systemd/user/watcher-autopilot.service` et
+     `watcher-autopilot.timer` (OnBootSec=30s, OnUnitActiveSec=1h, Persistent=true).
+   - Le kill-switch `~/.watcher/disable` ou la variable `WATCHER_DISABLE=1` désactive l'autostart. `WATCHER_AUTOSTART=1` force
+     la réactivation quelles que soient les préférences précédentes.
 
-## Exécution surveillée
+2. **Boucle continue**
+   - La commande `watcher autopilot run --noninteractive` déclenche le contrôleur (`app/autopilot/controller.py`) qui orchestre
+     la boucle `discover → scrape → verify → ingest → reindex` jusqu'à la prochaine fenêtre programmée.
+   - La planification (`app/autopilot/scheduler.py`) applique les créneaux réseau (`02:00–04:00`, `network_windows`) et les
+     budgets (`bandwidth_mb_per_day`, `cpu_percent_cap`, `ram_mb_cap`). Hors plage, le réseau reste coupé.
 
-1. Pour démarrer, cliquer sur « Lancer ». L'autopilote entre dans la phase « Analyse » où il collecte les informations nécessaires.
-2. Examiner les hypothèses affichées. Approuver ou ajuster les hypothèses invalides avant de poursuivre vers la phase « Planification ».
-3. Durant la phase « Planification », l'assistant propose une liste d'actions. Désactiver les actions qui dépassent le périmètre ou exigent un consentement absent.
-4. Valider pour passer à la phase « Exécution ». Surveiller les notifications de sécurité ; un indicateur rouge implique une intervention humaine immédiate.
-5. À tout moment, utiliser « Mettre en pause » pour suspendre les actions restantes, ou « Arrêter » pour revenir au statut « Prêt » après justification dans le journal.
+3. **Surveillance et rapports**
+   - Chaque itération journalise un `trace_id` JSON structuré pour audit (`~/.watcher/logs/`).
+   - Les métriques hebdomadaires sont résumées dans `~/.watcher/reports/autopilot-YYYY-WW.html` : sources contactées, éléments
+     ingérés, rejets (licence ou corroboration insuffisante) et consommation budgétaire.
 
-## Contrôles intégrés
+## Phases de la boucle Autopilot
 
-- Les actions critiques déclenchent un double contrôle. L'autopilote sollicite un binôme pour confirmation avant de poursuivre.
-- Les ressources consommées sont agrégées en temps réel dans le widget « Budget ». Lorsque 80 % du budget est atteint, le système impose une revue intermédiaire.
-- Le moteur applique la politique de consentement pour filtrer les fichiers et sources non autorisés. Une tâche refusée passe automatiquement en revue manuelle.
-- La politique `policy.yaml` (v2) impose : fenêtre réseau 02:00–04:00 (`network_windows`), `allowlist_domains` explicite, kill-switch `~/.watcher/disable`, budgets CPU 60 %, RAM 4 Go et bande passante 200 Mo/j. L'autopilote coupe le réseau hors créneau et respecte ces limites.
+| Phase      | Description                                                                                          | Modules clés                                      |
+|------------|------------------------------------------------------------------------------------------------------|---------------------------------------------------|
+| Discover   | Exploration via sitemaps, RSS, GitHub Topics et résolution des *knowledge gaps*.                      | `app/autopilot/discovery.py`                      |
+| Scrape     | Téléchargement contrôlé : robots.txt, ETag/If-Modified-Since, throttling, timeouts, UA dédié.        | `app/scrapers/http.py`, `app/scrapers/rss.py`, … |
+| Verify     | Consolidation multi-sources (≥ 2 indépendantes), scoring de confiance, rejet des licences interdites. | `app/scrapers/verify.py`, `app/policy/rules.py`   |
+| Ingest     | Normalisation, détection de langue, chunking, embeddings locaux, indexation SQLite-VSS/FAISS.        | `app/ingest/pipeline.py`                          |
+| Reindex    | Rafraîchissement des statistiques (`index.stats`) et génération du rapport hebdomadaire.             | `app/ingest/index.py`                             |
 
-## Clôture et archivage
+Chaque phase tourne dans un sous-processus enfermé (Job Objects sous Windows, cgroups sous Linux) avec quotas CPU/RAM et
+système de fichiers limité au workspace (`~/.watcher/workspace`).
 
-1. À la fin de la phase « Synthèse », l'autopilote propose un rapport structuré.
-2. Examiner les sections « Actions réalisées », « Décisions humaines » et « Recommandations ». Ajouter des commentaires si nécessaire.
-3. Sélectionner « Approuver et archiver » pour générer le paquet d'audit contenant le journal, les artefacts signés et les hachages de référence.
-4. Exporter le paquet vers le coffre hors ligne ou sur la clé de contrôle conformément aux règles internes.
+## Gestion des budgets et du réseau
 
-## Entretien récurrent
+- **Offline par défaut** : la politique impose `offline_default: true`. Le réseau n'est activé que durant les fenêtres
+  autorisées. `pytest-socket` garantit ce comportement en tests.
+- **Budgets** : la scheduler réduit dynamiquement le nombre de tâches si les quotas CPU/RAM/bande passante approchent 100 %.
+- **Kill-switch** : la présence de `~/.watcher/disable` arrête la boucle en cours. Le fichier est surveillé à chaque itération.
 
-- Planifier des revues trimestrielles des scénarios pour s'assurer que les budgets et contraintes restent pertinents.
-- Utiliser la [procédure de vérification des artefacts](verifier-artefacts.md) afin de valider les livrables avant diffusion.
-- En cas d'incident, suivre la [procédure de dépannage](depannage.md) pour suspendre l'autopilote et diagnostiquer la cause racine.
-- Pour une mise en route rapide sans script, se référer au [Quickstart sans commande](quickstart-sans-commande.md).
+## Journalisation et audit
+
+- Toutes les actions autopilot sont tracées dans `~/.watcher/logs/autopilot.jsonl` avec `trace_id`, phase, source et résultat.
+- Le ledger `~/.watcher/consents.jsonl` n'enregistre qu'un nouvel item lorsqu'une source (domaine/scope/version) change.
+- Les scripts d'autostart générés (`~/.watcher/autostart/windows/*`, `~/.watcher/autostart/linux/*`) peuvent être ré-exécutés
+  pour audit ou réparation.
+
+## Tests recommandés
+
+- `pytest -m autopilot --maxfail=1` : valide la planification réseau, les budgets et le kill-switch.
+- `pytest -m scraping` : couvre la conformité robots/ETag et la déduplication.
+- Simulation d'un logon Windows ou `systemd --user` : vérifier que `watcher autopilot run --noninteractive` démarre sans
+  interaction.
+
+Ces tests sont intégrés aux pipelines CI, assurant le mode plug-and-play et la conformité aux critères de confiance.
