@@ -1,18 +1,15 @@
-"""User-facing policy management helpers."""
-
 from __future__ import annotations
 
 import hashlib
-from datetime import datetime
 from pathlib import Path
-from typing import Any, Iterable
+from typing import Iterable
 
 import yaml
 
 from pydantic import ValidationError
 
 from .ledger import ConsentLedger, LedgerError
-from .schema import DomainRule, Policy
+from .schema import Policy
 
 
 class PolicyError(RuntimeError):
@@ -45,10 +42,8 @@ class PolicyManager:
         except yaml.YAMLError as exc:  # pragma: no cover - defensive
             raise PolicyError("policy.yaml is not valid YAML") from exc
 
-        normalised = self._normalise_defaults(data)
-
         try:
-            return Policy.model_validate(normalised)
+            return Policy.model_validate(data)
         except ValidationError as exc:
             raise PolicyError("policy.yaml is invalid") from exc
 
@@ -77,45 +72,32 @@ class PolicyManager:
         categories: Iterable[str] | None = None,
         bandwidth_mb: int | None = None,
         time_budget_minutes: int | None = None,
-    ) -> DomainRule:
+    ) -> str:
+        del categories, bandwidth_mb, time_budget_minutes  # legacy compatibility
         policy = self._read_policy()
-        cats = list(categories or policy.categories.allowed)
-        rule = DomainRule(
-            domain=domain,
-            scope=scope,
-            categories=cats,
-            bandwidth_mb=(
-                bandwidth_mb if bandwidth_mb is not None else policy.network.bandwidth_mb
-            ),
-            time_budget_minutes=(
-                time_budget_minutes
-                if time_budget_minutes is not None
-                else policy.network.time_budget_minutes
-            ),
-            last_approved=datetime.utcnow(),
-        )
-        policy.network.allowlist = [
-            existing
-            for existing in policy.network.allowlist
-            if existing.domain != domain or existing.scope != scope
-        ]
-        policy.network.allowlist.append(rule)
-        self._write_policy(policy)
-        self._record("approve", domain=domain, scope=scope)
-        return rule
+        domain_norm = domain.strip().lower()
+        if not domain_norm:
+            raise PolicyError("domain must not be empty")
+        if domain_norm not in policy.allowlist_domains:
+            policy.allowlist_domains.append(domain_norm)
+            policy.allowlist_domains = sorted(set(policy.allowlist_domains))
+            self._write_policy(policy)
+        self._record("approve", domain=domain_norm, scope=scope)
+        return domain_norm
 
     def revoke(self, domain: str, scope: str | None = None) -> None:
         policy = self._read_policy()
-        before = len(policy.network.allowlist)
-        policy.network.allowlist = [
-            existing
-            for existing in policy.network.allowlist
-            if existing.domain != domain or (scope and existing.scope != scope)
-        ]
-        if len(policy.network.allowlist) == before:
+        domain_norm = domain.strip().lower()
+        if not domain_norm:
+            raise PolicyError("domain must not be empty")
+        before = set(policy.allowlist_domains)
+        policy.allowlist_domains = sorted(
+            {item for item in policy.allowlist_domains if item != domain_norm}
+        )
+        if set(policy.allowlist_domains) == before:
             raise PolicyError(f"aucune autorisation trouvée pour {domain}")
         self._write_policy(policy)
-        self._record("revoke", domain=domain, scope=scope or "*")
+        self._record("revoke", domain=domain_norm, scope=scope or "*")
 
     def _record(self, action: str, *, domain: str, scope: str) -> None:
         try:
@@ -128,40 +110,3 @@ class PolicyManager:
             scope=scope,
             policy_hash=self._policy_hash(),
         )
-
-    def _normalise_defaults(self, data: dict[str, Any]) -> dict[str, Any]:
-        defaults = data.get("defaults")
-        if not isinstance(defaults, dict):
-            return data
-
-        legacy_aliases = {
-            # ``consent_required`` and ``offline_mode`` were used in early
-            # prototypes before the schema settled on ``require_consent`` and
-            # ``offline``.  Preserve the value provided by the user instead of
-            # discarding it.
-            "consent_required": "require_consent",
-            "offline_mode": "offline",
-        }
-        legacy_drop = {
-            # ``auto_approve`` was removed in favour of the explicit
-            # allowlist/ledger flow.
-            "auto_approve",
-        }
-
-        cleaned_defaults: dict[str, Any] = {}
-        for key, value in defaults.items():
-            if key in legacy_drop:
-                continue
-
-            target = legacy_aliases.get(key, key)
-            # If both the legacy alias and the new key are present, keep the
-            # explicit modern key.
-            if target in cleaned_defaults and target != key:
-                continue
-
-            cleaned_defaults[target] = value
-
-        normalised = dict(data)
-        normalised["defaults"] = cleaned_defaults
-        return normalised
-

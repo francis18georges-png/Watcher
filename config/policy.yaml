@@ -1,25 +1,23 @@
-version: 1
+version: 2
+autostart: true
+offline_default: true
+require_corroboration: 2
+kill_switch_file: "~/.watcher/disable"
+network_windows:
+  - days: [mon, tue, wed, thu, fri, sat, sun]
+    start: "02:00"
+    end: "04:00"
+budgets:
+  bandwidth_mb_per_day: 200
+  cpu_percent_cap: 60
+  ram_mb_cap: 4096
+allowlist_domains:
+  - docs.python.org
+  - pytorch.org
+  - w3.org
 subject:
   hostname: "{{ hostname }}"
   generated_at: "{{ generated_at }}"
-defaults:
-  offline: true
-  require_consent: true
-  kill_switch: false
-network:
-  allowed_windows:
-    - days: [mon, tue, wed, thu, fri]
-      window: "09:00-18:00"
-  allowlist: []
-  bandwidth_mb: 128
-  time_budget_minutes: 15
-budgets:
-  cpu_percent: 75
-  ram_mb: 4096
-categories:
-  allowed:
-    - documentation
-    - code
 models:
   llm:
     name: demo-smollm-135m-instruct.Q4_K_M.gguf

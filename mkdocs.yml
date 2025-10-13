@@ -73,7 +73,9 @@ nav:
   - Accueil: index.md
   - Quickstart sans commande: quickstart-sans-commande.md
   - Architecture:
+      - Résumé express: architecture-summary.md
       - Vue d'ensemble: architecture.md
+      - Arborescence cible: arborescence-cible.md
       - Journal de conception:
           - 2025-09-12: journal/2025-09-12.md
           - 2025-09-14: journal/2025-09-14.md
@@ -89,8 +91,10 @@ nav:
       - Gouvernance du consentement: policy-consent.md
       - Conventions de logging: logging.md
       - Autopilote: autopilot.md
+      - Autostart sans commande: autostart.md
       - Vérifier les artefacts: verifier-artefacts.md
       - Dépannage plug-and-play: depannage.md
+      - Plan de tests pytest: tests-plan.md
       - Feuille de route: ROADMAP.md
       - Journal des modifications: CHANGELOG.md
       - Politique de fusion: merge-policy.md

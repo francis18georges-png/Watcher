@@ -23,6 +23,7 @@ Ce document détaille la gouvernance du mode Autopilote de Watcher. Il structure
 - Les actions critiques déclenchent un double contrôle. L'autopilote sollicite un binôme pour confirmation avant de poursuivre.
 - Les ressources consommées sont agrégées en temps réel dans le widget « Budget ». Lorsque 80 % du budget est atteint, le système impose une revue intermédiaire.
 - Le moteur applique la politique de consentement pour filtrer les fichiers et sources non autorisés. Une tâche refusée passe automatiquement en revue manuelle.
+- La politique `policy.yaml` (v2) impose : fenêtre réseau 02:00–04:00 (`network_windows`), `allowlist_domains` explicite, kill-switch `~/.watcher/disable`, budgets CPU 60 %, RAM 4 Go et bande passante 200 Mo/j. L'autopilote coupe le réseau hors créneau et respecte ces limites.
 
 ## Clôture et archivage
 

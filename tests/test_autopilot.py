@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import json
-from datetime import datetime
+from datetime import datetime, time
 
 import pytest
 
@@ -15,14 +15,11 @@ from app.autopilot import (
 )
 from app.policy.schema import (
     Budgets,
-    Categories,
-    Defaults,
     ModelEntry,
     ModelsSection,
-    NetworkSection,
+    NetworkWindow,
     Policy,
     Subject,
-    TimeWindow,
 )
 
 
@@ -48,17 +45,17 @@ class DummyProbe(ResourceProbe):
 def _policy() -> Policy:
     now = datetime(2024, 1, 1, 10, 0, 0)
     return Policy(
-        version=1,
+        version=2,
+        autostart=True,
+        offline_default=True,
+        require_corroboration=2,
+        kill_switch_file="disable",
+        network_windows=[
+            NetworkWindow(days=["mon", "tue"], start=time(8, 0), end=time(20, 0))
+        ],
+        budgets=Budgets(bandwidth_mb_per_day=500, cpu_percent_cap=50, ram_mb_cap=1024),
+        allowlist_domains=["docs.python.org"],
         subject=Subject(hostname="test-host", generated_at=now),
-        defaults=Defaults(),
-        network=NetworkSection(
-            allowed_windows=[TimeWindow(days=["mon", "tue"], window="08:00-20:00")],
-            bandwidth_mb=500,
-            time_budget_minutes=120,
-            allowlist=[],
-        ),
-        budgets=Budgets(cpu_percent=50, ram_mb=1024),
-        categories=Categories(allowed=[]),
         models=ModelsSection(
             llm=ModelEntry(name="llm", sha256="abc", license="MIT"),
             embedding=ModelEntry(name="embed", sha256="def", license="MIT"),

@@ -582,7 +582,13 @@ def _confirm_autopilot_run(topics: Sequence[str]) -> bool:
 
 def _build_autopilot_pipeline() -> IngestPipeline:
     store = SimpleVectorStore(namespace="autopilot")
-    return IngestPipeline(store)
+    manager = PolicyManager()
+    try:
+        policy = manager._read_policy()
+        min_sources = max(2, policy.require_corroboration)
+    except PolicyError:
+        min_sources = 2
+    return IngestPipeline(store, min_sources=min_sources)
 
 
 def _build_autopilot_crawler(*, noninteractive: bool) -> _DefaultCrawler:

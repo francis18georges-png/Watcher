@@ -5,6 +5,7 @@ Cette procédure fournit une méthode sans ligne de commande pour diagnostiquer 
 ## Symptômes courants
 
 - **Autopilote bloqué en phase Analyse** : le module attend une validation de consentement ou une ressource manquante.
+- **Autopilote hors ligne permanent** : vérifier la présence du fichier `~/.watcher/disable` ou de la variable `WATCHER_DISABLE`.
 - **Échec de vérification des artefacts** : les hachages ne correspondent pas au registre de référence.
 - **Alertes de quota** : le budget de tâches défini a été dépassé ou une ressource critique est saturée.
 

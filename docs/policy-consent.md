@@ -40,3 +40,4 @@ Ce guide décrit la procédure opérée par Watcher pour consigner les consentem
 - Les consentements actifs sont exposés à l'autopilote comme contraintes. Une tâche ne peut s'exécuter que si son périmètre est couvert par un consentement valide.
 - Les retraits sont synchronisés avec la [procédure de dépannage](depannage.md) pour déclencher, si nécessaire, une suspension préventive.
 - La page [Quickstart sans commande](quickstart-sans-commande.md) résume la première capture à effectuer lors de l'onboarding.
+- Chaque nouveau domaine ou périmètre approuvé est inscrit dans `consents.jsonl` (JSONL signé) et ajoute le domaine à `policy.yaml` (`allowlist_domains`). Aucune fenêtre popup récurrente : seule l'évolution de périmètre déclenche une nouvelle entrée.
