@@ -100,16 +100,13 @@ def test_autostart_creates_windows_definitions(
     )
 
 
-def test_autostart_respects_disable_switches(
+def test_autostart_respects_disable_environment(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     home = tmp_path / "home"
     home.mkdir()
 
-    (home / ".watcher").mkdir(parents=True)
-    (home / ".watcher" / "disable").write_text("blocked", encoding="utf-8")
-
-    monkeypatch.setenv("WATCHER_AUTOSTART", "1")
+    monkeypatch.delenv("WATCHER_AUTOSTART", raising=False)
     monkeypatch.setenv("WATCHER_DISABLE", "1")
     monkeypatch.setattr("app.core.first_run.platform.system", lambda: "Linux")
 
@@ -125,3 +122,35 @@ def test_autostart_respects_disable_switches(
     assert not (systemd_dir / "watcher-autopilot.service").exists()
     assert not (systemd_dir / "watcher-autopilot.timer").exists()
     assert calls == []
+
+
+def test_autostart_force_overrides_kill_switch(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    home = tmp_path / "home"
+    home.mkdir()
+
+    watcher_dir = home / ".watcher"
+    watcher_dir.mkdir(parents=True)
+    (watcher_dir / "disable").write_text("blocked", encoding="utf-8")
+
+    monkeypatch.setenv("WATCHER_AUTOSTART", "1")
+    monkeypatch.setenv("WATCHER_DISABLE", "1")
+    monkeypatch.setattr("app.core.first_run.platform.system", lambda: "Linux")
+    monkeypatch.setattr("app.core.first_run.sys.executable", "/usr/bin/python3")
+
+    calls: list[list[str]] = []
+    monkeypatch.setattr(
+        "app.core.first_run.subprocess.run", _fake_subprocess_run(calls)
+    )
+
+    configurator = FirstRunConfigurator(home=home)
+    configurator.run(auto=True, download_models=False)
+
+    systemd_dir = home / ".config" / "systemd" / "user"
+    service_path = systemd_dir / "watcher-autopilot.service"
+    timer_path = systemd_dir / "watcher-autopilot.timer"
+
+    assert service_path.exists()
+    assert timer_path.exists()
+    assert any("watcher-autopilot.timer" in call for call in map(" ".join, calls))

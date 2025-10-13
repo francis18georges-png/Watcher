@@ -4,7 +4,7 @@ offline_default: true
 require_corroboration: 2
 kill_switch_file: "~/.watcher/disable"
 network_windows:
-  - days: [mon, tue, wed, thu, fri, sat, sun]
+  - days: ["Mon-Sun"]
     start: "02:00"
     end: "04:00"
 budgets:

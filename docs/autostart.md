@@ -18,7 +18,7 @@ schtasks /Create /TN "Watcher Autopilot" /TR $autopilot /SC ONLOGON /F
 
 - **RunOnce** exécute `watcher init --auto` si la sentinelle `~/.watcher/first_run` est présente.
 - La tâche planifiée `Watcher Autopilot` lance `watcher autopilot run --noninteractive` à chaque ouverture de session.
-- La présence de `~/.watcher/disable` ou de l'environnement `WATCHER_DISABLE=1` annule la planification, sauf si `WATCHER_AUTOSTART=1` force l'activation.
+- La présence de `~/.watcher/disable` ou de l'environnement `WATCHER_DISABLE=1` annule la planification, sauf si `WATCHER_AUTOSTART=1` force explicitement l'activation (l'override s'applique même si les deux kill-switch sont présents).
 
 ## Linux (systemd --user)
 
