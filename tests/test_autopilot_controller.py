@@ -112,39 +112,25 @@ def _prepare_policy(home: Path, now: datetime) -> PolicyFiles:
     config_dir.mkdir(parents=True, exist_ok=True)
     policy_path = config_dir / "policy.yaml"
     ledger_path = config_dir / "consents.jsonl"
-    window = {"days": [now.strftime("%a").lower()[:3]], "window": "09:00-10:00"}
-    allowlist = [
-        {
-            "domain": "allowed-one.test",
-            "categories": ["news"],
-            "bandwidth_mb": 15,
-            "time_budget_minutes": 30,
-            "allow_subdomains": True,
-            "scope": "web",
-            "last_approved": now.isoformat(),
-        },
-        {
-            "domain": "allowed-two.test",
-            "categories": ["news"],
-            "bandwidth_mb": 15,
-            "time_budget_minutes": 30,
-            "allow_subdomains": True,
-            "scope": "web",
-            "last_approved": now.isoformat(),
-        },
-    ]
+    window = {
+        "days": [now.strftime("%a").lower()[:3]],
+        "start": "09:00",
+        "end": "10:00",
+    }
     policy = {
-        "version": 1,
-        "subject": {"hostname": "test", "generated_at": now.isoformat()},
-        "defaults": {"offline": False, "require_consent": True, "kill_switch": False},
-        "network": {
-            "allowed_windows": [window],
-            "allowlist": allowlist,
-            "bandwidth_mb": 50,
-            "time_budget_minutes": 60,
+        "version": 2,
+        "autostart": True,
+        "offline_default": True,
+        "require_corroboration": 2,
+        "kill_switch_file": str(config_dir / "disable"),
+        "network_windows": [window],
+        "budgets": {
+            "bandwidth_mb_per_day": 50,
+            "cpu_percent_cap": 80,
+            "ram_mb_cap": 1024,
         },
-        "budgets": {"cpu_percent": 80, "ram_mb": 1024},
-        "categories": {"allowed": ["news"]},
+        "allowlist_domains": ["allowed-one.test", "allowed-two.test"],
+        "subject": {"hostname": "test", "generated_at": now.isoformat()},
         "models": {
             "llm": {"name": "dummy", "sha256": "0", "license": "Apache-2.0"},
             "embedding": {"name": "dummy", "sha256": "1", "license": "Apache-2.0"},

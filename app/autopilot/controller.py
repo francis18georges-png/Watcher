@@ -400,21 +400,24 @@ class AutopilotController:
             policy = self._policy_loader()
         except PolicyError as exc:  # pragma: no cover - defensive
             raise AutopilotError(str(exc)) from exc
-        if policy.defaults.kill_switch:
+        if policy.kill_switch_engaged():
             self._logger.warning("Kill-switch actif – exécution interrompue.")
             return AutopilotRunResult(ingested=0, reason="kill-switch")
-        if not policy.network.allowlist:
+        if not policy.allowlist_domains:
             self._logger.warning("Aucun domaine autorisé – rien à faire.")
             return AutopilotRunResult(ingested=0, reason="allowlist vide")
 
-        allowed = {rule.domain: rule for rule in policy.network.allowlist}
+        allowed_rules = policy.domain_rules()
+        allowed = {rule.domain: rule for rule in allowed_rules}
         consented = self._ledger_view.approvals()
         gate = ConsentGate(
             allowed=allowed,
             consented=consented,
-            require_consent=policy.defaults.require_consent,
+            require_consent=True,
             logger=self._logger,
         )
+        if policy.require_corroboration > self.pipeline.min_sources:
+            self.pipeline.min_sources = policy.require_corroboration
         verifier = MultiSourceVerifier(min_sources=self.pipeline.min_sources)
 
         active_topics = topics or state.topics
@@ -422,7 +425,7 @@ class AutopilotController:
         collected: list[tuple[RawDocument, str]] = []
         skipped: list[str] = []
 
-        bandwidth_limit = float(policy.network.bandwidth_mb)
+        bandwidth_limit = float(policy.budgets.bandwidth_mb_per_day)
         total_bandwidth = 0.0
         per_domain_bandwidth: MutableMapping[str, float] = defaultdict(float)
         start_time = now
@@ -436,14 +439,10 @@ class AutopilotController:
                 continue
             rule = allowed.get(domain)
             if rule is None:
-                # consent single-use without explicit rule
                 rule = DomainRule(
                     domain=domain,
-                    categories=[],
-                    bandwidth_mb=policy.network.bandwidth_mb,
-                    time_budget_minutes=policy.network.time_budget_minutes,
-                    allow_subdomains=True,
-                    scope="web",
+                    bandwidth_mb=policy.budgets.bandwidth_mb_per_day,
+                    time_budget_minutes=policy.window_duration_minutes(),
                 )
             if self._exceeded_time(policy, rule, start_time):
                 self._logger.warning("Budget temporel dépassé pour %s.", domain)
@@ -535,7 +534,7 @@ class AutopilotController:
         start: datetime,
     ) -> bool:
         elapsed = (self._clock() - start).total_seconds() / 60
-        if elapsed > float(policy.network.time_budget_minutes):
+        if elapsed > float(policy.window_duration_minutes()):
             return True
         return elapsed > float(rule.time_budget_minutes)
 

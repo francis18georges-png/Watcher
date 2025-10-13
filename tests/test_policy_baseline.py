@@ -15,6 +15,18 @@ def _normalize_policy(data: dict) -> dict:
     subject["hostname"] = "__HOST__"
     subject["generated_at"] = "__TIME__"
 
+    windows = []
+    for window in normalized.get("network_windows", []):
+        windows.append(
+            {
+                "days": sorted(window.get("days", [])),
+                "start": window.get("start"),
+                "end": window.get("end"),
+            }
+        )
+    normalized["network_windows"] = sorted(windows, key=lambda item: (item["start"], item["end"]))
+    normalized["allowlist_domains"] = sorted(normalized.get("allowlist_domains", []))
+
     models = normalized.setdefault("models", {})
     for key in ("llm", "embedding"):
         section = models.setdefault(key, {})
