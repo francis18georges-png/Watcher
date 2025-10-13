@@ -356,6 +356,10 @@ class FirstRunConfigurator:
     def _should_enable_autostart(self) -> bool:
         """Return :data:`True` when the autopilot autostart is enabled."""
 
+        raw_value = os.environ.get("WATCHER_AUTOSTART")
+        if raw_value and raw_value.strip().lower() in {"1", "true", "yes", "on"}:
+            return True
+
         if os.environ.get("WATCHER_DISABLE"):
             return False
 
@@ -363,11 +367,10 @@ class FirstRunConfigurator:
         if kill_switch.exists():
             return False
 
-        value = os.environ.get("WATCHER_AUTOSTART")
-        if value is None:
+        if raw_value is None:
             return True
 
-        value = value.strip().lower()
+        value = raw_value.strip().lower()
         return value not in {"", "0", "false", "no", "off"}
 
     def _autopilot_command_parts(self) -> list[str]:
