@@ -85,6 +85,20 @@ def _download_once(url: str, destination: Path, resume: bool) -> bool:
         return False
 
 
+def _artifact_matches_spec(path: Path, spec: ModelSpec) -> bool:
+    """Return ``True`` when *path* matches the expected ``sha256`` and size."""
+
+    if not path.exists():
+        return False
+    try:
+        size = path.stat().st_size
+    except OSError:
+        return False
+    if spec.size_bytes > 0 and size != spec.size_bytes:
+        return False
+    return _hash_file(path) == spec.sha256
+
+
 def download_model(spec: ModelSpec, target_dir: Path, resume: bool = True) -> Path:
     """Ensure the given model *spec* is available under *target_dir*.
 
@@ -97,8 +111,11 @@ def download_model(spec: ModelSpec, target_dir: Path, resume: bool = True) -> Pa
     destination = spec.destination(target_dir)
     destination.parent.mkdir(parents=True, exist_ok=True)
 
-    if destination.exists() and _hash_file(destination) == spec.sha256:
+    if _artifact_matches_spec(destination, spec):
         return destination
+
+    if destination.exists():
+        destination.unlink(missing_ok=True)
 
     temp = destination.with_suffix(".part")
     if temp.exists() and not resume:
@@ -106,14 +123,16 @@ def download_model(spec: ModelSpec, target_dir: Path, resume: bool = True) -> Pa
 
     for url in spec.urls:
         if _download_once(url, temp, resume=resume):
-            if temp.exists() and _hash_file(temp) == spec.sha256:
+            if _artifact_matches_spec(temp, spec):
                 temp.replace(destination)
                 return destination
+            temp.unlink(missing_ok=True)
 
     if spec.embedded_resource is not None:
         _copy_embedded(spec.embedded_resource, destination)
-        if _hash_file(destination) == spec.sha256:
+        if _artifact_matches_spec(destination, spec):
             return destination
+        destination.unlink(missing_ok=True)
 
     if temp.exists():
         temp.unlink(missing_ok=True)
