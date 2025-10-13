@@ -21,6 +21,8 @@ import sys
 import textwrap
 
 import yaml
+
+from app.core.autostart import render_systemd_scripts, render_windows_scripts
 from app.core.model_registry import ensure_models, select_models
 from app.policy.ledger import ConsentLedger, LedgerError
 
@@ -389,6 +391,11 @@ class FirstRunConfigurator:
             ["watcher", "autopilot", "run", "--noninteractive"]
         )
 
+        for artifact in render_windows_scripts(
+            self.config_dir, autopilot_command=autopilot_command
+        ):
+            artifact.write()
+
         script_value = run_once_command.replace("'", "''")
         powershell_script = textwrap.dedent(
             f"""
@@ -438,45 +445,18 @@ class FirstRunConfigurator:
 
         command = shlex.join(self._autopilot_command_parts())
 
-        service_body = textwrap.dedent(
-            f"""
-            [Unit]
-            Description=Watcher Autopilot orchestrator
-
-            [Service]
-            Type=oneshot
-            WorkingDirectory={self.home}
-            Environment=WATCHER_HOME={self.config_dir}
-            ExecStart={command}
-
-            [Install]
-            WantedBy=default.target
-            """
-        ).strip()
-        service_path.write_text(
-            "\n".join(line.rstrip() for line in service_body.splitlines()) + "\n",
-            encoding="utf-8",
+        artifacts = render_systemd_scripts(
+            self.config_dir,
+            autopilot_command=command,
+            working_dir=self.home,
         )
-
-        timer_body = textwrap.dedent(
-            """
-            [Unit]
-            Description=Watcher Autopilot orchestrator schedule
-
-            [Timer]
-            OnBootSec=30s
-            OnUnitActiveSec=1h
-            Persistent=true
-            Unit=watcher-autopilot.service
-
-            [Install]
-            WantedBy=timers.target
-            """
-        ).strip()
-        timer_path.write_text(
-            "\n".join(line.rstrip() for line in timer_body.splitlines()) + "\n",
-            encoding="utf-8",
-        )
+        for artifact in artifacts:
+            written = artifact.write()
+            content = written.read_text(encoding="utf-8")
+            if artifact.path.name.endswith(".service"):
+                service_path.write_text(content, encoding="utf-8")
+            elif artifact.path.name.endswith(".timer"):
+                timer_path.write_text(content, encoding="utf-8")
 
         try:
             subprocess.run(

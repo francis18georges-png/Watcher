@@ -4,8 +4,16 @@ Watcher automatise l'exécution de l'autopilote sans commandes en configurant de
 
 ## Windows (Task Scheduler + RunOnce)
 
+Les artefacts générés sont archivés dans `~/.watcher/autostart/windows/` pour audit :
+
+- `watcher-register-autostart.ps1` peut être relancé pour recréer le RunOnce et la tâche planifiée.
+- `README.md` résume les étapes appliquées durant `watcher init --auto`.
+- **RunOnce** exécute `watcher init --auto` si la sentinelle `~/.watcher/first_run` est présente.
+- La tâche planifiée `Watcher Autopilot` lance `watcher autopilot run --noninteractive` à chaque ouverture de session.
+- `WATCHER_DISABLE=1` ou `~/.watcher/disable` désactivent le démarrage automatique, sauf si `WATCHER_AUTOSTART=1` force explicitement l'activation.
+
 ```powershell
-# Créé lors de `watcher init --auto`
+# Contenu de ~/.watcher/autostart/windows/watcher-register-autostart.ps1
 $runOnce = "watcher init --auto"
 $autopilot = "watcher autopilot run --noninteractive"
 
@@ -16,14 +24,13 @@ Set-ItemProperty -Path 'HKCU:\Software\Microsoft\Windows\CurrentVersion\RunOnce'
 schtasks /Create /TN "Watcher Autopilot" /TR $autopilot /SC ONLOGON /F
 ```
 
-- **RunOnce** exécute `watcher init --auto` si la sentinelle `~/.watcher/first_run` est présente.
-- La tâche planifiée `Watcher Autopilot` lance `watcher autopilot run --noninteractive` à chaque ouverture de session.
-- La présence de `~/.watcher/disable` ou de l'environnement `WATCHER_DISABLE=1` annule la planification, sauf si `WATCHER_AUTOSTART=1` force explicitement l'activation (l'override s'applique même si les deux kill-switch sont présents).
-
 ## Linux (systemd --user)
 
+Les fichiers systemd sont stockés dans `~/.watcher/autostart/linux/` et recopiés dans `~/.config/systemd/user/` pour activation.
+Toute dérive peut être corrigée en recopiant les artefacts signés depuis le dossier d'autostart.
+
 ```ini
-# ~/.config/systemd/user/watcher-autopilot.service
+# ~/.watcher/autostart/linux/watcher-autopilot.service
 [Unit]
 Description=Watcher Autopilot orchestrator
 
@@ -38,7 +45,7 @@ WantedBy=default.target
 ```
 
 ```ini
-# ~/.config/systemd/user/watcher-autopilot.timer
+# ~/.watcher/autostart/linux/watcher-autopilot.timer
 [Unit]
 Description=Watcher Autopilot orchestrator schedule
 
