@@ -53,6 +53,10 @@ def test_autostart_creates_systemd_units(
     assert "OnUnitActiveSec=1h" in timer_content
     assert "Persistent=true" in timer_content
 
+    autostart_dir = home / ".watcher" / "autostart" / "linux"
+    assert (autostart_dir / "watcher-autopilot.service").is_file()
+    assert (autostart_dir / "watcher-autopilot.timer").is_file()
+
     assert [
         "systemctl",
         "--user",
@@ -98,6 +102,15 @@ def test_autostart_creates_windows_definitions(
     assert any(
         "watcher autopilot run --noninteractive" in part for part in schtasks_call
     )
+
+    autostart_dir = home / ".watcher" / "autostart" / "windows"
+    script_path = autostart_dir / "watcher-register-autostart.ps1"
+    readme_path = autostart_dir / "README.md"
+    assert script_path.is_file()
+    assert readme_path.is_file()
+    content = script_path.read_text(encoding="utf-8")
+    assert "watcher init --auto" in content
+    assert "watcher autopilot run --noninteractive" in content
 
 
 def test_autostart_respects_disable_environment(
