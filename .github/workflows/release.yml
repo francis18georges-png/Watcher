@@ -326,7 +326,11 @@ jobs:
           python scripts/normalize_zip_metadata.py "$ARCHIVE_FILE"
 
       - name: Store notarization credentials
-        if: matrix.os == 'macos-latest' && env.APPLE_NOTARIZE_APPLE_ID != '' && env.APPLE_NOTARIZE_TEAM_ID != '' && env.APPLE_NOTARIZE_PASSWORD != ''
+        if: >-
+          matrix.os == 'macos-latest' &&
+          env.APPLE_NOTARIZE_APPLE_ID != '' &&
+          env.APPLE_NOTARIZE_TEAM_ID != '' &&
+          env.APPLE_NOTARIZE_PASSWORD != ''
         shell: bash
         run: |
           set -euo pipefail
@@ -336,7 +340,11 @@ jobs:
             --password "$APPLE_NOTARIZE_PASSWORD"
 
       - name: Notarize macOS archive
-        if: matrix.os == 'macos-latest' && env.APPLE_NOTARIZE_APPLE_ID != '' && env.APPLE_NOTARIZE_TEAM_ID != '' && env.APPLE_NOTARIZE_PASSWORD != ''
+        if: >-
+          matrix.os == 'macos-latest' &&
+          env.APPLE_NOTARIZE_APPLE_ID != '' &&
+          env.APPLE_NOTARIZE_TEAM_ID != '' &&
+          env.APPLE_NOTARIZE_PASSWORD != ''
         shell: bash
         run: |
           set -euo pipefail
