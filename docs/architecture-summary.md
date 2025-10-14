@@ -4,12 +4,14 @@ Watcher fonctionne comme un pipeline local-first orchestrant l'initialisation au
 des connaissances en RAG. Les modules principaux sont :
 
 - **Bootstrap** (`app/core/first_run.py`) : détecte le matériel, choisit les modèles `llama.cpp`, télécharge les artefacts par
-  hachage et écrit `~/.watcher/{config.toml,policy.yaml,.env,consents.jsonl}` avant de configurer l'autostart.
+  hachage vérifié (SHA256 + taille) et écrit `~/.watcher/{config.toml,policy.yaml,.env,consents.jsonl}` avant de configurer
+  l'autostart.
 - **Politique** (`app/policy`) : valide un schéma unique `policy.yaml`, expose les domaines autorisés et applique le kill-switch.
 - **Autopilot** (`app/autopilot`) : planifie les créneaux réseau (02:00–04:00), applique les budgets CPU/RAM/bande passante et
   boucle sur *discover → scrape → verify → ingest* sans intervention.
 - **Scrapers & ingestion** (`app/scrapers`, `app/ingest`) : récupèrent en respectant robots.txt, normalisent les textes et
-  n'indexent que les contenus corroborés (≥ 2 sources) dans une base vectorielle locale.
+  n'indexent que les contenus corroborés (≥ 2 sources) dans une base vectorielle locale. Les documents rejetés sont consignés
+  avec leur licence afin d'alimenter les audits.
 - **Sécurité & sandbox** (`app/tools`, `app.utils`) : isole les sous-processus via Job Objects/cgroups et coupe le réseau hors
   fenêtre autorisée.
 
@@ -17,7 +19,7 @@ des connaissances en RAG. Les modules principaux sont :
 
 ```
 [Boot] -> [FirstRunConfigurator] -> [~/.watcher]
-    -> [PolicyManager] -> [policy.yaml | consents.jsonl]
+    -> [PolicyManager] -> [policy.yaml | consents.jsonl (signatures HMAC)]
     -> [Autostart Tasks] -> {Windows Task Scheduler, systemd --user}
 [Autostart] -> [AutopilotScheduler] -> [AutopilotController]
 [AutopilotController] -> (Discovery) -> [Scrapers]
