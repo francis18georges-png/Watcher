@@ -3,11 +3,20 @@
 from __future__ import annotations
 
 import argparse
-from datetime import datetime, timezone
+import hashlib
+import os
+import sys
+import textwrap
 from contextlib import suppress
+from datetime import datetime, timezone
 from importlib import resources
 from pathlib import Path
 from typing import Iterable, Sequence
+
+try:  # Python 3.11+
+    import tomllib  # type: ignore[import-not-found]
+except ModuleNotFoundError:  # pragma: no cover - Python <3.11 fallback
+    import tomli as tomllib  # type: ignore[import-not-found]
 
 from config import get_settings
 
@@ -26,6 +35,21 @@ from app.ingest import IngestPipeline, IngestValidationError, RawDocument
 from app.llm import rag
 from app.policy.manager import PolicyError, PolicyManager
 from app.tools import plugins
+
+DEFAULT_MODEL = {
+    "name": "demo-smollm-135m-instruct",
+    "filename": "demo-smollm-135m-instruct.Q4_K_M.gguf",
+    "url": (
+        "https://huggingface.co/QuantFactory/SmolLM-135M-Instruct-GGUF/resolve/main/"
+        "SmolLM-135M-Instruct-Q4_K_M.gguf"
+    ),
+    "sha256": "43d2819fb6bb94f514f4f099263b4526a65293fee7fdcbec8d3f12df0d48529f",
+    "size": 1_048_576,
+}
+
+WATCHER_HOME = Path.home() / ".watcher"
+CONFIG_FILENAME = "config.toml"
+POLICY_FILENAME = "policy.yaml"
 
 
 def _plugin_base() -> plugins.Location | None:
@@ -58,8 +82,196 @@ def _iter_plugins() -> list[plugins.Plugin]:
     return plugins.reload_plugins(_PLUGIN_MANIFEST)
 
 
+def _verify_file(path: Path, expected_hash: str | None, expected_size: int | None) -> bool:
+    """Return ``True`` if ``path`` matches the provided size and digest."""
+
+    if expected_hash is None or expected_size is None:
+        return False
+    if not path.is_file():
+        return False
+    actual_size = path.stat().st_size
+    if actual_size != int(expected_size):
+        return False
+    digest = hashlib.sha256(path.read_bytes()).hexdigest()
+    return digest.lower() == expected_hash.lower()
+
+
+def _stage_default_model(target: Path) -> Path:
+    """Copy the bundled demonstration model to ``target`` if needed."""
+
+    target.parent.mkdir(parents=True, exist_ok=True)
+
+    if _verify_file(target, DEFAULT_MODEL["sha256"], DEFAULT_MODEL["size"]):
+        return target
+
+    with resources.as_file(
+        resources.files("app.assets.models") / DEFAULT_MODEL["filename"]
+    ) as source_path:
+        data = source_path.read_bytes()
+
+    digest = hashlib.sha256(data).hexdigest()
+    if digest != DEFAULT_MODEL["sha256"]:
+        msg = "Le modèle embarqué ne correspond pas à la somme de contrôle attendue."
+        raise RuntimeError(msg)
+
+    target.write_bytes(data)
+    return target
+
+
+def _write_default_config(config_path: Path, model_path: Path) -> None:
+    """Create a minimal TOML configuration pointing to ``model_path``."""
+
+    content = textwrap.dedent(
+        f"""
+        [core]
+        mode = "offline"
+
+        [model]
+        name = "{DEFAULT_MODEL['name']}"
+        path = "{model_path.as_posix()}"
+        sha256 = "{DEFAULT_MODEL['sha256']}"
+        size = {DEFAULT_MODEL['size']}
+        source = "{DEFAULT_MODEL['url']}"
+        """
+    ).strip()
+    config_path.write_text(content + "\n", encoding="utf-8")
+
+
+def _write_default_policy(policy_path: Path) -> None:
+    """Create a conservative offline policy file."""
+
+    content = textwrap.dedent(
+        """
+        telemetry:
+          enabled: false
+
+        scraping:
+          allow: []
+          deny:
+            - "*"
+        """
+    ).strip()
+    policy_path.write_text(content + "\n", encoding="utf-8")
+
+
+def perform_auto_init() -> int:
+    """Initialise the user configuration directory without interaction."""
+
+    watcher_root = WATCHER_HOME
+    models_dir = watcher_root / "models"
+    config_path = watcher_root / CONFIG_FILENAME
+    policy_path = watcher_root / POLICY_FILENAME
+
+    watcher_root.mkdir(parents=True, exist_ok=True)
+    models_dir.mkdir(parents=True, exist_ok=True)
+
+    model_path = models_dir / DEFAULT_MODEL["filename"]
+    staged_model = _stage_default_model(model_path)
+    _write_default_config(config_path, staged_model)
+    _write_default_policy(policy_path)
+
+    print(f"Configuration écrite dans {config_path}")
+    print(f"Politique mise à jour dans {policy_path}")
+    print(
+        "Modèle de démonstration prêt à l'emploi:",
+        f"{staged_model} (sha256={DEFAULT_MODEL['sha256']})",
+    )
+    return 0
+
+
+def perform_offline_run(prompt: str, model_name: str | None = None) -> int:
+    """Execute a minimal offline inference using the packaged model."""
+
+    config_path = WATCHER_HOME / CONFIG_FILENAME
+    if not config_path.is_file():
+        print("Configuration introuvable. Exécutez `watcher init --auto`.", file=sys.stderr)
+        return 1
+
+    config = tomllib.loads(config_path.read_text(encoding="utf-8"))
+    model_config = config.get("model", {})
+    configured_name = model_config.get("name")
+    configured_path = Path(model_config.get("path", "")).expanduser()
+    expected_hash = model_config.get("sha256")
+    expected_size = model_config.get("size")
+
+    if model_name and model_name != configured_name:
+        print(
+            f"Le modèle '{model_name}' n'est pas configuré (actuel: '{configured_name}').",
+            file=sys.stderr,
+        )
+        return 1
+
+    if not _verify_file(configured_path, expected_hash, expected_size):
+        if expected_hash == DEFAULT_MODEL["sha256"]:
+            with suppress(RuntimeError):
+                _stage_default_model(configured_path)
+        if not _verify_file(configured_path, expected_hash, expected_size):
+            print(
+                "Le modèle configuré est absent ou corrompu. Relancez `watcher init --auto`.",
+                file=sys.stderr,
+            )
+            return 1
+
+    try:
+        from llama_cpp import Llama
+    except ImportError as exc:  # pragma: no cover - import side effect
+        print(f"llama-cpp-python requis: {exc}", file=sys.stderr)
+        return 1
+
+    llm = Llama(
+        model_path=str(configured_path),
+        n_ctx=1024,
+        n_threads=min(max(os.cpu_count() or 1, 1), 4),
+        seed=42,
+        verbose=False,
+    )
+
+    system_prompt = (
+        "Tu es Watcher, un assistant local fonctionnant entièrement hors-ligne. "
+        "Réponds brièvement et avec un ton professionnel."
+    )
+    completion = llm.create_chat_completion(
+        messages=[
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": prompt},
+        ],
+        max_tokens=256,
+        temperature=0.1,
+        stream=False,
+    )
+
+    message = ""
+    if isinstance(completion, dict):
+        choices = completion.get("choices") or []
+        if choices:
+            choice = choices[0]
+            if isinstance(choice, dict):
+                message = (
+                    choice.get("message", {}).get("content")
+                    or choice.get("text")
+                    or ""
+                )
+
+    text = message.strip() or "Impossible de générer une réponse."
+    print(text)
+    return 0
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     """Entry point for the :mod:`watcher` command."""
+    arg_list = list(argv if argv is not None else sys.argv[1:])
+
+    if arg_list and arg_list[0] == "init" and "--auto" in arg_list[1:]:
+        return perform_auto_init()
+
+    if arg_list and arg_list[0] == "run":
+        probe = argparse.ArgumentParser(add_help=False)
+        probe.add_argument("--prompt", default="Présente Watcher en une phrase.")
+        probe.add_argument("--offline", action="store_true")
+        probe.add_argument("--model", default=None)
+        known, _ = probe.parse_known_args(arg_list[1:])
+        if known.offline:
+            return perform_offline_run(known.prompt, model_name=known.model)
 
     auto_configure_if_needed()
     settings = get_settings()

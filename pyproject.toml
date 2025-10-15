@@ -21,6 +21,7 @@ dependencies = [
     "alembic==1.13.2",
     "llama-cpp-python==0.2.88",
     "PyYAML==6.0.2",
+    "tomli>=2.0.1; python_version < '3.11'",
 ]
 classifiers = [
     "Development Status :: 4 - Beta",

@@ -324,3 +324,85 @@ jobs:
           path: |
             dist/Watcher-Setup.zip
             dist/Watcher-Setup.zip.sigstore
+
+  release-dry-run:
+    name: Release dry run
+    needs: quality
+    if: github.event_name == 'pull_request'
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, windows-2022]
+    env:
+      PYINSTALLER_DIST: ${{ github.workspace }}/dry-pyinstaller-dist
+      PYINSTALLER_BUILD: ${{ github.workspace }}/dry-pyinstaller-build
+      PYINSTALLER_SPEC: ${{ github.workspace }}/dry-pyinstaller-spec
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install build tooling
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install build pyinstaller cyclonedx-bom cyclonedx-py
+
+      - name: Prepare directories
+        run: |
+          python - <<'PY'
+          import os
+          from pathlib import Path
+
+          for key in ("PYINSTALLER_DIST", "PYINSTALLER_BUILD", "PYINSTALLER_SPEC"):
+              Path(os.environ[key]).mkdir(parents=True, exist_ok=True)
+          PY
+
+      - name: Build wheel and sdist
+        run: python -m build
+
+      - name: Build standalone executable
+        run: |
+          python - <<'PY'
+          import os
+          import PyInstaller.__main__
+
+          PyInstaller.__main__.run(
+              [
+                  "packaging/watcher.spec",
+                  "--noconfirm",
+                  "--distpath",
+                  os.environ["PYINSTALLER_DIST"],
+                  "--workpath",
+                  os.environ["PYINSTALLER_BUILD"],
+                  "--specpath",
+                  os.environ["PYINSTALLER_SPEC"],
+              ]
+          )
+          PY
+
+      - name: Generate SBOM snapshot
+        run: cyclonedx-py environment --format json --output-file watcher-dry-run-sbom.json
+
+      - name: Verify artifacts
+        run: |
+          python - <<'PY'
+          import os
+          from pathlib import Path
+
+          wheel_dir = Path("dist")
+          wheels = list(wheel_dir.glob("*.whl"))
+          sdists = list(wheel_dir.glob("*.tar.gz"))
+          binary_root = Path(os.environ["PYINSTALLER_DIST"]) / "Watcher"
+
+          if not wheels:
+              raise SystemExit("Wheel introuvable dans dist/")
+          if not sdists:
+              raise SystemExit("Source archive introuvable dans dist/")
+          if not binary_root.exists():
+              raise SystemExit("Binaire PyInstaller manquant")
+          PY

@@ -26,6 +26,8 @@ jobs:
 
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
+        with:
+          platforms: linux/amd64,linux/arm64
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -45,8 +47,8 @@ jobs:
         with:
           images: ghcr.io/${{ github.repository_owner }}/watcher
           tags: |
-            type=raw,value=latest,enable=${{ github.ref == 'refs/heads/main' }}
-            type=ref,event=tag,pattern=v*
+            type=raw,value=ghcr.io/${{ github.repository_owner }}/watcher:latest,enable=${{ github.ref == 'refs/heads/main' }}
+            type=raw,value=ghcr.io/${{ github.repository_owner }}/watcher:${{ github.ref_name || 'edge' }}
 
       - name: Install cosign
         uses: sigstore/cosign-installer@v3.5.0
@@ -64,13 +66,10 @@ jobs:
           cache-to: type=gha,mode=max
 
       - name: Verify published image platforms
-        if: startsWith(github.ref, 'refs/tags/')
         run: |
           set -euo pipefail
-          tag="${GITHUB_REF_NAME}"
-          image="ghcr.io/${{ github.repository_owner }}/watcher:${tag}"
-          echo "Inspecting $image"
-          inspect_output=$(docker buildx imagetools inspect "$image")
+          image_digest="ghcr.io/${{ github.repository_owner }}/watcher@${{ steps.build.outputs.digest }}"
+          inspect_output=$(docker buildx imagetools inspect "$image_digest")
           printf '%s\n' "$inspect_output"
           for platform in linux/amd64 linux/arm64; do
             if ! grep -q "$platform" <<<"$inspect_output"; then
@@ -160,7 +159,7 @@ jobs:
       image: ghcr.io/${{ github.repository_owner }}/watcher
       digest: ${{ needs.build-and-push.outputs.image-digest }}
       registry-username: ${{ github.actor }}
-      registry-password: ${{ github.token }}
+      registry-password: ${{ secrets.GITHUB_TOKEN }}
     secrets: inherit
 
   normalize-provenance:
