@@ -20,8 +20,8 @@ watcher run --offline --prompt "test"
 ## Publication
 
 ```bash
-git tag -a v0.4.0 -m "v0.4.0"
-git push origin v0.4.0
+git tag -a v0.5.0 -m "Public release"
+git push origin v0.5.0
 cosign verify-attestation --type slsaprovenance ghcr.io/<owner>/watcher:latest
 ```
 
