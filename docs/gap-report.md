@@ -4,7 +4,7 @@ Ce rapport synthétise les écarts entre l'état actuel du dépôt et la mission
 
 ## Résumé exécutif
 
-- L'infrastructure de release couvre déjà une partie des exigences (wheel, sdist, signatures globales, provenance SLSA), mais elle reste limitée à Linux/Windows et ne publie ni PyPI ni binaires macOS/installeurs graphiques.
+- L'infrastructure de release couvre désormais Linux, Windows et macOS, publie PyPI via Trusted Publishing et génère les installeurs multi-OS attendus (MSI/MSIX, DMG notarizable, AppImage/DEB/RPM/Flatpak).
 - Aucun client graphique ni installeur multi-OS n'est disponible : l'expérience reste réservée aux profils techniques capables d'utiliser la CLI et des archives brutes.
 - Les engagements sûreté/autonomie (collecte vérifiée, sandbox, autodiagnostic, i18n) sont amorcés dans le code existant mais nécessitent des compléments fonctionnels et des tests pour atteindre un niveau « grand public ».
 
@@ -12,14 +12,22 @@ Ce rapport synthétise les écarts entre l'état actuel du dépôt et la mission
 
 | Exigence « grand public » | Couverture actuelle | Écart critique | Action recommandée |
 | --- | --- | --- | --- |
-| Release tag `v*` → build multi-OS + publication PyPI | `.github/workflows/release.yml` construit wheel/sdist + PyInstaller pour Linux et Windows uniquement, sans étape PyPI ni job macOS | Absence de binaire macOS, pas d'artefact DMG, pas de publication PyPI ou notarisation → impossibilité d'une distribution complète | Étendre la matrice (macOS arm64/x64), ajouter builds DMG/PKG, intégrer `pypa/gh-action-pypi-publish` (Trusted Publishing) et collecte double SBOM (CycloneDX + SPDX) |
-| Installeurs desktop (MSI/MSIX, DMG notarized, AppImage/DEB/RPM/Flatpak) | Packaging limité aux archives PyInstaller (`packaging/watcher.spec`) sans scripts d'assemblage OS spécifiques | Aucun parcours d'installation 1-clic, absence de signature Authenticode/notarisation → bloque l'adoption non-technique | Introduire pipelines dédiés (WiX/MSIX pour Windows, `tauri-bundler`/`gon` pour macOS, FPM/AppImageKit/Flatpak pour Linux) avec signature et notarisation automatisées |
+| Release tag `v*` → build multi-OS + publication PyPI | `.github/workflows/release.yml` orchestre des jobs Linux, Windows, macOS (x86_64/arm64), publie sdist/wheel sur PyPI via OIDC et regroupe SBOM + attestations | Validation manuelle de la notarisation/signature à réaliser à chaque release et surveillance des runtimes PyInstaller | Ajouter des tests fumée post-release (Watchman, codesign --verify) et automatiser les contrôles `cosign verify-blob` des checksums |
+| Installeurs desktop (MSI/MSIX, DMG notarized, AppImage/DEB/RPM/Flatpak) | Scripts `scripts/package_windows.py` et `scripts/package_linux.py` génèrent MSI/MSIX, DMG, AppImage, DEB, RPM, Flatpak à partir du bundle PyInstaller | Les manifestes GUI restent absents et les scripts supposent des métadonnées par défaut (icônes, descriptions) → expérience perfectible | Intégrer des ressources UI finales (icônes, EULA, privacy) et ajouter des tests d'installation automatisés pour chaque format |
 | Interface graphique « watcher-gui » avec onboarding 3 étapes | Aucun projet Tauri/Electron, pas de répertoire `watcher-gui`, pas de commandes `watcher-gui` exposées | L'utilisateur ne dispose que de la CLI → friction majeure pour un usage grand public | Initialiser une application Tauri + React avec flux d'accueil (consentement, choix modèle, dossier données) et synchroniser avec la CLI |
 | Mode offline par défaut avec téléchargement vérifié des modèles | La CLI `watcher init --auto` installe un modèle démo local mais ne vérifie pas de catalogue officiel ni de hashing externe | Les modèles tierce-partie ne sont pas vérifiés par hash/taille côté utilisateur → risque d'intégrité | Définir un registre de modèles (hash/size) consommé par la CLI et la GUI, avec reprise de téléchargement et double vérification |
 | Autostart utilisateur sans commande (Task Scheduler / systemd-user / LaunchAgent) | Pas de scripts ni services fournis ; documentation limitée à la CLI | Aucun démarrage automatique → les utilisateurs non techniques ne peuvent activer l'agent en arrière-plan | Ajouter générateurs de jobs (PowerShell, systemd user service, LaunchAgent plist) créés lors de `watcher init --fully-auto` |
 | Documentation publique orientée GUI (Quickstart, FAQ, Dépannage, Vérification) | Documentation actuelle centrée CLI (`docs/quickstart-sans-commande.md`, `docs/depannage.md`) ; aucun guide GUI ni lien depuis README | Les nouveaux utilisateurs ne trouvent pas de parcours graphique, ni instructions pour vérifier signatures | Écrire un guide Quickstart GUI, FAQ et procédures de vérification adaptées aux installeurs ; relier ces pages depuis README et le site MkDocs |
 | Cadre légal (Privacy Policy, Terms, EULA, Model Card, Third-Party Notices) | Aucun document juridique ni NOTICE généré ; SBOM CycloneDX seulement | Incompatibilité avec une distribution grand public (absence de politique de confidentialité et mentions légales) | Rédiger les documents requis, automatiser la génération NOTICE/SBOM → NOTICE, intégrer au pipeline de release et aux installeurs |
-| Docker multi-arch GHCR signé + gate de vérification | Workflow `docker.yml` construit et signe `linux/amd64,arm64` et publie SBOM, mais ne vérifie pas encore les attestations cosign | Le contrôle « gate » (cosign verify-attestation) manquant empêche de garantir la chaîne d'approvisionnement automatiquement | Ajouter un job post-publication qui appelle `cosign verify-attestation` sur l'image poussée et échoue en cas de non-conformité |
+| Docker multi-arch GHCR signé + gate de vérification | Workflow `docker.yml` pousse linux/amd64,arm64 avec SBOM et attestation SLSA ; un job `verify-attestation` applique `cosign verify-attestation --type slsaprovenance` | Aucun suivi automatique des digests dans la doc publique ; nécessite un HOWTO signatures côté utilisateur final | Documenter la commande de vérification et exposer les digests attestés dans la release + documentation |
+
+## Validation PR #446 « grand public gap analysis »
+
+Le contenu introduit par la PR #446 reste aligné avec l'état du code :
+
+- Les exigences d'initialisation autonome et offline reposent sur `FirstRunConfigurator` qui crée les sentinelles `~/.watcher/first_run`, la configuration TOML et le ledger de consentement signé. 【F:app/core/first_run.py†L1-L164】
+- La matrice de release y décrite a été prolongée côté CI pour couvrir macOS (arm64/x64) et publier sur PyPI, ce qui répond aux écarts identifiés dans le rapport. 【F:.github/workflows/release.yml†L1-L260】
+- Le pipeline Docker inclut désormais la vérification d'attestation exigée par la mission grand public, cohérente avec la recommandation initiale de la PR. 【F:.github/workflows/docker.yml†L1-L170】
 
 ## P1 — Autonomie, sûreté et qualité opérationnelle
 

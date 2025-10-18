@@ -135,7 +135,7 @@ jobs:
       image: ghcr.io/${{ github.repository_owner }}/watcher
       digest: ${{ needs.build-and-push.outputs.image-digest }}
       registry-username: ${{ github.actor }}
-      registry-password: ${{ secrets.GITHUB_TOKEN }}
+      registry-password: ${{ github.token }}
     secrets: inherit
 
   normalize-provenance:
@@ -169,3 +169,22 @@ jobs:
           name: watcher-image-provenance
           path: provenance/dist/watcher-image.intoto.jsonl
           if-no-files-found: error
+
+  verify-attestation:
+    name: Verify published image attestation
+    needs:
+      - build-and-push
+      - generate-provenance
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Install cosign
+        uses: sigstore/cosign-installer@v3.5.0
+
+      - name: Verify cosign attestation
+        env:
+          IMAGE: ghcr.io/${{ github.repository_owner }}/watcher@${{ needs.build-and-push.outputs.image-digest }}
+        run: |
+          set -euo pipefail
+          cosign verify-attestation \
+            --type slsaprovenance \
+            "$IMAGE"

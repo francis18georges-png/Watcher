@@ -23,10 +23,28 @@ jobs:
             python: "3.12"
             artifact_tag: linux-x86_64
             archive_ext: tar.gz
+            platform: linux
+            build_core: true
           - os: windows-2022
             python: "3.12"
             artifact_tag: windows-x86_64
             archive_ext: zip
+            platform: windows
+            build_core: false
+          - os: macos-13
+            python: "3.12"
+            artifact_tag: macos-x86_64
+            archive_ext: dmg
+            platform: macos
+            build_core: false
+            arch: x86_64
+          - os: macos-14
+            python: "3.12"
+            artifact_tag: macos-arm64
+            archive_ext: dmg
+            platform: macos
+            build_core: false
+            arch: arm64
     env:
       ARTIFACT_TAG: ${{ matrix.artifact_tag }}
       ARCHIVE_EXT: ${{ matrix.archive_ext }}
@@ -34,6 +52,12 @@ jobs:
       PYINSTALLER_DIST: ${{ github.workspace }}/pyinstaller-dist
       PYINSTALLER_BUILD: ${{ github.workspace }}/pyinstaller-build
       PYINSTALLER_SPEC: ${{ github.workspace }}/pyinstaller-spec
+      WATCHER_PLATFORM: ${{ matrix.platform }}
+      WINDOWS_SIGNING_CERTIFICATE: ${{ secrets.WINDOWS_SIGNING_CERTIFICATE }}
+      WINDOWS_SIGNING_CERT_PASSWORD: ${{ secrets.WINDOWS_SIGNING_CERT_PASSWORD }}
+      WINDOWS_SIGNING_THUMBPRINT: ${{ secrets.WINDOWS_SIGNING_THUMBPRINT }}
+      MACOS_CERTIFICATE_BASE64: ${{ secrets.MACOS_CERTIFICATE_BASE64 }}
+      MACOS_CERTIFICATE_PASSWORD: ${{ secrets.MACOS_CERTIFICATE_PASSWORD }}
     steps:
       - name: Validate SemVer tag
         run: |
@@ -87,6 +111,15 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           python -m pip install build pyinstaller cyclonedx-bom cyclonedx-py
+          if [ "$WATCHER_PLATFORM" = "linux" ]; then
+            sudo apt-get update
+            sudo apt-get install -y rpm flatpak-builder flatpak gpg squashfs-tools
+            flatpak remote-add --if-not-exists --user flathub https://flathub.org/repo/flathub.flatpakrepo
+          fi
+          if [ "$WATCHER_PLATFORM" = "windows" ]; then
+            python -m pip install signtoolhelper
+          fi
+        shell: bash
 
       - name: Prepare build directories
         run: |
@@ -100,6 +133,7 @@ jobs:
           PY
 
       - name: Build wheel and sdist
+        if: matrix.build_core
         run: |
           python -m build --outdir "${{ env.ARTIFACT_DIR }}"
 
@@ -124,6 +158,7 @@ jobs:
           PY
 
       - name: Package executable archive
+        if: env.WATCHER_PLATFORM != 'macos'
         run: |
           python - <<'PY'
           import os
@@ -154,6 +189,73 @@ jobs:
           else:
               raise SystemExit(f"Unsupported archive extension: {archive_ext}")
           PY
+
+      - name: Build Linux installers
+        if: env.WATCHER_PLATFORM == 'linux'
+        run: |
+          set -euo pipefail
+          VERSION="${GITHUB_REF_NAME#v}"
+          python scripts/package_linux.py \
+            --dist-root "${PYINSTALLER_DIST}/Watcher" \
+            --artifact-dir "${ARTIFACT_DIR}" \
+            --version "$VERSION"
+
+      - name: Build Windows installers
+        if: env.WATCHER_PLATFORM == 'windows'
+        shell: pwsh
+        run: |
+          $version = "$env:GITHUB_REF_NAME".TrimStart('v')
+          python scripts/package_windows.py \
+            --dist-root "$env:PYINSTALLER_DIST\Watcher" \
+            --artifact-dir "$env:ARTIFACT_DIR" \
+            --version $version \
+            --signing-certificate "$env:WINDOWS_SIGNING_CERTIFICATE" \
+            --signing-password "$env:WINDOWS_SIGNING_CERT_PASSWORD" \
+            --signing-thumbprint "$env:WINDOWS_SIGNING_THUMBPRINT"
+
+      - name: Import signing certificate (macOS)
+        if: env.WATCHER_PLATFORM == 'macos' && env.MACOS_CERTIFICATE_BASE64 != ''
+        run: |
+          set -euo pipefail
+          CERT_PATH="$RUNNER_TEMP/watcher-cert.p12"
+          echo "$MACOS_CERTIFICATE_BASE64" | base64 --decode > "$CERT_PATH"
+          security create-keychain -p "$MACOS_CERTIFICATE_PASSWORD" build.keychain
+          security import "$CERT_PATH" -k build.keychain -P "$MACOS_CERTIFICATE_PASSWORD" -T /usr/bin/codesign
+          security list-keychains -s build.keychain
+          security default-keychain -s build.keychain
+          security unlock-keychain -p "$MACOS_CERTIFICATE_PASSWORD" build.keychain
+          security set-key-partition-list -S apple-tool:,apple: -s -k "$MACOS_CERTIFICATE_PASSWORD" build.keychain
+
+      - name: Create macOS disk image
+        if: env.WATCHER_PLATFORM == 'macos'
+        run: |
+          set -euo pipefail
+          APP_NAME="Watcher"
+          DIST_ROOT="${PYINSTALLER_DIST}/${APP_NAME}"
+          if [ ! -d "$DIST_ROOT" ]; then
+            echo "PyInstaller output '$DIST_ROOT' is missing" >&2
+            exit 1
+          fi
+          DMG_PATH="${ARTIFACT_DIR}/watcher-${ARTIFACT_TAG}.dmg"
+          rm -f "$DMG_PATH"
+          mkdir -p "$ARTIFACT_DIR"
+          hdiutil create -volname "$APP_NAME" -srcfolder "$DIST_ROOT" -ov -format UDZO "$DMG_PATH"
+
+      - name: Notarize macOS disk image
+        if: env.WATCHER_PLATFORM == 'macos' && env.MACOS_CERTIFICATE_BASE64 != ''
+        env:
+          NOTARY_APPLE_ID: ${{ secrets.MACOS_NOTARY_APPLE_ID }}
+          NOTARY_TEAM_ID: ${{ secrets.MACOS_NOTARY_TEAM_ID }}
+          NOTARY_APP_PASSWORD: ${{ secrets.MACOS_NOTARY_APP_PASSWORD }}
+        run: |
+          set -euo pipefail
+          DMG_PATH="${ARTIFACT_DIR}/watcher-${ARTIFACT_TAG}.dmg"
+          xcrun notarytool submit "$DMG_PATH" \
+            --apple-id "$NOTARY_APPLE_ID" \
+            --team-id "$NOTARY_TEAM_ID" \
+            --password "$NOTARY_APP_PASSWORD" \
+            --wait
+          xcrun stapler staple "$DMG_PATH"
 
       - name: Generate CycloneDX SBOM
         run: |
@@ -310,6 +412,7 @@ jobs:
     needs:
       - collate
       - generate-provenance
+      - publish-pypi
     runs-on: ubuntu-24.04
     permissions:
       contents: write
@@ -370,3 +473,31 @@ jobs:
           files: ${{ steps.assets.outputs.files }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  publish-pypi:
+    name: Publish to PyPI
+    needs: collate
+    runs-on: ubuntu-24.04
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - name: Download build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: release-final
+          path: dist
+
+      - name: Prepare distribution packages
+        run: |
+          set -euo pipefail
+          mkdir -p pypi
+          shopt -s nullglob
+          for file in dist/**/*.whl dist/**/*.tar.gz; do
+            cp "$file" pypi/
+          done
+
+      - name: Publish packages
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          packages-dir: pypi
