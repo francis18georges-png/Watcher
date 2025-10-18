@@ -1,0 +1,20 @@
+[Unit]
+Description=Watcher offline agent
+After=network-online.target
+Wants=network-online.target
+ConditionPathExists=!%h/.watcher/disable
+
+[Service]
+Type=simple
+Environment=WATCHER_OFFLINE=1
+Environment=WATCHER_DISABLE_NETWORK=1
+Environment=PYTHONUNBUFFERED=1
+ExecStart=%h/.local/bin/watcher run --offline --prompt test
+Restart=on-failure
+RestartSec=10
+WorkingDirectory=%h
+StandardOutput=append:%h/.watcher/logs/autostart.log
+StandardError=append:%h/.watcher/logs/autostart.err
+
+[Install]
+WantedBy=default.target

@@ -11,6 +11,7 @@ Les artefacts générés sont archivés dans `~/.watcher/autostart/windows/` pou
 - **RunOnce** exécute `watcher init --auto` si la sentinelle `~/.watcher/first_run` est présente.
 - La tâche planifiée `Watcher Autopilot` lance `watcher autopilot run --noninteractive` à chaque ouverture de session.
 - `WATCHER_DISABLE=1` ou `~/.watcher/disable` désactivent le démarrage automatique, sauf si `WATCHER_AUTOSTART=1` force explicitement l'activation.
+- Le planificateur peut importer `scripts/autostart/windows/watcher-task.xml` pour obtenir une tâche reproductible pilotant `run-offline.ps1` (voir dépôt).
 
 ```powershell
 # Contenu de ~/.watcher/autostart/windows/watcher-register-autostart.ps1
@@ -57,6 +58,13 @@ Unit=watcher-autopilot.service
 
 [Install]
 WantedBy=timers.target
+```
+
+Un service systemd minimal prêt à l'emploi est également versionné dans `scripts/autostart/linux/watcher.service` et peut être installé via :
+
+```bash
+install -Dm644 scripts/autostart/linux/watcher.service ~/.config/systemd/user/watcher.service
+systemctl --user enable --now watcher.service
 ```
 
 Ces unités sont installées et activées (`systemctl --user enable --now watcher-autopilot.timer`) automatiquement par `FirstRunConfigurator` lorsque le kill-switch est absent.

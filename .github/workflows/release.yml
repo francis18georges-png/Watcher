@@ -13,16 +13,18 @@ permissions:
 
 jobs:
   build:
-    name: Build packages (${{ matrix.artifact_tag }})
+    name: Build packages (${{ matrix.os }} / py${{ matrix.python }})
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
       matrix:
         include:
           - os: ubuntu-24.04
+            python: "3.12"
             artifact_tag: linux-x86_64
             archive_ext: tar.gz
           - os: windows-2022
+            python: "3.12"
             artifact_tag: windows-x86_64
             archive_ext: zip
     env:
@@ -53,11 +55,33 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: "3.12"
+          python-version: ${{ matrix.python }}
           cache: pip
           cache-dependency-path: |
             requirements.txt
             requirements-dev.txt
+
+      - name: Configure reproducible build metadata
+        shell: bash
+        run: |
+          python - <<'PY'
+          from __future__ import annotations
+
+          import os
+          from datetime import datetime, timezone
+
+          now = datetime.now(tz=timezone.utc)
+          epoch = int(now.timestamp())
+          env = {
+              "SOURCE_DATE_EPOCH": str(epoch),
+              "PYTHONHASHSEED": "0",
+          }
+          with open(os.environ["GITHUB_ENV"], "a", encoding="utf-8") as env_file:
+              for key, value in env.items():
+                  env_file.write(f"{key}={value}\n")
+          with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as handle:
+              handle.write(f"build_timestamp={now.isoformat()}\n")
+          PY
 
       - name: Install build dependencies
         run: |
@@ -240,6 +264,13 @@ jobs:
 
       - name: Install cosign
         uses: sigstore/cosign-installer@v3.5.0
+
+      - name: Sign global checksums
+        run: |
+          cosign sign-blob \
+            --yes \
+            --output-signature dist/checksums.txt.sig \
+            dist/checksums.txt
 
       - name: Generate cosign attestation
         run: |
