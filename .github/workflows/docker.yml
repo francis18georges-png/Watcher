@@ -5,7 +5,7 @@ on:
     branches:
       - main
     tags:
-      - 'v*'
+      - "v*"
   workflow_dispatch:
 
 permissions:
@@ -16,10 +16,9 @@ permissions:
 jobs:
   build-and-push:
     name: Build and publish image
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     outputs:
-      image-digest: ${{ steps.build.outputs.digest }}
-      image-ref: ${{ steps.image-ref.outputs.value }}
+      image-digest: ${{ steps.digest.outputs.digest }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -41,54 +40,35 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Extract Docker metadata
-        id: meta
-        uses: docker/metadata-action@v5
-        with:
-          images: ghcr.io/${{ github.repository_owner }}/watcher
-          tags: |
-            type=raw,value=ghcr.io/${{ github.repository_owner }}/watcher:latest,enable=${{ github.ref == 'refs/heads/main' }}
-            type=raw,value=ghcr.io/${{ github.repository_owner }}/watcher:${{ github.ref_name || 'edge' }}
-
       - name: Install cosign
         uses: sigstore/cosign-installer@v3.5.0
 
       - name: Build and push image
-        id: build
-        uses: docker/build-push-action@v5
+        id: bp
+        uses: docker/build-push-action@v6
         with:
           context: .
           push: true
           platforms: linux/amd64,linux/arm64
-          tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
+          tags: |
+            ghcr.io/${{ github.repository_owner }}/watcher:latest
+            ghcr.io/${{ github.repository_owner }}/watcher:${{ github.ref_name }}
+          outputs: type=image,push-by-digest=true,name=ghcr.io/${{ github.repository_owner }}/watcher
           cache-from: type=gha
           cache-to: type=gha,mode=max
+
+      - name: Read digest
+        id: digest
+        run: echo "digest=${{ steps.bp.outputs.digest }}" >> "$GITHUB_OUTPUT"
 
       - name: Verify published image platforms
         run: |
           set -euo pipefail
-          image_digest="ghcr.io/${{ github.repository_owner }}/watcher@${{ steps.build.outputs.digest }}"
-          inspect_output=$(docker buildx imagetools inspect "$image_digest")
-          printf '%s\n' "$inspect_output"
-          for platform in linux/amd64 linux/arm64; do
-            if ! grep -q "$platform" <<<"$inspect_output"; then
-              echo "Missing manifest for $platform" >&2
-              exit 1
-            fi
-          done
+          docker buildx imagetools inspect ghcr.io/${{ github.repository_owner }}/watcher:${{ github.ref_name }}
 
       - name: Set image digest reference
-        id: image-ref
         run: |
-          set -euo pipefail
-          if [ -z "${{ steps.build.outputs.digest }}" ]; then
-            echo "Image digest missing" >&2
-            exit 1
-          fi
-          image_digest="ghcr.io/${{ github.repository_owner }}/watcher@${{ steps.build.outputs.digest }}"
-          echo "IMAGE_DIGEST_REF=$image_digest" >> "$GITHUB_ENV"
-          printf 'value=%s\n' "$image_digest" >> "$GITHUB_OUTPUT"
+          echo "IMAGE_DIGEST_REF=ghcr.io/${{ github.repository_owner }}/watcher@${{ steps.bp.outputs.digest }}" >> "$GITHUB_ENV"
 
       - name: Scan image with Trivy
         id: trivy-scan
@@ -126,18 +106,14 @@ jobs:
           artifact-name: watcher-image-sbom-spdx
 
       - name: Sign published images
-        if: success()
         run: |
           set -euo pipefail
           mkdir -p sigstore
-          while IFS= read -r tag; do
-            if [ -z "$tag" ]; then
-              continue
-            fi
+          for tag in "ghcr.io/${{ github.repository_owner }}/watcher:latest" "ghcr.io/${{ github.repository_owner }}/watcher:${{ github.ref_name }}"; do
             safe_name=$(echo "$tag" | sed 's#[/:]#__#g')
             bundle="sigstore/${safe_name}.sigstore"
             cosign sign --yes --output-bundle "$bundle" "$tag"
-          done <<< "${{ steps.meta.outputs.tags }}"
+          done
 
       - name: Upload signature bundles
         if: always()
