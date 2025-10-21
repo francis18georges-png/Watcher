@@ -1,49 +1,54 @@
-# Gap Report — Watcher « IA grand public »
+# Gap Report — Watcher 0.4.0 « IA grand public »
 
 ## Résumé exécutif
 
-- **P0 (Livraison vérifiable).** Les workflows GitHub Actions construisent et signent les artefacts principaux (sdist/wheel, exécutables PyInstaller, images Docker multi-arch) et déclenchent Trusted Publishing, mais il reste à aligner le build Python sur la pipeline `nox -s build` exigée par la mission et à documenter la vérification utilisateur dans la documentation publique.
-- **P1 (Autonomie sûre).** Les briques de collecte vérifiée, d'ingestion locale et de pilotage autonome sont présentes dans le code et couvertes par des tests unitaires, mais la surveillance supply-chain manque encore d'une exécution CodeQL dédiée et la documentation utilisateur n'explique pas comment exploiter les rapports hebdomadaires.
-- **P2 (Expérience & écosystème).** L'ensemble de la documentation oriente toujours vers une interface graphique inexistante et ne couvre ni la prise en main CLI ni les canaux de distribution communautaires (winget/Homebrew). Une refonte éditoriale reste nécessaire pour refléter l'expérience réelle.
+- **P0 (Livraison vérifiable).** Les workflows Release/Docker/Pages couvrent les exigences de build multi-OS, de signatures cosign et d'attestations SLSA, et la CLI fournit les commandes `watcher init --fully-auto` et `watcher run --offline`. Les actions de vérification côté utilisateur restent peu documentées et il manque une validation intégrale des commandes contractuelles dans la documentation publique.
+- **P1 (Autonomie & sûreté).** Les briques de scraping vérifié, de politique réseau/consentement, d'ingestion locale et de pipeline RAG sont implémentées avec tests hors-ligne. En revanche, l'autopilot n'expose pas encore de détection active des knowledge gaps et les contrôles supply-chain attendus (CodeQL, secret-scan, pip-audit) ne sont pas en place.
+- **P2 (Expérience & distribution).** Aucun binaire Tauri « watcher-gui » n'est livrable, les installeurs Linux ne sont pas signés et aucun manifeste winget/Homebrew/Flatpak externe n'est publié. L'écosystème d'assistance (`watcher doctor`, guide CLI grand public) reste à construire.
 
 ## P0 — Livraison vérifiable
 
-### Release GitHub
+| Domaine | Exigence cible | Statut | Constats et écarts |
+| --- | --- | --- | --- |
+| Release GitHub | Tags `v*` + `workflow_dispatch` → sdist/wheel, PyInstaller Win/mac/Linux, SBOM, checksums signés, SLSA, publication PyPI | ✅ | Le workflow `.github/workflows/release.yml` orchestre les jobs multi-OS, génère SBOM CycloneDX, signe `checksums.txt` avec cosign et produit une attestation SLSA avant de pousser les artefacts sur GitHub Release/PyPI. Aucune documentation utilisateur n'explique encore comment vérifier les signatures téléchargées. |
+| Docker multi-arch | Build `linux/amd64,linux/arm64`, SBOM, cosign `verify-attestation` | ✅ | `.github/workflows/docker.yml` construit et pousse l'image GHCR, exécute `imagetools inspect`, signe chaque tag et déclenche `cosign verify-attestation --type slsaprovenance`. Aucun guide CLI n'accompagne les commandes de vérification. |
+| Documentation Pages | MkDocs strict + déploiement GitHub Pages | ⚠️ | `deploy-docs.yml` publie bien le site MkDocs, mais les pages « Quickstart sans commande » et « Vérification des artefacts » décrivent une interface graphique fictive et ne mentionnent pas les commandes contractuelles, créant un écart avec l'expérience réelle. |
+| CLI prête | `watcher` exposé via `pyproject`, commandes `init --fully-auto` / `run --offline` opérationnelles | ✅ | `pyproject.toml` déclare `watcher = "app.cli:main"`; la CLI fournit `perform_auto_init` et `perform_offline_run`, vérifie les empreintes des modèles et utilise `llama_cpp` en mode déterministe. |
+| Première exécution | Génération de `~/.watcher/{config.toml,policy.yaml,consents.jsonl}`, téléchargement par hash | ✅ | `FirstRunConfigurator` détecte le matériel, sélectionne les modèles via `ensure_models`, écrit config/policy/ledger et consigne le consentement initial; `ModelSpec` impose SHA-256 + taille avec reprise de téléchargement. |
+| Validation CLI | `watcher run --offline` déterministe | ⚠️ | Le test `tests/test_e2e_offline.py` exécute `python -m app.cli run --offline`, mais la documentation publique n'illustre pas l'utilisation du binaire installé (`watcher run --offline --prompt "Bonjour"`). Ajouter un guide opérateur et une vérification CLI installée est recommandé. |
 
-**État actuel.** Le workflow `.github/workflows/release.yml` déclenche une matrice `ubuntu-24.04` / `windows-2022` / `macos-14` avec Python 3.12, construit la sdist et la wheel via `python -m build`, génère les bundles PyInstaller/DMG/AppImage/DEB/RPM/Flatpak, publie un fichier de checksums signé (`cosign sign-blob`) et produit une attestation SLSA pour `checksums.txt` avant de créer la release GitHub et de pousser sur PyPI via OIDC.【F:.github/workflows/release.yml†L1-L310】【F:.github/workflows/release.yml†L312-L400】
+### Actions P0 recommandées
+- Ajouter dans la documentation Pages un tutoriel « Vérifier une release » avec `docker buildx imagetools inspect` et `cosign verify-attestation`.
+- Documenter pas-à-pas `pip install -e .`, `watcher init --fully-auto`, `watcher run --offline --prompt "…"`.
+- Étendre les tests E2E pour exécuter la console-script `watcher` depuis un environnement virtualenv.
 
-**Écarts.** Le cahier des charges impose un enchaînement `pip install -r requirements-dev.txt && nox -s build`, alors que le workflow contourne Nox et appelle directement `python -m build` et les scripts PyInstaller personnalisés (`scripts/package_linux.py`, `scripts/package_windows.py`).【F:.github/workflows/release.yml†L70-L210】 Harmoniser le pipeline avec `nox -s build` assurerait que les mêmes contrôles s'appliquent localement et en CI.
+## P1 — Autonomie & sûreté
 
-### Docker multi-arch + provenance
+| Domaine | Exigence cible | Statut | Constats et écarts |
+| --- | --- | --- | --- |
+| Scraping vérifié | robots.txt, ETag/If-Modified-Since, throttling, UA dédié, dédup/hash, licence | ✅ | `HTTPScraper` gère robots.txt, fenêtres réseau, reprise conditionnelle, extraction Readability/trafilatura, déduplication par hash et détection de licence, tout en conservant un cache local. |
+| Politique & kill-switch | Allowlist, fenêtres réseau, budgets, `~/.watcher/disable` | ✅ | Le schéma `Policy` impose `network_windows`, budgets et chemin de kill-switch; la baseline `policy.yaml` fournit allowlist, budgets et kill switch activables. |
+| RAG local | Ingest → normalisation → langue → chunking → embeddings → index SQLite-VSS | ✅ | `IngestPipeline` exige ≥2 sources, filtre par licence, stocke `{url,titre,licence,date,hash,score}`; `SimpleVectorStore` encode localement (SentenceTransformers) et persiste dans SQLite, utilisé par `rag.answer_question`. |
+| Autopilot | Cycle discover→scrape→verify→ingest→rapport hebdo | ⚠️ | `AutopilotController` orchestre discovery/scraping/ingestion, applique kill-switch et génère `reports/weekly.html`, mais aucun module n'implémente la détection des « knowledge gaps » demandée, ni une diffusion du rapport (CLI/Docs). |
+| Tests hors-ligne | pytest-socket, E2E offline | ✅ | La suite inclut un shim `pytest_socket` qui bloque le réseau par défaut et un test e2e offline déterministe sur le modèle GGUF embarqué, garantissant l'exécution sans dépendance réseau. |
+| Supply-chain CI | Scorecard, CodeQL, secret-scan, pip-audit | ❌ | Le dépôt dispose d'un job Scorecard, mais aucun workflow CodeQL, secret-scan ou pip-audit n'est défini; les scans vulnérabilité Trivy ne couvrent que l'image Docker. |
 
-**État actuel.** Le workflow `.github/workflows/docker.yml` configure QEMU/Buildx, pousse une image `linux/amd64,linux/arm64` sur GHCR, extrait le digest, appelle `docker buildx imagetools inspect` et déclenche `cosign verify-attestation --type slsaprovenance` après génération de l'attestation SLSA v1 `generator_container_slsa3`.【F:.github/workflows/docker.yml†L1-L170】
+### Actions P1 recommandées
+- Ajouter un module de détection des knowledge gaps (ex : comparaison topics/policy vs index) avec rapport CLI/HTML.
+- Publier le rapport hebdomadaire via CLI (`watcher autopilot report`) et documenter sa consultation.
+- Créer des workflows CodeQL (langages Python/Rust/Tauri), secret-scan et pip-audit pour satisfaire la gouvernance supply-chain.
 
-**Écarts.** Les digests et commandes de vérification ne sont pas relayés dans la documentation publique : les guides `quickstart-sans-commande.md` et `verifier-artefacts.md` présupposent une interface graphique et ne fournissent aucun exemple CLI pour `cosign`/`imagetools`。【F:docs/quickstart-sans-commande.md†L1-L60】【F:docs/verifier-artefacts.md†L1-L32】 Il faut ajouter un guide opérationnel aligné sur les commandes attendues (`docker buildx imagetools inspect …`, `cosign verify-attestation …`).
+## P2 — Expérience & distribution
 
-### Documentation publique
+| Domaine | Exigence cible | Statut | Constats et écarts |
+| --- | --- | --- | --- |
+| GUI Tauri | `watcher-gui` minimale, onboarding 3 étapes, i18n fr/en | ❌ | Aucun projet Tauri n'est présent dans le dépôt; la documentation mentionne un répertoire `src-tauri/` mais aucun code n'est livré. |
+| Installeurs signés & canaux | MSI/MSIX signés, DMG notarized, AppImage/DEB/RPM/Flatpak signés + publication winget/Homebrew | ⚠️ | Les scripts génèrent MSI/MSIX (avec signature si secrets fournis) et DMG notarized; les paquets Linux (AppImage/DEB/RPM/Flatpak) sont construits sans signature GPG ni publication winget/Homebrew/Flatpak remote. |
+| Support utilisateur | Plan de tests + scripts auto-diagnostic (`watcher doctor`) | ❌ | Le plan de tests existe, mais aucun utilitaire `watcher doctor` ou bundle d'autodiagnostic n'est distribué; la documentation publique reste centrée sur une UI inexistante. |
+| Documentation grand public | Guides CLI, vérification artefacts | ❌ | Les guides actuels décrivent des assistants graphiques fictifs, sans instructions CLI concrètes pour l'installation, l'initialisation ou la vérification des signatures. |
 
-**État actuel.** Le déploiement MkDocs via `.github/workflows/deploy-docs.yml` publie automatiquement le site GitHub Pages en exécutant `mkdocs build --strict` et en déployant l'artefact `site/` sur l'environnement `github-pages`.【F:.github/workflows/deploy-docs.yml†L1-L48】
-
-**Écarts.** Les contenus clefs (« Quickstart sans commande », « Vérification des artefacts ») décrivent des écrans inexistants (widgets GUI, boutons « Nouvelle vérification ») et ne mentionnent pas les commandes `watcher init --fully-auto`, `watcher run --offline`, ni les contrôles de signatures attendus par la mission.【F:docs/quickstart-sans-commande.md†L1-L40】【F:docs/verifier-artefacts.md†L1-L32】 Une réécriture orientée CLI est indispensable pour rendre la documentation publiable.
-
-### CLI offline prête à l'emploi
-
-**État actuel.** La commande `watcher init --fully-auto` déclenche désormais `FirstRunConfigurator`, crée `~/.watcher/{config.toml,policy.yaml,consents.jsonl}` et télécharge les modèles déclarés avec vérification SHA-256 avant d'annoncer l'emplacement des fichiers au terminal.【F:app/cli.py†L114-L154】 Le mode `watcher run --offline` lit la configuration `llm`/`model`, vérifie l'empreinte du modèle (avec reprise via le bundle embarqué) puis exécute `llama_cpp.Llama` en seed déterministe.【F:app/cli.py†L196-L274】
-
-**Écarts.** Aucun test d'intégration n'exécute la séquence demandée (`watcher init --fully-auto` suivi de `watcher run --offline --prompt …`). Les tests d'autostart couvrent encore explicitement le flag `--auto` historique et la configuration minimale.【F:tests/test_first_run_autostart.py†L91-L113】 Il faut ajouter un scénario e2e spécifique pour garantir la compatibilité Python ≥ 3.12 et l'exécution offline sans manual tweaking.
-
-## P1 — Autonomie sûre
-
-- **Scraping vérifié.** `HTTPScraper` gère robots.txt, throttling, ETag/If-Modified-Since et calcule un hachage de contenu pour de-duplication.【F:app/scrapers/http.py†L24-L188】
-- **Ingestion locale.** `IngestPipeline` exige au moins deux sources distinctes, filtre par licence et stocke les métadonnées `{url,title,licence,hash,score,date}` dans la base vectorielle locale.【F:app/ingest/pipeline.py†L1-L110】
-- **Autopilot.** `AutopilotController` applique le kill-switch, la consent ledger, la corroboration et produit un rapport hebdomadaire HTML via `ReportGenerator`.【F:app/autopilot/controller.py†L300-L420】
-
-**Écarts.** La mission exige CodeQL et un rapport hebdomadaire communiqué aux opérateurs. Aucun workflow CodeQL n'est présent dans `.github/workflows/`, et les tests/documentations n'exploitent pas le rapport `reports/weekly.html` généré par l'autopilote.【F:.github/workflows†L1-L8】【F:app/autopilot/controller.py†L318-L386】 Il faut ajouter un workflow CodeQL dédié et documenter la consultation hebdomadaire (ou exposer un lien CLI/Docs).
-
-## P2 — Expérience & écosystème
-
-- **Documentation réaliste.** Les pages Quickstart et Vérification décrivent toujours des interactions GUI fictives, générant une dissonance pour les utilisateurs CLI.【F:docs/quickstart-sans-commande.md†L1-L60】【F:docs/verifier-artefacts.md†L1-L32】
-- **Distribution écosystème.** Aucun manifeste winget/Homebrew/Flatpak supplémentaire n'est produit en sortie de release malgré la fabrication des paquets correspondants.【F:.github/workflows/release.yml†L128-L210】
-- **Support utilisateur.** Pas de commande `watcher doctor` ni de packaging automatique des journaux mentionnés dans la documentation.
-
-Ces écarts P2 peuvent être traités après la mise en conformité P0/P1 pour livrer une expérience réellement « grand public ».
+### Actions P2 recommandées
+- Monter un projet Tauri (`watcher-gui`) avec onboarding minimal et intégrer le pipeline de build/signature.
+- Ajouter la signature GPG des artefacts Linux, générer les manifestes winget/Homebrew et automatiser leur publication.
+- Concevoir `watcher doctor` (collecte anonymisée des diagnostics, vérification des hash modèles) et intégrer le script dans les installeurs.
+- Réécrire les guides utilisateur autour du flux CLI réel (installation, vérification des artefacts, mode offline).
