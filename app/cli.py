@@ -82,15 +82,17 @@ def _iter_plugins() -> list[plugins.Plugin]:
     return plugins.reload_plugins(_PLUGIN_MANIFEST)
 
 
-def _verify_file(path: Path, expected_hash: str | None, expected_size: int | None) -> bool:
+def _verify_file(
+    path: Path, expected_hash: str | None, expected_size: int | None
+) -> bool:
     """Return ``True`` if ``path`` matches the provided size and digest."""
 
-    if expected_hash is None or expected_size is None:
+    if expected_hash is None:
         return False
     if not path.is_file():
         return False
     actual_size = path.stat().st_size
-    if actual_size != int(expected_size):
+    if expected_size is not None and actual_size != int(expected_size):
         return False
     digest = hashlib.sha256(path.read_bytes()).hexdigest()
     return digest.lower() == expected_hash.lower()
@@ -118,64 +120,48 @@ def _stage_default_model(target: Path) -> Path:
     return target
 
 
-def _write_default_config(config_path: Path, model_path: Path) -> None:
-    """Create a minimal TOML configuration pointing to ``model_path``."""
-
-    content = textwrap.dedent(
-        f"""
-        [core]
-        mode = "offline"
-
-        [model]
-        name = "{DEFAULT_MODEL['name']}"
-        path = "{model_path.as_posix()}"
-        sha256 = "{DEFAULT_MODEL['sha256']}"
-        size = {DEFAULT_MODEL['size']}
-        source = "{DEFAULT_MODEL['url']}"
-        """
-    ).strip()
-    config_path.write_text(content + "\n", encoding="utf-8")
-
-
-def _write_default_policy(policy_path: Path) -> None:
-    """Create a conservative offline policy file."""
-
-    content = textwrap.dedent(
-        """
-        telemetry:
-          enabled: false
-
-        scraping:
-          allow: []
-          deny:
-            - "*"
-        """
-    ).strip()
-    policy_path.write_text(content + "\n", encoding="utf-8")
-
-
 def perform_auto_init() -> int:
     """Initialise the user configuration directory without interaction."""
 
-    watcher_root = WATCHER_HOME
-    models_dir = watcher_root / "models"
-    config_path = watcher_root / CONFIG_FILENAME
-    policy_path = watcher_root / POLICY_FILENAME
+    configurator = FirstRunConfigurator()
+    config_path = configurator.run(fully_auto=True, download_models=True)
+    policy_path = configurator.policy_path
+    ledger_path = configurator.consent_ledger
 
-    watcher_root.mkdir(parents=True, exist_ok=True)
-    models_dir.mkdir(parents=True, exist_ok=True)
+    config_data = tomllib.loads(config_path.read_text(encoding="utf-8"))
+    llm_section = config_data.get("model") or config_data.get("llm", {})
 
-    model_path = models_dir / DEFAULT_MODEL["filename"]
-    staged_model = _stage_default_model(model_path)
-    _write_default_config(config_path, staged_model)
-    _write_default_policy(policy_path)
+    model_path_str = (
+        llm_section.get("path")
+        or llm_section.get("model_path")
+        or llm_section.get("model")
+        or ""
+    )
+    model_path = Path(model_path_str).expanduser()
+    expected_hash = (
+        llm_section.get("sha256")
+        or llm_section.get("model_sha256")
+        or llm_section.get("sha")
+    )
+
+    actual_size: int | None = None
+    if model_path.is_file():
+        try:
+            actual_size = model_path.stat().st_size
+        except OSError:
+            actual_size = None
 
     print(f"Configuration écrite dans {config_path}")
     print(f"Politique mise à jour dans {policy_path}")
-    print(
-        "Modèle de démonstration prêt à l'emploi:",
-        f"{staged_model} (sha256={DEFAULT_MODEL['sha256']})",
-    )
+    print(f"Journal des consentements initialisé dans {ledger_path}")
+    if model_path_str:
+        details = []
+        if expected_hash:
+            details.append(f"sha256={expected_hash}")
+        if actual_size is not None:
+            details.append(f"taille={actual_size}")
+        suffix = f" ({', '.join(details)})" if details else ""
+        print(f"Modèle prêt à l'emploi : {model_path}{suffix}")
     return 0
 
 
@@ -184,15 +170,32 @@ def perform_offline_run(prompt: str, model_name: str | None = None) -> int:
 
     config_path = WATCHER_HOME / CONFIG_FILENAME
     if not config_path.is_file():
-        print("Configuration introuvable. Exécutez `watcher init --auto`.", file=sys.stderr)
+        print(
+            "Configuration introuvable. Exécutez `watcher init --fully-auto`.",
+            file=sys.stderr,
+        )
         return 1
 
     config = tomllib.loads(config_path.read_text(encoding="utf-8"))
-    model_config = config.get("model", {})
-    configured_name = model_config.get("name")
-    configured_path = Path(model_config.get("path", "")).expanduser()
-    expected_hash = model_config.get("sha256")
-    expected_size = model_config.get("size")
+    model_config = config.get("model") or {}
+    llm_config = config.get("llm") or {}
+
+    configured_name = model_config.get("name") or llm_config.get("name")
+    configured_path = Path(
+        model_config.get("path")
+        or llm_config.get("model_path")
+        or llm_config.get("path")
+        or ""
+    ).expanduser()
+    expected_hash = (
+        model_config.get("sha256")
+        or llm_config.get("model_sha256")
+        or llm_config.get("sha256")
+    )
+    expected_size = model_config.get("size") or llm_config.get("model_size")
+
+    if not configured_name and configured_path.name:
+        configured_name = configured_path.name
 
     if model_name and model_name != configured_name:
         print(
@@ -207,7 +210,8 @@ def perform_offline_run(prompt: str, model_name: str | None = None) -> int:
                 _stage_default_model(configured_path)
         if not _verify_file(configured_path, expected_hash, expected_size):
             print(
-                "Le modèle configuré est absent ou corrompu. Relancez `watcher init --auto`.",
+                "Le modèle configuré est absent ou corrompu. "
+                "Relancez `watcher init --fully-auto`.",
                 file=sys.stderr,
             )
             return 1
@@ -261,7 +265,9 @@ def main(argv: Sequence[str] | None = None) -> int:
     """Entry point for the :mod:`watcher` command."""
     arg_list = list(argv if argv is not None else sys.argv[1:])
 
-    if arg_list and arg_list[0] == "init" and "--auto" in arg_list[1:]:
+    if arg_list and arg_list[0] == "init" and (
+        "--auto" in arg_list[1:] or "--fully-auto" in arg_list[1:]
+    ):
         return perform_auto_init()
 
     if arg_list and arg_list[0] == "run":
@@ -317,6 +323,8 @@ def main(argv: Sequence[str] | None = None) -> int:
     )
     init_parser.add_argument(
         "--auto",
+        "--fully-auto",
+        dest="fully_auto",
         action="store_true",
         help=(
             "Exécute l'initialisation sans interaction, détecte le matériel et"
@@ -523,7 +531,7 @@ def main(argv: Sequence[str] | None = None) -> int:
 
     if args.command == "init":
         configurator = FirstRunConfigurator()
-        path = configurator.run(fully_auto=args.auto, download_models=True)
+        path = configurator.run(fully_auto=args.fully_auto, download_models=True)
         print(f"Configuration utilisateur écrite dans {path}")
         return 0
 
