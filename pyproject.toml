@@ -7,7 +7,7 @@ name = "watcher"
 version = "0.4.0"
 description = "Atelier local d'IA de programmation autonome (offline par défaut)."
 readme = "README.md"
-requires-python = ">=3.10"
+requires-python = ">=3.12"
 license = { file = "LICENSE" }
 authors = [{ name = "Watcher contributors" }]
 dependencies = [
@@ -30,9 +30,8 @@ classifiers = [
     "Operating System :: OS Independent",
     "Programming Language :: Python",
     "Programming Language :: Python :: 3",
-    "Programming Language :: Python :: 3.10",
-    "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
 ]
 
 [project.scripts]

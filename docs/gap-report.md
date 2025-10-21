@@ -1,56 +1,49 @@
-# Gap Report — Watcher « grand public »
-
-Ce rapport synthétise les écarts entre l'état actuel du dépôt et la mission « Watcher grand public ». Les priorités suivent la nomenclature P0 (bloquant), P1 (majeur), P2 (amélioration). Chaque écart documente l'impact sur l'utilisateur final et les actions correctives recommandées.
+# Gap Report — Watcher « IA grand public »
 
 ## Résumé exécutif
 
-- L'infrastructure de release couvre désormais Linux, Windows et macOS, publie PyPI via Trusted Publishing et génère les installeurs multi-OS attendus (MSI/MSIX, DMG notarizable, AppImage/DEB/RPM/Flatpak).
-- Aucun client graphique ni installeur multi-OS n'est disponible : l'expérience reste réservée aux profils techniques capables d'utiliser la CLI et des archives brutes.
-- Les engagements sûreté/autonomie (collecte vérifiée, sandbox, autodiagnostic, i18n) sont amorcés dans le code existant mais nécessitent des compléments fonctionnels et des tests pour atteindre un niveau « grand public ».
+- **P0 (Livraison vérifiable).** Les workflows GitHub Actions construisent et signent les artefacts principaux (sdist/wheel, exécutables PyInstaller, images Docker multi-arch) et déclenchent Trusted Publishing, mais il reste à aligner le build Python sur la pipeline `nox -s build` exigée par la mission et à documenter la vérification utilisateur dans la documentation publique.
+- **P1 (Autonomie sûre).** Les briques de collecte vérifiée, d'ingestion locale et de pilotage autonome sont présentes dans le code et couvertes par des tests unitaires, mais la surveillance supply-chain manque encore d'une exécution CodeQL dédiée et la documentation utilisateur n'explique pas comment exploiter les rapports hebdomadaires.
+- **P2 (Expérience & écosystème).** L'ensemble de la documentation oriente toujours vers une interface graphique inexistante et ne couvre ni la prise en main CLI ni les canaux de distribution communautaires (winget/Homebrew). Une refonte éditoriale reste nécessaire pour refléter l'expérience réelle.
 
-## P0 — Distribution immédiate et onboarding
+## P0 — Livraison vérifiable
 
-| Exigence « grand public » | Couverture actuelle | Écart critique | Action recommandée |
-| --- | --- | --- | --- |
-| Release tag `v*` → build multi-OS + publication PyPI | `.github/workflows/release.yml` orchestre des jobs Linux, Windows, macOS (x86_64/arm64), publie sdist/wheel sur PyPI via OIDC et regroupe SBOM + attestations | Validation manuelle de la notarisation/signature à réaliser à chaque release et surveillance des runtimes PyInstaller | Ajouter des tests fumée post-release (Watchman, codesign --verify) et automatiser les contrôles `cosign verify-blob` des checksums |
-| Installeurs desktop (MSI/MSIX, DMG notarized, AppImage/DEB/RPM/Flatpak) | Scripts `scripts/package_windows.py` et `scripts/package_linux.py` génèrent MSI/MSIX, DMG, AppImage, DEB, RPM, Flatpak à partir du bundle PyInstaller | Les manifestes GUI restent absents et les scripts supposent des métadonnées par défaut (icônes, descriptions) → expérience perfectible | Intégrer des ressources UI finales (icônes, EULA, privacy) et ajouter des tests d'installation automatisés pour chaque format |
-| Interface graphique « watcher-gui » avec onboarding 3 étapes | Aucun projet Tauri/Electron, pas de répertoire `watcher-gui`, pas de commandes `watcher-gui` exposées | L'utilisateur ne dispose que de la CLI → friction majeure pour un usage grand public | Initialiser une application Tauri + React avec flux d'accueil (consentement, choix modèle, dossier données) et synchroniser avec la CLI |
-| Mode offline par défaut avec téléchargement vérifié des modèles | La CLI `watcher init --auto` installe un modèle démo local mais ne vérifie pas de catalogue officiel ni de hashing externe | Les modèles tierce-partie ne sont pas vérifiés par hash/taille côté utilisateur → risque d'intégrité | Définir un registre de modèles (hash/size) consommé par la CLI et la GUI, avec reprise de téléchargement et double vérification |
-| Autostart utilisateur sans commande (Task Scheduler / systemd-user / LaunchAgent) | Pas de scripts ni services fournis ; documentation limitée à la CLI | Aucun démarrage automatique → les utilisateurs non techniques ne peuvent activer l'agent en arrière-plan | Ajouter générateurs de jobs (PowerShell, systemd user service, LaunchAgent plist) créés lors de `watcher init --fully-auto` |
-| Documentation publique orientée GUI (Quickstart, FAQ, Dépannage, Vérification) | Documentation actuelle centrée CLI (`docs/quickstart-sans-commande.md`, `docs/depannage.md`) ; aucun guide GUI ni lien depuis README | Les nouveaux utilisateurs ne trouvent pas de parcours graphique, ni instructions pour vérifier signatures | Écrire un guide Quickstart GUI, FAQ et procédures de vérification adaptées aux installeurs ; relier ces pages depuis README et le site MkDocs |
-| Cadre légal (Privacy Policy, Terms, EULA, Model Card, Third-Party Notices) | Aucun document juridique ni NOTICE généré ; SBOM CycloneDX seulement | Incompatibilité avec une distribution grand public (absence de politique de confidentialité et mentions légales) | Rédiger les documents requis, automatiser la génération NOTICE/SBOM → NOTICE, intégrer au pipeline de release et aux installeurs |
-| Docker multi-arch GHCR signé + gate de vérification | Workflow `docker.yml` pousse linux/amd64,arm64 avec SBOM et attestation SLSA ; un job `verify-attestation` applique `cosign verify-attestation --type slsaprovenance` | Aucun suivi automatique des digests dans la doc publique ; nécessite un HOWTO signatures côté utilisateur final | Documenter la commande de vérification et exposer les digests attestés dans la release + documentation |
+### Release GitHub
 
-## Validation PR #446 « grand public gap analysis »
+**État actuel.** Le workflow `.github/workflows/release.yml` déclenche une matrice `ubuntu-24.04` / `windows-2022` / `macos-14` avec Python 3.12, construit la sdist et la wheel via `python -m build`, génère les bundles PyInstaller/DMG/AppImage/DEB/RPM/Flatpak, publie un fichier de checksums signé (`cosign sign-blob`) et produit une attestation SLSA pour `checksums.txt` avant de créer la release GitHub et de pousser sur PyPI via OIDC.【F:.github/workflows/release.yml†L1-L310】【F:.github/workflows/release.yml†L312-L400】
 
-Le contenu introduit par la PR #446 reste aligné avec l'état du code :
+**Écarts.** Le cahier des charges impose un enchaînement `pip install -r requirements-dev.txt && nox -s build`, alors que le workflow contourne Nox et appelle directement `python -m build` et les scripts PyInstaller personnalisés (`scripts/package_linux.py`, `scripts/package_windows.py`).【F:.github/workflows/release.yml†L70-L210】 Harmoniser le pipeline avec `nox -s build` assurerait que les mêmes contrôles s'appliquent localement et en CI.
 
-- Les exigences d'initialisation autonome et offline reposent sur `FirstRunConfigurator` qui crée les sentinelles `~/.watcher/first_run`, la configuration TOML et le ledger de consentement signé. 【F:app/core/first_run.py†L1-L164】
-- La matrice de release y décrite a été prolongée côté CI pour couvrir macOS (arm64/x64) et publier sur PyPI, ce qui répond aux écarts identifiés dans le rapport. 【F:.github/workflows/release.yml†L1-L260】
-- Le pipeline Docker inclut désormais la vérification d'attestation exigée par la mission grand public, cohérente avec la recommandation initiale de la PR. 【F:.github/workflows/docker.yml†L1-L170】
+### Docker multi-arch + provenance
 
-## P1 — Autonomie, sûreté et qualité opérationnelle
+**État actuel.** Le workflow `.github/workflows/docker.yml` configure QEMU/Buildx, pousse une image `linux/amd64,linux/arm64` sur GHCR, extrait le digest, appelle `docker buildx imagetools inspect` et déclenche `cosign verify-attestation --type slsaprovenance` après génération de l'attestation SLSA v1 `generator_container_slsa3`.【F:.github/workflows/docker.yml†L1-L170】
 
-| Exigence | Couverture actuelle | Lacune principale | Suivi |
-| --- | --- | --- | --- |
-| Scraping vérifié (robots, ETag, throttling, licences, corroboration ≥2 sources) | Module `app/scrapers/http.py` gère robots.txt et cache local ; pas de validation licence/corroboration ni scoring de confiance | Risque d'ingérer des sources incompatibles/licence propriétaire sans double vérification | Étendre les scrapers pour extraire licence, implémenter un pipeline de corroboration et rejeter les sources non conformes |
-| RAG local avec métadonnées complètes + export/import | `SimpleVectorStore` stocke embeddings localement mais ne capture pas licence/hash ni mécanismes d'export/import | Manque d'audit trail et d'opérations de sauvegarde/restauration pour partage/diagnostic | Élargir le schéma pour stocker {url,titre,licence,date,hash,score}, ajouter commandes CLI/GUI `index export/import` |
-| Autopilot discover→scrape→verify→ingest→reindex + rapports hebdo | Scheduler existant gère la priorité de sujets (`TopicScore`) mais pas de boucle complète ni génération de rapports HTML | Les utilisateurs ne reçoivent pas de synthèse hebdomadaire ni de traçabilité des rejets | Implémenter une pipeline orchestrée avec production de rapports (HTML + JSON) déposés dans `~/.watcher/reports/` |
-| Sécurité runtime (sandbox LLM, FS confiné, réseau OFF par défaut) | `app/core/sandbox.py` fournit une base de sandbox mais pas d'intégration cgroups/Job Objects ; politique réseau via fichiers statiques | Isolation incomplète (pas de confinement OS spécifique), risque d'exposition réseau | Intégrer cgroups v2 (Linux), Job Objects (Windows), App Sandbox (macOS) et enforceur réseau dynamique aligné sur `policy.yaml` |
-| Consentement explicite + ledger signé | `watcher init` crée policy/config mais n'enregistre pas les consentements avec signature horodatée | Non-conformité réglementaire (pas de trace de consentement ni révocation) | Implémenter `consents.jsonl` signé, bouton GUI pour retirer/accorder consentements, vérification lors du démarrage |
-| Updater opt-in respectant offline | Aucun mécanisme de mise à jour (ni CLI ni GUI) | Les utilisateurs doivent re-télécharger manuellement chaque version | Activer updater Tauri (ou équivalent) avec canal opt-in, vérification de signatures, compatibilité offline |
+**Écarts.** Les digests et commandes de vérification ne sont pas relayés dans la documentation publique : les guides `quickstart-sans-commande.md` et `verifier-artefacts.md` présupposent une interface graphique et ne fournissent aucun exemple CLI pour `cosign`/`imagetools`。【F:docs/quickstart-sans-commande.md†L1-L60】【F:docs/verifier-artefacts.md†L1-L32】 Il faut ajouter un guide opérationnel aligné sur les commandes attendues (`docker buildx imagetools inspect …`, `cosign verify-attestation …`).
 
-## P2 — Expérience et écosystème
+### Documentation publique
 
-| Exigence | Couverture actuelle | Opportunité | Prochaines étapes |
-| --- | --- | --- | --- |
-| Auto-diagnostic CLI/GUI (GPU, AVX/NEON, permissions, réseau) | Pas de commande dédiée ; tests ponctuels dans `tests/` | Support difficile (pas de rapport d'état prêt à partager) | Ajouter `watcher doctor` (CLI) et panneau GUI « Diagnostics » générant un ZIP exportable |
-| Journalisation et support utilisateur | Logs locaux textuels, pas de packaging ZIP ni bouton « Envoyer au support » | Assistance post-déploiement compliquée | Normaliser la journalisation JSON + export ZIP chiffré volontaire |
-| Internationalisation fr/en (accessibilité AA) | CLI/documents majoritairement en français ; pas de fichiers de locales ni support clavier GUI | Public non francophone exclu | Intégrer `react-i18next` (GUI), catalogues YAML, tests d'accessibilité (axe-core) |
-| Tests et gates (pytest-socket, Playwright/Cypress, diff-coverage) | CI actuelle (`ci.yml`) couvre lint/tests Python mais pas les scénarios offline ni tests E2E GUI | Qualité incertaine sur les parcours critiques grand public | Étendre la CI avec pytest-socket, suites E2E offline, tests Playwright, diff-coverage 100 % |
-| Supply-chain (Scorecard, CodeQL, secret-scan, pip-audit) | `ci.yml` déclenche Scorecard et sécurité basique mais pas CodeQL/pip-audit obligatoires | Risque d'exposition supply-chain non détectée | Ajouter jobs CodeQL, pip-audit, dépendances signées |
-| Distribution écosystème (winget, Homebrew, Flatpak) | Aucun manifeste pour winget/Homebrew/Flatpak | Découvreabilité limitée | Générer manifestes automatiquement lors des releases |
+**État actuel.** Le déploiement MkDocs via `.github/workflows/deploy-docs.yml` publie automatiquement le site GitHub Pages en exécutant `mkdocs build --strict` et en déployant l'artefact `site/` sur l'environnement `github-pages`.【F:.github/workflows/deploy-docs.yml†L1-L48】
 
-## Conclusion
+**Écarts.** Les contenus clefs (« Quickstart sans commande », « Vérification des artefacts ») décrivent des écrans inexistants (widgets GUI, boutons « Nouvelle vérification ») et ne mentionnent pas les commandes `watcher init --fully-auto`, `watcher run --offline`, ni les contrôles de signatures attendus par la mission.【F:docs/quickstart-sans-commande.md†L1-L40】【F:docs/verifier-artefacts.md†L1-L32】 Une réécriture orientée CLI est indispensable pour rendre la documentation publiable.
 
-La base CLI actuelle fournit un socle local-first et certaines primitives de sécurité (mode offline, politique réseau, signatures). Pour atteindre l'objectif « grand public », Watcher doit prioriser l'industrialisation de la distribution (release multi-OS, GUI Tauri/Electron, installeurs signés) avant d'étendre les modules d'autonomie et de conformité. Une feuille de route incrémentale peut suivre l'ordre P0 → P1 → P2 ci-dessus pour livrer rapidement une version installable en un clic, sûre et respectueuse des contraintes offline.
+### CLI offline prête à l'emploi
+
+**État actuel.** La commande `watcher init --fully-auto` déclenche désormais `FirstRunConfigurator`, crée `~/.watcher/{config.toml,policy.yaml,consents.jsonl}` et télécharge les modèles déclarés avec vérification SHA-256 avant d'annoncer l'emplacement des fichiers au terminal.【F:app/cli.py†L114-L154】 Le mode `watcher run --offline` lit la configuration `llm`/`model`, vérifie l'empreinte du modèle (avec reprise via le bundle embarqué) puis exécute `llama_cpp.Llama` en seed déterministe.【F:app/cli.py†L196-L274】
+
+**Écarts.** Aucun test d'intégration n'exécute la séquence demandée (`watcher init --fully-auto` suivi de `watcher run --offline --prompt …`). Les tests d'autostart couvrent encore explicitement le flag `--auto` historique et la configuration minimale.【F:tests/test_first_run_autostart.py†L91-L113】 Il faut ajouter un scénario e2e spécifique pour garantir la compatibilité Python ≥ 3.12 et l'exécution offline sans manual tweaking.
+
+## P1 — Autonomie sûre
+
+- **Scraping vérifié.** `HTTPScraper` gère robots.txt, throttling, ETag/If-Modified-Since et calcule un hachage de contenu pour de-duplication.【F:app/scrapers/http.py†L24-L188】
+- **Ingestion locale.** `IngestPipeline` exige au moins deux sources distinctes, filtre par licence et stocke les métadonnées `{url,title,licence,hash,score,date}` dans la base vectorielle locale.【F:app/ingest/pipeline.py†L1-L110】
+- **Autopilot.** `AutopilotController` applique le kill-switch, la consent ledger, la corroboration et produit un rapport hebdomadaire HTML via `ReportGenerator`.【F:app/autopilot/controller.py†L300-L420】
+
+**Écarts.** La mission exige CodeQL et un rapport hebdomadaire communiqué aux opérateurs. Aucun workflow CodeQL n'est présent dans `.github/workflows/`, et les tests/documentations n'exploitent pas le rapport `reports/weekly.html` généré par l'autopilote.【F:.github/workflows†L1-L8】【F:app/autopilot/controller.py†L318-L386】 Il faut ajouter un workflow CodeQL dédié et documenter la consultation hebdomadaire (ou exposer un lien CLI/Docs).
+
+## P2 — Expérience & écosystème
+
+- **Documentation réaliste.** Les pages Quickstart et Vérification décrivent toujours des interactions GUI fictives, générant une dissonance pour les utilisateurs CLI.【F:docs/quickstart-sans-commande.md†L1-L60】【F:docs/verifier-artefacts.md†L1-L32】
+- **Distribution écosystème.** Aucun manifeste winget/Homebrew/Flatpak supplémentaire n'est produit en sortie de release malgré la fabrication des paquets correspondants.【F:.github/workflows/release.yml†L128-L210】
+- **Support utilisateur.** Pas de commande `watcher doctor` ni de packaging automatique des journaux mentionnés dans la documentation.
+
+Ces écarts P2 peuvent être traités après la mise en conformité P0/P1 pour livrer une expérience réellement « grand public ».
