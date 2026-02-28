@@ -26,6 +26,7 @@ __all__ = [
     "AutopilotRunResult",
     "ConsentGate",
     "DiscoveryResult",
+    "KnowledgeGapDetector",
     "LedgerView",
     "MultiSourceVerifier",
     "ReportGenerator",
@@ -72,7 +73,40 @@ class AutopilotRunResult:
     ingested: int
     skipped: list[str] = field(default_factory=list)
     blocked: list[str] = field(default_factory=list)
+    knowledge_gaps: list[str] = field(default_factory=list)
     reason: str | None = None
+
+
+class KnowledgeGapDetector:
+    """Detect topics that are not sufficiently covered by a run."""
+
+    def detect(
+        self,
+        *,
+        topics: Sequence[str],
+        discovered: Sequence[DiscoveryResult],
+        ingested: Sequence[RawDocument],
+    ) -> list[str]:
+        gaps: list[str] = []
+        for topic in topics:
+            label = topic.strip()
+            if not label:
+                continue
+            lowered = label.lower()
+            discovered_match = any(
+                _topic_matches(lowered, item.url, item.title, item.summary)
+                for item in discovered
+            )
+            ingested_match = any(
+                _topic_matches(lowered, doc.url, doc.title, doc.text)
+                for doc in ingested
+            )
+            if not discovered_match:
+                gaps.append(f"{label}: aucune source découverte")
+                continue
+            if not ingested_match:
+                gaps.append(f"{label}: sources découvertes mais non ingérées")
+        return gaps
 
 
 class ConsentGate:
@@ -266,6 +300,7 @@ class ReportGenerator:
         *,
         ingested: Sequence[str],
         revoked: Sequence[str],
+        knowledge_gaps: Sequence[str],
         timestamp: datetime,
     ) -> None:
         history = self._load_history()
@@ -274,6 +309,8 @@ class ReportGenerator:
             history.append({"type": "ingested", "value": url, "timestamp": now_iso})
         for domain in revoked:
             history.append({"type": "revoked", "value": domain, "timestamp": now_iso})
+        for gap in knowledge_gaps:
+            history.append({"type": "knowledge_gap", "value": gap, "timestamp": now_iso})
         self._save_history(history)
         self._write_report(history, timestamp)
 
@@ -299,6 +336,7 @@ class ReportGenerator:
         since_norm = _normalise_datetime(window_start)
         ingested: list[str] = []
         revoked: list[str] = []
+        knowledge_gaps: list[str] = []
         for entry in history:
             timestamp = LedgerView._parse_timestamp(entry.get("timestamp"))
             if timestamp is None:
@@ -309,6 +347,8 @@ class ReportGenerator:
                 ingested.append(str(entry.get("value", "")))
             elif entry.get("type") == "revoked":
                 revoked.append(str(entry.get("value", "")))
+            elif entry.get("type") == "knowledge_gap":
+                knowledge_gaps.append(str(entry.get("value", "")))
         html = [
             "<html>",
             "  <head>",
@@ -332,6 +372,13 @@ class ReportGenerator:
             html.append("    </ul>")
         else:
             html.append("    <p>Aucune révocation enregistrée.</p>")
+        html.append("    <h2>Knowledge gaps détectés</h2>")
+        if knowledge_gaps:
+            html.append("    <ul>")
+            html.extend(f"      <li>{item}</li>" for item in sorted(set(knowledge_gaps)))
+            html.append("    </ul>")
+        else:
+            html.append("    <p>Aucun gap détecté.</p>")
         html.extend(["  </body>", "</html>"])
         self.output_path.write_text("\n".join(html), encoding="utf-8")
 
@@ -381,6 +428,7 @@ class AutopilotController:
         reports_dir = report_path or (self._config_dir / "reports" / "weekly.html")
         self._reporter = ReportGenerator(Path(reports_dir))
         self._ledger_view = LedgerView(self._ledger_path)
+        self._gap_detector = KnowledgeGapDetector()
         self._last_request: dict[str, float] = {}
 
     # ------------------------------------------------------------------
@@ -485,13 +533,24 @@ class AutopilotController:
                 break
 
         verified = verifier.filter(collected)
+        verified_documents = [item[0] for item in verified]
+        knowledge_gaps = self._gap_detector.detect(
+            topics=active_topics,
+            discovered=discovered,
+            ingested=verified_documents,
+        )
         if not verified:
             self._logger.info("Aucun contenu corroboré à ingérer.")
-            return AutopilotRunResult(ingested=0, skipped=skipped, blocked=gate.blocked)
+            return AutopilotRunResult(
+                ingested=0,
+                skipped=skipped,
+                blocked=gate.blocked,
+                knowledge_gaps=knowledge_gaps,
+            )
 
         try:
             with VectorStoreTransaction(self.pipeline.store) as transaction:
-                ingested = self.pipeline.ingest([item[0] for item in verified])
+                ingested = self.pipeline.ingest(verified_documents)
                 transaction.commit()
         except IngestValidationError as exc:
             self._logger.error("Ingestion interrompue: %s", exc)
@@ -499,19 +558,22 @@ class AutopilotController:
                 ingested=0,
                 skipped=skipped,
                 blocked=gate.blocked,
+                knowledge_gaps=knowledge_gaps,
                 reason="ingestion invalide",
             )
 
         recent_revoked = self._ledger_view.revocations_since(now - timedelta(days=7))
         self._reporter.record(
-            ingested=[item[0].url for item in verified],
+            ingested=[item.url for item in verified_documents],
             revoked=recent_revoked,
+            knowledge_gaps=knowledge_gaps,
             timestamp=now,
         )
         return AutopilotRunResult(
             ingested=ingested,
             skipped=skipped,
             blocked=gate.blocked,
+            knowledge_gaps=knowledge_gaps,
         )
 
     # ------------------------------------------------------------------
@@ -563,8 +625,12 @@ def _bytes_to_mb(size: int) -> float:
     return round(size / (1024 * 1024), 4)
 
 
+def _topic_matches(topic: str, *values: str) -> bool:
+    haystack = " ".join(value.lower() for value in values if value)
+    return topic in haystack
+
+
 def _normalise_datetime(value: datetime) -> datetime:
     if value.tzinfo is None:
         return value
     return value.astimezone(timezone.utc).replace(tzinfo=None)
-
