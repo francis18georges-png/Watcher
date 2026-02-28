@@ -510,6 +510,16 @@ def main(argv: Sequence[str] | None = None) -> int:
         action="store_true",
         help="Désactive la confirmation interactive avant l'exécution",
     )
+    autopilot_report = autopilot_sub.add_parser(
+        "report",
+        help="Afficher le chemin du rapport autopilot hebdomadaire",
+    )
+    autopilot_report.add_argument(
+        "--format",
+        choices=("path", "text"),
+        default="text",
+        help="Format de sortie (path: chemin brut, text: message lisible).",
+    )
 
     args = parser.parse_args(argv)
 
@@ -690,6 +700,20 @@ def main(argv: Sequence[str] | None = None) -> int:
                             "Sujets absents de la file: " + ", ".join(missing)
                         )
                 return 0
+            if args.autopilot_command == "report":
+                policy_manager = scheduler._policy_manager  # type: ignore[attr-defined]
+                config_dir = (
+                    policy_manager.config_dir
+                    if policy_manager is not None
+                    else Path.home() / ".watcher"
+                )
+                report_path = config_dir / "reports" / "weekly.html"
+                if args.format == "path":
+                    print(report_path)
+                else:
+                    status = "disponible" if report_path.exists() else "non généré"
+                    print(f"Rapport autopilot ({status}) : {report_path}")
+                return 0
         except AutopilotError as exc:
             parser.error(str(exc))
 
@@ -830,4 +854,6 @@ def _summarise_autopilot_result(result: AutopilotRunResult) -> list[str]:
         lines.append("Ignorées: " + ", ".join(result.skipped))
     if result.blocked:
         lines.append("Bloquées: " + ", ".join(result.blocked))
+    if result.knowledge_gaps:
+        lines.append("Knowledge gaps: " + "; ".join(result.knowledge_gaps))
     return lines

@@ -3,7 +3,7 @@
 ## Résumé exécutif
 
 - **P0 (Livraison vérifiable).** Les workflows Release/Docker/Pages couvrent les exigences de build multi-OS, de signatures cosign et d'attestations SLSA, et la CLI fournit les commandes `watcher init --fully-auto` et `watcher run --offline`. Les actions de vérification côté utilisateur restent peu documentées et il manque une validation intégrale des commandes contractuelles dans la documentation publique.
-- **P1 (Autonomie & sûreté).** Les briques de scraping vérifié, de politique réseau/consentement, d'ingestion locale et de pipeline RAG sont implémentées avec tests hors-ligne. En revanche, l'autopilot n'expose pas encore de détection active des knowledge gaps et les contrôles supply-chain attendus (CodeQL, secret-scan, pip-audit) ne sont pas en place.
+- **P1 (Autonomie & sûreté).** Les briques de scraping vérifié, de politique réseau/consentement, d'ingestion locale et de pipeline RAG sont implémentées avec tests hors-ligne. L'autopilot remonte désormais les knowledge gaps durant les cycles et les publie dans le rapport hebdomadaire/CLI, mais les contrôles supply-chain attendus (CodeQL, secret-scan, pip-audit) ne sont pas encore en place.
 - **P2 (Expérience & distribution).** Aucun binaire Tauri « watcher-gui » n'est livrable, les installeurs Linux ne sont pas signés et aucun manifeste winget/Homebrew/Flatpak externe n'est publié. L'écosystème d'assistance (`watcher doctor`, guide CLI grand public) reste à construire.
 
 ## P0 — Livraison vérifiable
@@ -29,13 +29,11 @@
 | Scraping vérifié | robots.txt, ETag/If-Modified-Since, throttling, UA dédié, dédup/hash, licence | ✅ | `HTTPScraper` gère robots.txt, fenêtres réseau, reprise conditionnelle, extraction Readability/trafilatura, déduplication par hash et détection de licence, tout en conservant un cache local. |
 | Politique & kill-switch | Allowlist, fenêtres réseau, budgets, `~/.watcher/disable` | ✅ | Le schéma `Policy` impose `network_windows`, budgets et chemin de kill-switch; la baseline `policy.yaml` fournit allowlist, budgets et kill switch activables. |
 | RAG local | Ingest → normalisation → langue → chunking → embeddings → index SQLite-VSS | ✅ | `IngestPipeline` exige ≥2 sources, filtre par licence, stocke `{url,titre,licence,date,hash,score}`; `SimpleVectorStore` encode localement (SentenceTransformers) et persiste dans SQLite, utilisé par `rag.answer_question`. |
-| Autopilot | Cycle discover→scrape→verify→ingest→rapport hebdo | ⚠️ | `AutopilotController` orchestre discovery/scraping/ingestion, applique kill-switch et génère `reports/weekly.html`, mais aucun module n'implémente la détection des « knowledge gaps » demandée, ni une diffusion du rapport (CLI/Docs). |
+| Autopilot | Cycle discover→scrape→verify→ingest→rapport hebdo | ✅ | `AutopilotController` orchestre discovery/scraping/ingestion, applique kill-switch, détecte les knowledge gaps par sujet et les exporte dans `reports/weekly.html`; la CLI expose `watcher autopilot report` pour consulter le chemin du rapport local. |
 | Tests hors-ligne | pytest-socket, E2E offline | ✅ | La suite inclut un shim `pytest_socket` qui bloque le réseau par défaut et un test e2e offline déterministe sur le modèle GGUF embarqué, garantissant l'exécution sans dépendance réseau. |
 | Supply-chain CI | Scorecard, CodeQL, secret-scan, pip-audit | ❌ | Le dépôt dispose d'un job Scorecard, mais aucun workflow CodeQL, secret-scan ou pip-audit n'est défini; les scans vulnérabilité Trivy ne couvrent que l'image Docker. |
 
 ### Actions P1 recommandées
-- Ajouter un module de détection des knowledge gaps (ex : comparaison topics/policy vs index) avec rapport CLI/HTML.
-- Publier le rapport hebdomadaire via CLI (`watcher autopilot report`) et documenter sa consultation.
 - Créer des workflows CodeQL (langages Python/Rust/Tauri), secret-scan et pip-audit pour satisfaire la gouvernance supply-chain.
 
 ## P2 — Expérience & distribution
