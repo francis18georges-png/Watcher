@@ -1,0 +1,38 @@
+name: pip-audit
+
+on:
+  push:
+  pull_request:
+  schedule:
+    - cron: "43 3 * * 1"
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    name: Audit Python dependencies
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: |
+            requirements.txt
+            requirements-dev.txt
+
+      - name: Install pip-audit
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install pip-audit
+
+      - name: Run pip-audit (runtime)
+        run: pip-audit -r requirements.txt
+
+      - name: Run pip-audit (dev)
+        run: pip-audit -r requirements-dev.txt

@@ -137,6 +137,7 @@ def test_cli_autopilot_run_success(monkeypatch, capsys):
                 ingested=2,
                 skipped=["https://skipped.test/doc"],
                 blocked=["blocked.test"],
+                knowledge_gaps=["security: aucune source découverte"],
             )
 
     scheduler_instance = scheduler
@@ -159,6 +160,7 @@ def test_cli_autopilot_run_success(monkeypatch, capsys):
     assert "Cycle autopilot terminé: 2 source(s) ingérée(s)" in captured.out
     assert "Ignorées: https://skipped.test/doc" in captured.out
     assert "Bloquées: blocked.test" in captured.out
+    assert "Knowledge gaps: security: aucune source découverte" in captured.out
     assert "Cycle interrompu" not in captured.out
 
 
@@ -198,3 +200,21 @@ def test_cli_autopilot_run_blocked(monkeypatch, capsys):
     captured = capsys.readouterr()
     assert "Cycle autopilot terminé: 0 source(s) ingérée(s)" in captured.out
     assert "Cycle interrompu: kill-switch" in captured.out
+
+
+def test_cli_autopilot_report(monkeypatch, capsys, tmp_path):
+    config_dir = tmp_path / ".watcher"
+    report_path = config_dir / "reports" / "weekly.html"
+    report_path.parent.mkdir(parents=True, exist_ok=True)
+    report_path.write_text("<html></html>", encoding="utf-8")
+
+    scheduler = DummyScheduler()
+    scheduler._policy_manager = SimpleNamespace(config_dir=config_dir)
+
+    monkeypatch.setattr(cli, "AutopilotScheduler", lambda: scheduler)
+    monkeypatch.setattr(cli, "Engine", lambda: DummyEngine())
+
+    exit_code = cli.main(["autopilot", "report", "--format", "path"])
+    assert exit_code == 0
+    captured = capsys.readouterr()
+    assert captured.out.strip() == str(report_path)

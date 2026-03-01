@@ -15,6 +15,7 @@ from app.autopilot import (
     AutopilotController,
     ConsentGate,
     DiscoveryResult,
+    KnowledgeGapDetector,
     MultiSourceVerifier,
 )
 from app.autopilot.scheduler import AutopilotScheduler, ResourceUsage
@@ -317,6 +318,7 @@ def test_autopilot_controller_end_to_end(tmp_path: Path) -> None:
     report_html = report_path.read_text(encoding="utf-8")
     assert "Ce qui a été appris" in report_html
     assert "revoked.test" in report_html
+    assert "Knowledge gaps détectés" in report_html
 
 
 def test_consent_gate_and_verifier() -> None:
@@ -339,3 +341,33 @@ def test_consent_gate_and_verifier() -> None:
     result = verifier.filter([(doc_a, digest_same), (doc_b, digest_same), (doc_c, digest_unique)])
     assert (doc_c, digest_unique) not in result
     assert len(result) == 2
+
+
+def test_knowledge_gap_detector_flags_missing_topics() -> None:
+    detector = KnowledgeGapDetector()
+    discovered = [
+        DiscoveryResult(
+            url="https://allowed.test/python-news",
+            title="Python updates",
+            summary="release",
+            licence="CC-BY-4.0",
+        )
+    ]
+    ingested = [
+        RawDocument(
+            url="https://allowed.test/python-news",
+            title="Python updates",
+            text="Python release notes",
+            licence="CC-BY-4.0",
+        )
+    ]
+
+    gaps = detector.detect(
+        topics=["python", "security", "ml"],
+        discovered=discovered,
+        ingested=ingested,
+    )
+
+    assert "security: aucune source découverte" in gaps
+    assert "ml: aucune source découverte" in gaps
+    assert not any(item.startswith("python:") for item in gaps)

@@ -4,14 +4,16 @@ from __future__ import annotations
 
 import argparse
 import hashlib
+import json
 import os
+import zipfile
 import sys
 import textwrap
 from contextlib import suppress
 from datetime import datetime, timezone
 from importlib import resources
 from pathlib import Path
-from typing import Iterable, Sequence
+from typing import Iterable, Mapping, Sequence
 
 try:  # Python 3.11+
     import tomllib  # type: ignore[import-not-found]
@@ -261,6 +263,195 @@ def perform_offline_run(prompt: str, model_name: str | None = None) -> int:
     return 0
 
 
+def perform_doctor(
+    *,
+    output_format: str = "text",
+    export_path: Path | None = None,
+    redact: bool = True,
+) -> int:
+    """Run local diagnostics for public support workflows."""
+
+    checks: list[dict[str, object]] = []
+
+    def _add(name: str, status: str, detail: str, *, critical: bool) -> None:
+        checks.append(
+            {
+                "name": name,
+                "status": status,
+                "detail": detail,
+                "critical": critical,
+            }
+        )
+
+    home = WATCHER_HOME
+    config_path = home / CONFIG_FILENAME
+    policy_path = home / POLICY_FILENAME
+    ledger_path = home / "consents.jsonl"
+    state_path = home / "autopilot-state.json"
+    report_path = home / "reports" / "weekly.html"
+
+    if home.exists():
+        _add("watcher_home", "ok", f"Répertoire détecté: {home}", critical=True)
+    else:
+        _add("watcher_home", "error", f"Répertoire absent: {home}", critical=True)
+
+    config: dict[str, object] | None = None
+    if config_path.is_file():
+        try:
+            config = tomllib.loads(config_path.read_text(encoding="utf-8"))
+        except tomllib.TOMLDecodeError as exc:
+            _add("config", "error", f"config.toml invalide: {exc}", critical=True)
+        else:
+            _add("config", "ok", f"Configuration chargée: {config_path}", critical=True)
+    else:
+        _add("config", "error", f"Configuration absente: {config_path}", critical=True)
+
+    if policy_path.is_file():
+        _add("policy", "ok", f"Policy détectée: {policy_path}", critical=True)
+    else:
+        _add("policy", "error", f"Policy absente: {policy_path}", critical=True)
+
+    if ledger_path.is_file():
+        _add("consent_ledger", "ok", f"Ledger détecté: {ledger_path}", critical=True)
+    else:
+        _add("consent_ledger", "error", f"Ledger absent: {ledger_path}", critical=True)
+
+    if config is not None:
+        model_config = config.get("model") if isinstance(config.get("model"), dict) else {}
+        llm_config = config.get("llm") if isinstance(config.get("llm"), dict) else {}
+        model_path_raw = (
+            model_config.get("path")
+            or llm_config.get("model_path")
+            or llm_config.get("path")
+            or ""
+        )
+        model_path = Path(str(model_path_raw)).expanduser() if model_path_raw else Path()
+        expected_hash = (
+            model_config.get("sha256")
+            or llm_config.get("model_sha256")
+            or llm_config.get("sha256")
+        )
+        expected_size = model_config.get("size") or llm_config.get("model_size")
+        if not model_path_raw:
+            _add("model", "error", "Chemin modèle non défini dans config.toml", critical=True)
+        elif _verify_file(model_path, str(expected_hash) if expected_hash else None, expected_size):
+            _add("model", "ok", f"Modèle vérifié: {model_path}", critical=True)
+        elif model_path.is_file() and expected_hash is None:
+            _add(
+                "model",
+                "warn",
+                f"Modèle présent sans hash vérifiable: {model_path}",
+                critical=False,
+            )
+        else:
+            _add(
+                "model",
+                "error",
+                f"Modèle absent/corrompu: {model_path}",
+                critical=True,
+            )
+
+    if state_path.is_file():
+        _add("autopilot_state", "ok", f"État autopilot présent: {state_path}", critical=False)
+    else:
+        _add("autopilot_state", "warn", f"État autopilot absent: {state_path}", critical=False)
+
+    if report_path.is_file():
+        _add("weekly_report", "ok", f"Rapport hebdomadaire présent: {report_path}", critical=False)
+    else:
+        _add("weekly_report", "warn", f"Rapport hebdomadaire absent: {report_path}", critical=False)
+
+    has_critical_error = any(
+        check["critical"] and check["status"] == "error" for check in checks
+    )
+    status = "error" if has_critical_error else "ok"
+    payload = {
+        "status": status,
+        "watcher_home": str(home),
+        "checks": checks,
+    }
+
+    if output_format == "json":
+        print(json.dumps(payload, ensure_ascii=False, indent=2))
+    else:
+        icon = {"ok": "✅", "warn": "⚠️", "error": "❌"}
+        print(f"Diagnostic Watcher: {status.upper()}")
+        for check in checks:
+            marker = icon.get(str(check["status"]), "•")
+            print(f"{marker} {check['name']}: {check['detail']}")
+
+    if export_path is not None:
+        bundle_path = _write_doctor_bundle(
+            export_path,
+            payload,
+            config_path=config_path,
+            policy_path=policy_path,
+            ledger_path=ledger_path,
+            state_path=state_path,
+            report_path=report_path,
+            redact=redact,
+        )
+        print(f"Bundle diagnostic généré: {bundle_path}")
+
+    return 1 if has_critical_error else 0
+
+
+def _write_doctor_bundle(
+    target: Path,
+    payload: Mapping[str, object],
+    *,
+    config_path: Path,
+    policy_path: Path,
+    ledger_path: Path,
+    state_path: Path,
+    report_path: Path,
+    redact: bool,
+) -> Path:
+    target.parent.mkdir(parents=True, exist_ok=True)
+    if target.suffix.lower() != ".zip":
+        target = target.with_suffix(".zip")
+
+    with zipfile.ZipFile(target, mode="w", compression=zipfile.ZIP_DEFLATED) as archive:
+        archive.writestr(
+            "diagnostic.json",
+            json.dumps(payload, ensure_ascii=False, indent=2),
+        )
+        if config_path.is_file():
+            config_text = config_path.read_text(encoding="utf-8")
+            if redact:
+                config_text = _redact_config(config_text)
+            archive.writestr("config.toml", config_text)
+        if policy_path.is_file():
+            archive.write(policy_path, arcname="policy.yaml")
+        if ledger_path.is_file():
+            archive.write(ledger_path, arcname="consents.jsonl")
+        if state_path.is_file():
+            archive.write(state_path, arcname="autopilot-state.json")
+        if report_path.is_file():
+            archive.write(report_path, arcname="reports/weekly.html")
+
+        logs_dir = WATCHER_HOME / "logs"
+        if logs_dir.is_dir():
+            for path in sorted(logs_dir.glob("*.jsonl"))[:5]:
+                archive.write(path, arcname=f"logs/{path.name}")
+    return target
+
+
+def _redact_config(content: str) -> str:
+    redacted: list[str] = []
+    sensitive_keys = ("path", "url", "token", "secret", "key")
+    for line in content.splitlines():
+        stripped = line.strip()
+        if "=" in stripped:
+            key = stripped.split("=", 1)[0].strip().strip('"').lower()
+            if any(part in key for part in sensitive_keys):
+                indent = line[: len(line) - len(line.lstrip())]
+                redacted.append(f"{indent}{key} = \"<redacted>\"")
+                continue
+        redacted.append(line)
+    return "\n".join(redacted) + ("\n" if content.endswith("\n") else "")
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     """Entry point for the :mod:`watcher` command."""
     arg_list = list(argv if argv is not None else sys.argv[1:])
@@ -461,6 +652,27 @@ def main(argv: Sequence[str] | None = None) -> int:
         ),
     )
 
+    doctor_parser = sub.add_parser(
+        "doctor",
+        help="Exécuter un auto-diagnostic local pour le support utilisateur",
+    )
+    doctor_parser.add_argument(
+        "--format",
+        choices=("text", "json"),
+        default="text",
+        help="Format de sortie du diagnostic.",
+    )
+    doctor_parser.add_argument(
+        "--export",
+        default=None,
+        help="Chemin du bundle ZIP de diagnostic à générer.",
+    )
+    doctor_parser.add_argument(
+        "--no-redact",
+        action="store_true",
+        help="N'applique pas la redaction des champs sensibles dans config.toml exporté.",
+    )
+
     autopilot_parser = sub.add_parser(
         "autopilot",
         help="Gérer le scheduler autopilot supervisé",
@@ -509,6 +721,16 @@ def main(argv: Sequence[str] | None = None) -> int:
         "--noninteractive",
         action="store_true",
         help="Désactive la confirmation interactive avant l'exécution",
+    )
+    autopilot_report = autopilot_sub.add_parser(
+        "report",
+        help="Afficher le chemin du rapport autopilot hebdomadaire",
+    )
+    autopilot_report.add_argument(
+        "--format",
+        choices=("path", "text"),
+        default="text",
+        help="Format de sortie (path: chemin brut, text: message lisible).",
     )
 
     args = parser.parse_args(argv)
@@ -649,6 +871,14 @@ def main(argv: Sequence[str] | None = None) -> int:
         )
         return 0
 
+    if args.command == "doctor":
+        export_path = Path(args.export).expanduser() if args.export else None
+        return perform_doctor(
+            output_format=args.format,
+            export_path=export_path,
+            redact=not args.no_redact,
+        )
+
     if args.command == "autopilot":
         scheduler = AutopilotScheduler()
         engine = Engine()
@@ -689,6 +919,20 @@ def main(argv: Sequence[str] | None = None) -> int:
                         print(
                             "Sujets absents de la file: " + ", ".join(missing)
                         )
+                return 0
+            if args.autopilot_command == "report":
+                policy_manager = scheduler._policy_manager  # type: ignore[attr-defined]
+                config_dir = (
+                    policy_manager.config_dir
+                    if policy_manager is not None
+                    else Path.home() / ".watcher"
+                )
+                report_path = config_dir / "reports" / "weekly.html"
+                if args.format == "path":
+                    print(report_path)
+                else:
+                    status = "disponible" if report_path.exists() else "non généré"
+                    print(f"Rapport autopilot ({status}) : {report_path}")
                 return 0
         except AutopilotError as exc:
             parser.error(str(exc))
@@ -830,4 +1074,6 @@ def _summarise_autopilot_result(result: AutopilotRunResult) -> list[str]:
         lines.append("Ignorées: " + ", ".join(result.skipped))
     if result.blocked:
         lines.append("Bloquées: " + ", ".join(result.blocked))
+    if result.knowledge_gaps:
+        lines.append("Knowledge gaps: " + "; ".join(result.knowledge_gaps))
     return lines

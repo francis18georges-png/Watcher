@@ -71,6 +71,7 @@ extra:
 
 nav:
   - Accueil: index.md
+  - Quickstart CLI (recommandé): quickstart-cli.md
   - Quickstart sans commande: quickstart-sans-commande.md
   - Architecture:
       - Résumé express: architecture-summary.md

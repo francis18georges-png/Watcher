@@ -1,34 +1,72 @@
 # Vérification des artefacts Watcher
 
-La chaîne plug-and-play de Watcher produit des rapports signés et des paquets d'exécution. Cette procédure décrit comment vérifier leur intégrité sans recourir à des commandes en ligne. Toutes les opérations se déroulent dans les modules « Provenance » et « Audits » de l'interface.
+Ce guide décrit la procédure **CLI réelle** pour vérifier les artefacts de release Watcher
+(checksums, signature cosign et provenance SLSA), sans dépendre d'une interface graphique.
 
-## Préparer l'espace de contrôle
+## Prérequis
 
-1. Insérer la clé de contrôle ou monter le coffre hors ligne contenant les fichiers d'attestation remis avec le bundle.
-2. Depuis le tableau de bord, ouvrir l'onglet « Provenance » puis sélectionner « Nouvelle vérification ».
-3. Choisir la source à valider : paquet d'autopilote, index de connaissances ou build applicative.
+- `cosign` installé (version récente).
+- `sha256sum` (ou équivalent macOS `shasum -a 256`).
+- Les artefacts téléchargés depuis la release GitHub (`checksums.txt`, `checksums.txt.sig`,
+  `checksums.txt.pem`, paquets/binaries).
 
-## Vérification automatique
+## 1) Vérifier l'intégrité locale des fichiers
 
-1. Charger le paquet à contrôler via le sélecteur de fichiers intégré.
-2. L'interface calcule automatiquement l'empreinte SHA-256 et l'affiche à l'écran.
-3. L'application recherche la signature correspondante dans le registre `Watcher-Setup.intoto.jsonl`. Vérifier que l'indicateur « Signature valide » s'affiche en vert.
-4. Examiner le résumé CycloneDX associé pour confirmer la liste des dépendances, versions et licences.
+Depuis le dossier de téléchargement de la release:
 
-## Contrôles supplémentaires
+```bash
+sha256sum -c checksums.txt
+```
 
-1. Ouvrir l'onglet « Comparaison » pour juxtaposer le paquet courant avec la référence précédente.
-2. Vérifier que les différences signalées correspondent aux modifications attendues (nouvelles fonctionnalités, correctifs de sécurité).
-3. Si une divergence inattendue apparaît, basculer sur « Escalade » afin de notifier l'équipe sécurité et figer la diffusion des artefacts.
+Attendu: toutes les lignes doivent remonter `OK`.
 
-## Journalisation et conservation
+> macOS :
+>
+> ```bash
+> shasum -a 256 -c checksums.txt
+> ```
 
-1. Valider la vérification pour consigner le résultat dans le journal append-only. Une entrée horodatée est ajoutée avec le détail des hachages contrôlés.
-2. Archiver le rapport PDF généré automatiquement sur le support sécurisé dédié.
-3. Associer la vérification à la session Autopilote concernée pour maintenir la traçabilité bout en bout.
+## 2) Vérifier la signature cosign des checksums
 
-## Intégration dans les autres procédures
+```bash
+cosign verify-blob \
+  --certificate checksums.txt.pem \
+  --signature checksums.txt.sig \
+  checksums.txt
+```
 
-- Le [Quickstart sans commande](quickstart-sans-commande.md) renvoie vers cette page à l'étape de revue finale.
-- Les contrôles de consentement décrits dans le [guide de politique de consentement](policy-consent.md) doivent être cohérents avec les artefacts validés.
-- En cas d'anomalie détectée, suivre la [procédure de dépannage](depannage.md) pour enclencher l'enquête et, si nécessaire, révoquer les livrables.
+Cette étape valide que le fichier de checksums a bien été signé.
+
+## 3) Vérifier la provenance (attestation)
+
+Pour les artefacts de container (si vous utilisez l'image GHCR):
+
+```bash
+cosign verify-attestation \
+  --type slsaprovenance \
+  ghcr.io/<owner>/watcher:<tag>
+```
+
+Pour inspecter une image multi-arch avant vérification:
+
+```bash
+docker buildx imagetools inspect ghcr.io/<owner>/watcher:<tag>
+```
+
+## 4) Vérifier la cohérence release ↔ SBOM
+
+- Ouvrir le SBOM (`*.cdx.json`) publié dans la release.
+- Vérifier que les composants majeurs attendus sont présents (runtime Python,
+  dépendances critiques, versions alignées avec le tag).
+
+## 5) Que faire en cas d'échec
+
+- **Checksum invalide**: supprimer le fichier concerné et retélécharger depuis la release officielle.
+- **Signature cosign invalide**: bloquer l'utilisation de l'artefact et ouvrir un incident sécurité.
+- **Attestation absente/invalide**: considérer la release comme non conforme tant que l'équipe
+  de maintenance n'a pas corrigé la publication.
+
+## Intégration dans le parcours utilisateur
+
+- Le [Quickstart CLI](quickstart-cli.md) renvoie vers cette page après l'installation et l'initialisation.
+- Le [guide hors-ligne](offline_guide.md) complète ces contrôles pour les environnements déconnectés.
