@@ -1,5 +1,5 @@
 bandit==1.7.9
-black==24.8.0
+black==26.3.1
 build==1.2.2.post1
 codespell==2.3.0
 coverage==7.6.1
