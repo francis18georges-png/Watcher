@@ -248,3 +248,41 @@ def test_scheduler_migrates_legacy_queue(tmp_path):
     upgraded = json.loads(state_path.read_text(encoding="utf-8"))
     assert upgraded["queue"][0]["topic"] in {"bar", "foo"}
     assert isinstance(upgraded["queue"][0], dict)
+
+
+def test_scheduler_kill_switch_forces_offline(tmp_path):
+    policy = _policy()
+    kill_switch = tmp_path / "disable"
+    policy.kill_switch_file = str(kill_switch)
+    probe = DummyProbe(ResourceUsage(cpu_percent=10, ram_mb=256))
+    engine = DummyEngine()
+    scheduler = AutopilotScheduler(
+        policy_loader=lambda: policy,
+        state_path=tmp_path / "state.json",
+        resource_probe=probe,
+    )
+
+    scheduler.enable(["docs"], engine=engine, now=datetime(2024, 1, 1, 10, 0, 0))
+    kill_switch.write_text("1", encoding="utf-8")
+    state = scheduler.evaluate(engine=engine, now=datetime(2024, 1, 1, 10, 1, 0))
+
+    assert state.enabled is False
+    assert state.online is False
+    assert state.last_reason == "kill-switch"
+    assert engine.offline[-1] is True
+
+
+def test_scheduler_bandwidth_budget_enforced(tmp_path):
+    probe = DummyProbe(ResourceUsage(cpu_percent=10, ram_mb=256))
+    scheduler = AutopilotScheduler(
+        policy_loader=_policy,
+        state_path=tmp_path / "state.json",
+        resource_probe=probe,
+    )
+
+    scheduler.enable(["docs"], now=datetime(2024, 1, 1, 10, 0, 0))
+    scheduler.register_bandwidth_usage(500.5, now=datetime(2024, 1, 1, 10, 1, 0))
+    state = scheduler.evaluate(now=datetime(2024, 1, 1, 10, 2, 0))
+
+    assert state.online is False
+    assert state.last_reason == "budgets dépassés"

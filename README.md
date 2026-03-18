@@ -8,15 +8,14 @@ Mémoire vectorielle, curriculum adaptatif, A/B + bench et quality gate sécurit
 
 ## Version
 
-Les binaires et paquets signés sont publiés sur la page
-[GitHub Releases](https://github.com/francis18georges-png/Watcher/releases/latest).
-Le premier tag `vMAJOR.MINOR.PATCH` déclenche automatiquement la release ;
-tant qu'aucun tag n'est publié, le lien `releases/latest` renvoie `404`, ce qui est
-attendu.
+Le dépôt contient des workflows et des scripts de packaging, mais il ne faut pas en déduire qu'une distribution publique est disponible en continu.
+
+- **Releases publiques** : à considérer comme indisponibles tant qu'aucun tag publié ne contient réellement des artefacts téléchargeables.
+- **Artefacts maintenus dans le dépôt** : le code source, la configuration, les scripts, la documentation versionnée et les métriques locales.
+- **Artefacts potentiels** : wheels, archives packagées, SBOM ou bundles de signature, seulement lorsqu'une release effective a été créée et vérifiée.
 
 - 🗒️ Notes complètes : voir le [CHANGELOG](CHANGELOG.md) et la [page de notes de version](docs/release_notes.md).
-- ✅ Instructions de vérification (signatures, provenance, empreintes) : détaillées ci-dessous et à
-  appliquer pour chaque artefact téléchargé.
+- ✅ Les procédures de vérification ci-dessous décrivent la cible de packaging ; elles ne valent que lorsqu'un artefact public existe réellement.
 
 ## Démarrage hors ligne en 3 étapes
 
@@ -90,11 +89,8 @@ cffconvert --validate --format bibtex --outfile watcher.bib
 
 ## Documentation
 
-La documentation technique est générée avec [MkDocs Material](https://squidfunk.github.io/mkdocs-material/)
-et publiée via l'environnement **github-pages** du dépôt. Activez GitHub Pages (source :
-"GitHub Actions") pour rendre le site public, puis consultez
-[https://francis18georges-png.github.io/Watcher/](https://francis18georges-png.github.io/Watcher/)
-déployée automatiquement par `deploy-docs.yml`.
+La documentation source est maintenue dans `docs/` et peut être construite localement avec MkDocs.
+Le dépôt contient un workflow [`deploy-docs.yml`](.github/workflows/deploy-docs.yml), mais il ne faut pas présenter GitHub Pages comme une surface publique garantie tant qu'une page effectivement accessible n'est pas vérifiée.
 
 Pour la prévisualiser localement :
 
@@ -103,8 +99,8 @@ pip install -r requirements-dev.txt
 mkdocs serve
 ```
 
-Le workflow GitHub Actions [`deploy-docs.yml`](.github/workflows/deploy-docs.yml) construit le site avec `mkdocs build --strict`
-avant de le publier sur l'environnement **GitHub Pages** à chaque push sur `main`.
+Le workflow GitHub Actions [`deploy-docs.yml`](.github/workflows/deploy-docs.yml) construit le site avec `mkdocs build --strict`.
+Si GitHub Pages n'est pas activé ou accessible, la source de vérité reste la documentation versionnée dans ce dépôt.
 
 ## Sécurité et qualité automatisées
 
@@ -130,27 +126,27 @@ exécutions locales via `noxfile.py`.
 
 ## Releases, SBOM et provenance
 
-Chaque tag SemVer (`vMAJOR.MINOR.PATCH`) déclenche le workflow [`release.yml`](.github/workflows/release.yml) qui produit
-des exécutables Windows, Linux et macOS, un SBOM CycloneDX par plateforme et une attestation de provenance SLSA niveau 3.
+Le dépôt contient un workflow [`release.yml`](.github/workflows/release.yml) et des instructions de vérification d'artefacts.
+Cela décrit une **capacité de packaging** du dépôt, pas une promesse qu'une release publique est actuellement disponible.
 
 ### Artefacts publiés
 
-Chaque tag `vMAJOR.MINOR.PATCH` produit les artefacts suivants :
+Quand une release publique est réellement créée, elle peut inclure une partie des artefacts suivants selon l'état des workflows et de l'infrastructure :
 
-| Fichier | Description |
+| Fichier (ou motif) | Description |
 | --- | --- |
-| `watcher-windows-x86_64.zip` | Archive PyInstaller Windows autonome. |
-| `watcher-<version>.msi` / `watcher-<version>.msix` | Installeurs Windows (MSI WiX + MSIX signable). |
-| `watcher-macos-<arch>.dmg` | Image disque macOS signable et notarizable (arm64 + x86_64). |
-| `watcher-linux-x86_64.tar.gz` | Archive PyInstaller Linux autonome. |
-| `watcher-linux.AppImage` | AppImage signable contenant le binaire CLI. |
-| `watcher_<version>_amd64.deb` / `watcher-<version>-1.x86_64.rpm` | Paquets Debian et RPM générés à partir du bundle PyInstaller. |
-| `watcher-<version>.flatpak` | Bundle Flatpak exporté via `flatpak build-bundle`. |
-| `watcher-*.whl` / `watcher-*.tar.gz` | Wheel et sdist publiés automatiquement sur PyPI (Trusted Publishing OIDC). |
-| `checksums.txt`, `checksums.txt.sig`, `checksums.slsa.intoto.jsonl` | Manifestes de contrôle d'intégrité signés + provenance SLSA niveau 3. |
-| `watcher-*-sbom.json`, `watcher-image-sbom.cdx.json`, `sbom.spdx.json` | SBOM CycloneDX/SPDX pour les paquets applicatifs et l'image Docker. |
+| `watcher-linux-x86_64.tar.gz` | Archive exécutable Linux (PyInstaller). |
+| `watcher-windows-x86_64.zip` | Archive exécutable Windows (PyInstaller). |
+| `watcher-macos-x86_64.dmg`, `watcher-macos-arm64.dmg` | Images disque macOS. |
+| `watcher-<version>.msi`, `watcher-<version>.msix` | Installeurs Windows générés par `scripts/package_windows.py`. |
+| `watcher-linux.AppImage`, `watcher_<version>_amd64.deb`, `watcher-<version>-1.x86_64.rpm`, `watcher-<version>.flatpak` | Artefacts Linux générés par `scripts/package_linux.py`. |
+| `watcher-*.whl`, `watcher-*.tar.gz` | Paquets Python (wheel + sdist), ensuite publiés sur PyPI. |
+| `watcher-*-sbom.json` | SBOM CycloneDX par plateforme de build. |
+| `checksums.txt`, `checksums.txt.sig`, `checksums.slsa.intoto.jsonl` | Intégrité signée + provenance SLSA du lot de release. |
 
 ### Vérifier les artefacts publiés
+
+Cette section ne s'applique que si une release publique contient effectivement les fichiers mentionnés.
 
 Validez l'authenticité et l'intégrité des artefacts téléchargés pour un tag donné :
 
@@ -194,7 +190,7 @@ plateforme visée et conservez la provenance `*.intoto.jsonl` pour tracer la cha
 
 ### Installer sur Windows
 
-1. Téléchargez `Watcher-Setup.zip` ainsi que `Watcher-Setup.zip.sigstore` depuis la page GitHub Releases
+1. Téléchargez `watcher-windows-x86_64.zip` (et le manifeste `checksums.txt`) depuis la page GitHub Releases
    correspondant au tag SemVer (`vMAJOR.MINOR.PATCH`) que vous souhaitez déployer.
 2. Installez le CLI [Sigstore](https://www.sigstore.dev/) si nécessaire :
 
@@ -206,10 +202,10 @@ plateforme visée et conservez la provenance `*.intoto.jsonl` pour tracer la cha
 
    ```powershell
    sigstore verify identity `
-     --bundle Watcher-Setup.zip.sigstore `
+     --bundle checksums.txt.sig `
      --certificate-identity "https://github.com/francis18georges-png/Watcher/.github/workflows/release.yml@refs/tags/<tag>" `
      --certificate-oidc-issuer https://token.actions.githubusercontent.com `
-     Watcher-Setup.zip
+     checksums.txt
    ```
 
    Remplacez `<tag>` par la version téléchargée. Si vous validez un fork, adaptez l'identité du certificat pour refléter votre dépôt ; pour la distribution officielle, l'identité doit rester `https://github.com/francis18georges-png/Watcher/.github/workflows/release.yml@refs/tags/<tag>`.
@@ -223,11 +219,11 @@ Le bundle Sigstore fournit également un horodatage de transparence et peut êtr
 
 ### Installer sur Linux
 
-1. Téléchargez `Watcher-linux-x86_64.tar.gz` depuis la page GitHub Releases correspondant à la version désirée.
+1. Téléchargez `watcher-linux-x86_64.tar.gz` depuis la page GitHub Releases correspondant à la version désirée.
 2. Extrayez l'archive dans un répertoire dédié :
 
    ```bash
-   tar -xzf Watcher-linux-x86_64.tar.gz
+   tar -xzf watcher-linux-x86_64.tar.gz
    ```
 
 3. Exécutez le binaire depuis le dossier extrait :
@@ -242,8 +238,8 @@ Le bundle Sigstore fournit également un horodatage de transparence et peut êtr
 
 ### Installer sur macOS
 
-1. Téléchargez `Watcher-macos-x86_64.zip` depuis la page GitHub Releases.
-2. Décompressez l'archive (Finder → *Décompresser* ou `ditto -x -k Watcher-macos-x86_64.zip Watcher`).
+1. Téléchargez `watcher-macos-x86_64.dmg` ou `watcher-macos-arm64.dmg` depuis la page GitHub Releases.
+2. Montez l'image disque (`open watcher-macos-x86_64.dmg`) puis copiez l'application dans un dossier local (par ex. `~/Applications/Watcher/`).
 3. Si un certificat de signature est configuré, le binaire est signé et le workflow soumet automatiquement l'archive à la
    notarisation Apple à l'aide de `notarytool`. Vous pouvez vérifier l'intégrité locale :
 
@@ -370,8 +366,8 @@ Les fichiers d'environnement (`*.env`), les journaux (`*.log`) et les environnem
 
 ## Exécution via Docker
 
-Une image container officielle est construite par le workflow [`docker.yml`](.github/workflows/docker.yml)
-et publiée sur le registre GitHub Container Registry sous `ghcr.io/francis18georges-png/watcher`.
+Le dépôt contient un workflow [`docker.yml`](.github/workflows/docker.yml) pour construire une image container.
+Ne considérez pas l'image comme publiquement disponible tant qu'un tag ou un package GHCR vérifiable n'est pas présent.
 
 ### Utiliser l'image publiée
 
@@ -735,6 +731,40 @@ accélère les itérations et facilite la reprise après interruption.
 - `datasets/` : jeux d'entraînement Python (`fib`, `fizzbuzz`, `is_prime`).
 - `config/` : paramètres et règles de sécurité (`semgrep`).
 
+## Surface publique actuelle
+
+La surface publique décrite honnêtement aujourd'hui est la suivante :
+
+- le code source du dépôt ;
+- la CLI Python et les scripts locaux ;
+- la documentation versionnée dans `docs/` ;
+- les workflows CI/CD comme éléments d'infrastructure versionnés.
+
+Ne doivent pas être présentés comme garantis sans vérification :
+
+- GitHub Pages publique ;
+- GitHub Releases téléchargeables ;
+- images Docker publiées ;
+- artefacts signés/SBOM accessibles au public.
+
+## Slice Phase 1
+
+Le dépôt inclut maintenant une base minimale pour la Phase 1 de la roadmap documentaire contrôlée :
+
+- un **Source Registry** explicite, stocké localement en JSON ;
+- trois états de connaissance réels dans le code : `raw`, `validated`, `promoted` ;
+- des métadonnées minimales de traçabilité : source, type, langue, confiance, fraîcheur/date, licence, statut, ainsi que des traceurs HTTP quand ils existent (`etag`, `last_modified`, `fetched_at`).
+
+Cette base reste volontairement incrémentale : elle s'appuie sur la chaîne existante `autopilot -> scrapers -> ingest -> embeddings`, sans introduire de collecte web générale ni de boucle d'auto-amélioration.
+
+## GitHub ciblé
+
+Le support GitHub reste strictement ciblé et justifié :
+
+- **Supporté** : métadonnées de dépôt, dernière release, changelogs standards, documentation ciblée (`README.md`, `docs/README.md`, `docs/index.md`) et fichiers de référence explicitement autorisés via une spécification de repo du type `owner/repo:path/un.md,path/deux.py`.
+- **Non supporté pour le moment** : exploration large d'organisation, issues, pull requests, commits, arbre complet du dépôt, recherche GitHub globale, collecte récursive de documentation.
+- **Toujours soumis à corroboration** : release notes, changelogs, docs et fichiers de référence GitHub ne sont pas promus seuls ; ils passent par la vérification et les règles de corroboration existantes avant promotion.
+
 ## Sécurité
 
 Sandbox d'exécution confinée, tests et linters obligatoires avant adoption de code.
@@ -756,6 +786,8 @@ Les signalements doivent respecter la politique d'embargo décrite dans ce docum
 
 Watcher fonctionne hors ligne par défaut et n'envoie aucune donnée vers l'extérieur.
 Les journaux comme les contenus mémorisés restent sur l'environnement local et peuvent être effacés par l'utilisateur.
+
+La policy runtime (`config/policy.yaml` puis `~/.watcher/policy.yaml`) est appliquée par `app/autopilot/scheduler.py` et `app/autopilot/controller.py` : kill-switch, fenêtres réseau, caps CPU/RAM et budget `bandwidth_mb_per_day`. Ce budget est débité pendant la discovery (sitemaps, flux RSS, résolution GitHub ciblée) et pendant le scraping des pages, sur une fenêtre glissante de 24 h. Les accès `respect_robots=False` sont limités à l'API GitHub `api.github.com/repos/<owner>/<repo>` pour `scope=git`.
 
 ## Configuration des logs
 
@@ -799,3 +831,14 @@ Les contenus générés peuvent être conservés dans une base SQLite par le com
 
 Pour un aperçu détaillé des principes éthiques et des limites d'utilisation, consultez [ETHICS.md](ETHICS.md).
 
+
+
+## Checklist de vérification rapide
+
+Avant de communiquer publiquement sur Watcher, vérifier :
+
+- `docs/architecture.md` reflète bien l'arborescence réelle de `app/`.
+- `mkdocs build --strict` passe si la documentation doit être publiée.
+- une page GitHub Pages n'est mentionnée que si elle est effectivement accessible.
+- une GitHub Release n'est mentionnée que si elle contient réellement des artefacts.
+- les commandes CLI de base (`watcher init --fully-auto`, `watcher policy show`, `watcher run --offline`) restent exécutables localement.

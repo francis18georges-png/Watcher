@@ -270,7 +270,7 @@ diff --git a/app/scrapers/rss.py b/app/scrapers/rss.py
 ## I) Procédure d’installation & autostart
 1. Installer dépendances Python : `pip install -r requirements.txt` (ou package wheel signé).【F:README.md†L20-L33】
 2. Lancer `watcher init --fully-auto` (aucune interaction) : modèles vérifiés, config/policy/consents générés, autostart planifié, consentement initial journalisé.【F:README.md†L34-L60】【F:app/core/first_run.py†L69-L155】
-3. Vérifier policy/consents : `watcher policy show`, `watcher policy approve docs.python.org --scope autopilot`.【F:app/cli.py†L209-L270】
+3. Vérifier policy/consents : `watcher policy show`, `watcher policy approve --domain docs.python.org --scope autopilot`.【F:app/cli.py†L209-L270】
 4. Exécuter `watcher run --offline --prompt "Ping"` pour confirmer la réponse locale déterministe.【F:tests/test_e2e_offline.py†L1-L34】
 5. Autostart :
    - **Linux** : `systemctl --user daemon-reload && systemctl --user enable --now watcher-autopilot.timer` (généré automatiquement).【F:app/core/autostart.py†L46-L79】

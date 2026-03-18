@@ -14,6 +14,7 @@ import yaml
 from app.autopilot import (
     AutopilotController,
     ConsentGate,
+    DefaultDiscoveryCrawler,
     DiscoveryResult,
     KnowledgeGapDetector,
     MultiSourceVerifier,
@@ -91,8 +92,10 @@ class DummyCrawler:
 class DummyScraper:
     def __init__(self, mapping: dict[str, ScrapeResult]) -> None:
         self.mapping = mapping
+        self.calls: list[tuple[str, bool]] = []
 
     def fetch(self, url: str, *, respect_robots: bool = True) -> ScrapeResult | None:  # noqa: D401
+        self.calls.append((url, respect_robots))
         return self.mapping.get(url)
 
 
@@ -201,7 +204,7 @@ def test_autopilot_controller_end_to_end(tmp_path: Path) -> None:
     pipeline = IngestPipeline(store, chunk_size=256, min_sources=2, allowed_licences={"CC-BY-4.0"})
 
     crawler = DummyCrawler()
-    text = "Le contenu valide partagé."
+    text = "Le contenu valide partagé." * 8
     crawler.queue(
         [
             DiscoveryResult(
@@ -371,3 +374,263 @@ def test_knowledge_gap_detector_flags_missing_topics() -> None:
     assert "security: aucune source découverte" in gaps
     assert "ml: aucune source découverte" in gaps
     assert not any(item.startswith("python:") for item in gaps)
+
+
+def test_controller_tracks_bandwidth_and_robots_mode(tmp_path: Path) -> None:
+    start = datetime(2024, 1, 2, 9, 5, 0)
+    files = _prepare_policy(tmp_path, start)
+    clock = ControlledClock(start)
+    probe = SequenceProbe([ResourceUsage(cpu_percent=20, ram_mb=256)])
+    store = MemoryVectorStore()
+    pipeline = IngestPipeline(store, chunk_size=256, min_sources=2, allowed_licences={"CC-BY-4.0"})
+
+    crawler = DummyCrawler()
+    crawler.queue(
+        [
+            DiscoveryResult(
+                url="https://allowed-one.test/article",
+                title="Article A",
+                summary="",
+                licence="CC-BY-4.0",
+            ),
+            DiscoveryResult(
+                url="https://allowed-two.test/article",
+                title="Article B",
+                summary="",
+                licence="CC-BY-4.0",
+            ),
+        ]
+    )
+    text = "Le contenu valide partagé." * 8
+    scraper = DummyScraper(
+        {
+            "https://allowed-one.test/article": _scrape("https://allowed-one.test/article", text),
+            "https://allowed-two.test/article": _scrape("https://allowed-two.test/article", text),
+        }
+    )
+
+    manager = PolicyManager(home=tmp_path)
+    scheduler = AutopilotScheduler(
+        policy_manager=manager,
+        state_path=files.policy_path.parent / "autopilot-state.json",
+        resource_probe=probe,
+        clock=clock,
+    )
+    controller = AutopilotController(
+        scheduler=scheduler,
+        pipeline=pipeline,
+        crawler=crawler,
+        scraper=scraper,
+        throttle_seconds=0.0,
+        clock=clock,
+        sleep_func=lambda _: None,
+        report_path=files.policy_path.parent / "reports" / "weekly.html",
+    )
+
+    result = controller.run(["veille"])
+
+    assert result.ingested == 1
+    assert scraper.calls
+    assert all(call[1] is True for call in scraper.calls)
+    assert scheduler.state.bandwidth_mb_today > 0
+    registry_path = files.policy_path.parent / "source-registry.json"
+    assert registry_path.exists()
+    registry = json.loads(registry_path.read_text(encoding="utf-8"))
+    assert {item["status"] for item in registry} == {"promoted"}
+    assert all(item["source_type"] == "web" for item in registry)
+
+
+def test_controller_counts_discovery_bandwidth_before_scraping(tmp_path: Path) -> None:
+    start = datetime(2024, 1, 2, 9, 5, 0)
+    files = _prepare_policy(tmp_path, start)
+    policy = yaml.safe_load(files.policy_path.read_text(encoding="utf-8"))
+    policy["budgets"]["bandwidth_mb_per_day"] = 0
+    files.policy_path.write_text(yaml.safe_dump(policy, sort_keys=False), encoding="utf-8")
+
+    clock = ControlledClock(start)
+    probe = SequenceProbe([ResourceUsage(cpu_percent=20, ram_mb=256)])
+    store = MemoryVectorStore()
+    pipeline = IngestPipeline(store, chunk_size=256, min_sources=2, allowed_licences={"CC-BY-4.0"})
+    manager = PolicyManager(home=tmp_path)
+    scheduler = AutopilotScheduler(
+        policy_manager=manager,
+        state_path=files.policy_path.parent / "autopilot-state.json",
+        resource_probe=probe,
+        clock=clock,
+    )
+    controller = AutopilotController(
+        scheduler=scheduler,
+        pipeline=pipeline,
+        scraper=DummyScraper({}),
+        throttle_seconds=0.0,
+        clock=clock,
+        sleep_func=lambda _: None,
+        report_path=files.policy_path.parent / "reports" / "weekly.html",
+    )
+
+    feed = b"""<?xml version='1.0'?>
+    <rss version='2.0'>
+      <channel>
+        <item>
+          <title>AI Weekly</title>
+          <link>https://allowed-one.test/article</link>
+          <description>Focus on trustworthy AI systems.</description>
+        </item>
+      </channel>
+    </rss>
+    """
+
+    class DiscoveryHTTP:
+        def __init__(self, payload: bytes) -> None:
+            self.payload = payload
+            self.calls: list[tuple[str, bool]] = []
+
+        def fetch_raw(self, url: str, *, respect_robots: bool = True):
+            self.calls.append((url, respect_robots))
+            if url.endswith("/feed"):
+                return self.payload, {}
+            return None
+
+    discovery_http = DiscoveryHTTP(feed)
+    controller.crawler = DefaultDiscoveryCrawler(
+        http=discovery_http,
+        can_fetch=controller._can_fetch_more_bandwidth,
+        register_payload_bytes=controller._register_bandwidth_bytes,
+    )
+
+    result = controller.run(["AI"])
+
+    assert result.ingested == 0
+    assert result.reason is None
+    assert discovery_http.calls == []
+    assert scheduler.state.bandwidth_mb_today == 0
+    assert controller.scraper.calls == []
+
+
+def test_controller_records_raw_validated_promoted_states(tmp_path: Path) -> None:
+    start = datetime(2024, 1, 2, 9, 5, 0)
+    files = _prepare_policy(tmp_path, start)
+    clock = ControlledClock(start)
+    probe = SequenceProbe([ResourceUsage(cpu_percent=20, ram_mb=256)])
+    store = MemoryVectorStore()
+    pipeline = IngestPipeline(store, chunk_size=256, min_sources=2, allowed_licences={"CC-BY-4.0"})
+
+    crawler = DummyCrawler()
+    crawler.queue(
+        [
+            DiscoveryResult(
+                url="https://allowed-one.test/article",
+                title="Article A",
+                summary="",
+                licence="CC-BY-4.0",
+            ),
+            DiscoveryResult(
+                url="https://allowed-two.test/article",
+                title="Article B",
+                summary="",
+                licence="CC-BY-4.0",
+            ),
+        ]
+    )
+    text = "Le contenu valide partagé." * 8
+    scraper = DummyScraper(
+        {
+            "https://allowed-one.test/article": _scrape("https://allowed-one.test/article", text),
+            "https://allowed-two.test/article": _scrape("https://allowed-two.test/article", text),
+        }
+    )
+
+    manager = PolicyManager(home=tmp_path)
+    scheduler = AutopilotScheduler(
+        policy_manager=manager,
+        state_path=files.policy_path.parent / "autopilot-state.json",
+        resource_probe=probe,
+        clock=clock,
+    )
+    controller = AutopilotController(
+        scheduler=scheduler,
+        pipeline=pipeline,
+        crawler=crawler,
+        scraper=scraper,
+        throttle_seconds=0.0,
+        clock=clock,
+        sleep_func=lambda _: None,
+        report_path=files.policy_path.parent / "reports" / "weekly.html",
+    )
+
+    controller.run(["veille"])
+
+    registry_path = files.policy_path.parent / "source-registry.json"
+    registry = json.loads(registry_path.read_text(encoding="utf-8"))
+
+    assert len(registry) == 2
+    assert {item["status"] for item in registry} == {"promoted"}
+    assert all(item["confidence"] >= 1.0 for item in registry)
+    assert all(item["source"] in {"https://allowed-one.test/article", "https://allowed-two.test/article"} for item in registry)
+
+
+def test_controller_uses_prefetched_github_content_without_extra_scrape(tmp_path: Path) -> None:
+    start = datetime(2024, 1, 2, 9, 5, 0)
+    files = _prepare_policy(tmp_path, start)
+    policy = yaml.safe_load(files.policy_path.read_text(encoding="utf-8"))
+    policy["allowlist_domains"] = ["allowed-two.test", "github.com"]
+    files.policy_path.write_text(yaml.safe_dump(policy, sort_keys=False), encoding="utf-8")
+
+    clock = ControlledClock(start)
+    probe = SequenceProbe([ResourceUsage(cpu_percent=20, ram_mb=256)])
+    store = MemoryVectorStore()
+    pipeline = IngestPipeline(store, chunk_size=256, min_sources=2, allowed_licences={"CC-BY-4.0"})
+    crawler = DummyCrawler()
+    text = "Le contenu valide partagé." * 8
+    crawler.queue(
+        [
+            DiscoveryResult(
+                url="https://github.com/octocat/Hello-World/releases/tag/v1.2.3",
+                title="Release 1.2.3",
+                summary="Bug fixes",
+                licence="CC-BY-4.0",
+                content=text,
+                source_type="git-release",
+                fetched_at=start,
+                etag='"release"',
+                last_modified="Wed, 03 Jan 2024 10:00:00 GMT",
+            ),
+            DiscoveryResult(
+                url="https://allowed-two.test/article",
+                title="Article B",
+                summary="",
+                licence="CC-BY-4.0",
+            ),
+        ]
+    )
+    scraper = DummyScraper(
+        {
+            "https://allowed-two.test/article": _scrape("https://allowed-two.test/article", text),
+        }
+    )
+
+    manager = PolicyManager(home=tmp_path)
+    scheduler = AutopilotScheduler(
+        policy_manager=manager,
+        state_path=files.policy_path.parent / "autopilot-state.json",
+        resource_probe=probe,
+        clock=clock,
+    )
+    controller = AutopilotController(
+        scheduler=scheduler,
+        pipeline=pipeline,
+        crawler=crawler,
+        scraper=scraper,
+        throttle_seconds=0.0,
+        clock=clock,
+        sleep_func=lambda _: None,
+        report_path=files.policy_path.parent / "reports" / "weekly.html",
+    )
+
+    result = controller.run(["release"])
+
+    assert result.ingested == 1
+    assert scraper.calls == [("https://allowed-two.test/article", True)]
+    registry = json.loads((files.policy_path.parent / "source-registry.json").read_text(encoding="utf-8"))
+    assert {item["status"] for item in registry} == {"promoted"}
+    assert {item["source_type"] for item in registry} == {"git-release", "web"}

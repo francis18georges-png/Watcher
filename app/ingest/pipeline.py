@@ -8,8 +8,10 @@ from collections import defaultdict
 from dataclasses import dataclass
 from datetime import datetime
 from typing import Iterable, Sequence
+from urllib.parse import urlparse
 
 from app.embeddings.store import SimpleVectorStore
+from app.ingest.source_registry import KnowledgeStatus
 
 __all__ = [
     "RawDocument",
@@ -35,6 +37,38 @@ class RawDocument:
     text: str
     licence: str
     published_at: datetime | None = None
+    source_type: str = "web"
+    language: str | None = None
+    fetched_at: datetime | None = None
+    etag: str | None = None
+    last_modified: str | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class _ChunkingConfig:
+    size: int
+    overlap: int
+
+    @classmethod
+    def from_values(
+        cls,
+        *,
+        chunk_size: int,
+        chunk_overlap: int | None,
+    ) -> "_ChunkingConfig":
+        if chunk_size < 1:
+            raise ValueError("chunk_size must be >= 1")
+        if chunk_size == 1:
+            overlap = 0
+        elif chunk_overlap is None:
+            overlap = min(64, max(1, chunk_size // 5))
+        else:
+            overlap = int(chunk_overlap)
+        if overlap < 0:
+            raise ValueError("chunk_overlap must be >= 0")
+        if overlap >= chunk_size:
+            raise ValueError("chunk_overlap must be < chunk_size")
+        return cls(size=int(chunk_size), overlap=overlap)
 
 
 class IngestValidationError(ValueError):
@@ -50,6 +84,10 @@ class _ChunkCandidate:
     published_at: datetime | None
     language: str
     digest: str
+    source_type: str
+    fetched_at: datetime | None
+    etag: str | None
+    last_modified: str | None
 
 
 class IngestPipeline:
@@ -60,15 +98,19 @@ class IngestPipeline:
         store: SimpleVectorStore,
         *,
         chunk_size: int = 512,
+        chunk_overlap: int | None = None,
         min_sources: int = 2,
         allowed_licences: Iterable[str] | None = None,
     ) -> None:
-        if chunk_size < 1:
-            raise ValueError("chunk_size must be >= 1")
         if min_sources < 2:
             raise ValueError("min_sources must be >= 2")
         self.store = store
-        self.chunk_size = int(chunk_size)
+        self._chunking = _ChunkingConfig.from_values(
+            chunk_size=int(chunk_size),
+            chunk_overlap=chunk_overlap,
+        )
+        self.chunk_size = self._chunking.size
+        self.chunk_overlap = self._chunking.overlap
         self.min_sources = int(min_sources)
         self.allowed_licences = set(allowed_licences or _ALLOWED_LICENCES)
 
@@ -107,17 +149,15 @@ class IngestPipeline:
                 continue
             if digest in seen:
                 continue
-            score = self._compute_confidence(len(sources))
+            corroborating_sources = len(sources)
+            score = self._compute_confidence(corroborating_sources)
             representative = self._select_representative(items)
-            metadata: dict[str, object] = {
-                "url": representative.url,
-                "title": representative.title,
-                "licence": representative.licence,
-                "hash": digest,
-                "score": score,
-            }
-            if representative.published_at is not None:
-                metadata["date"] = representative.published_at.isoformat()
+            metadata = self._build_metadata(
+                representative=representative,
+                digest=digest,
+                corroborating_sources=corroborating_sources,
+                confidence_score=score,
+            )
             prepared_texts.append(representative.text)
             prepared_meta.append(metadata)
             seen.add(digest)
@@ -141,8 +181,8 @@ class IngestPipeline:
             normalised = _normalise_text(document.text)
             if not normalised:
                 continue
-            language = _detect_language(normalised)
-            for chunk in _chunk_text(normalised, self.chunk_size):
+            language = document.language or _detect_language(normalised)
+            for chunk in _chunk_text(normalised, self.chunk_size, self.chunk_overlap):
                 digest = hashlib.sha256(chunk.encode("utf-8")).hexdigest()
                 candidates.append(
                     _ChunkCandidate(
@@ -153,6 +193,10 @@ class IngestPipeline:
                         published_at=document.published_at,
                         language=language,
                         digest=digest,
+                        source_type=document.source_type,
+                        fetched_at=document.fetched_at,
+                        etag=document.etag,
+                        last_modified=document.last_modified,
                     )
                 )
         return candidates
@@ -172,6 +216,45 @@ class IngestPipeline:
         increment = 0.1
         score = base + (corroborating_sources - self.min_sources) * increment
         return round(min(1.0, score), 2)
+
+    def _build_metadata(
+        self,
+        *,
+        representative: _ChunkCandidate,
+        digest: str,
+        corroborating_sources: int,
+        confidence_score: float,
+    ) -> dict[str, object]:
+        metadata: dict[str, object] = {
+            "source": representative.url,
+            "url": representative.url,
+            "title": representative.title,
+            "licence": representative.licence,
+            "hash": digest,
+            "language": representative.language,
+            "source_type": representative.source_type,
+            "corroborating_sources": corroborating_sources,
+            "confidence_score": confidence_score,
+            "knowledge_state": KnowledgeStatus.PROMOTED.value,
+            # Compatibility aliases kept for existing callers/consumers.
+            "confidence": confidence_score,
+            "score": confidence_score,
+            "status": KnowledgeStatus.PROMOTED.value,
+        }
+        domain = _domain_from_url(representative.url)
+        if domain is not None:
+            metadata["domain"] = domain
+        if representative.published_at is not None:
+            published_iso = representative.published_at.isoformat()
+            metadata["date"] = published_iso
+            metadata["freshness_at"] = published_iso
+        if representative.fetched_at is not None:
+            metadata["fetched_at"] = representative.fetched_at.isoformat()
+        if representative.etag:
+            metadata["etag"] = representative.etag
+        if representative.last_modified:
+            metadata["last_modified"] = representative.last_modified
+        return metadata
 
 
 def _normalise_text(text: str) -> str:
@@ -197,14 +280,22 @@ def _detect_language(text: str) -> str:
     return "unknown"
 
 
-def _chunk_text(text: str, chunk_size: int) -> list[str]:
+def _chunk_text(text: str, chunk_size: int, chunk_overlap: int = 0) -> list[str]:
     words = text.split(" ")
     if not words:
         return []
     chunks: list[str] = []
-    step = max(1, chunk_size)
+    step = max(1, chunk_size - max(0, chunk_overlap))
     for start in range(0, len(words), step):
-        segment = " ".join(words[start : start + step]).strip()
+        segment = " ".join(words[start : start + chunk_size]).strip()
         if segment:
             chunks.append(segment)
+        if start + chunk_size >= len(words):
+            break
     return chunks
+
+
+def _domain_from_url(url: str) -> str | None:
+    parsed = urlparse(url)
+    hostname = (parsed.hostname or "").strip().lower()
+    return hostname or None

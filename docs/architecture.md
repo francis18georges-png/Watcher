@@ -1,132 +1,103 @@
-# Architecture
+# Architecture Watcher
 
-Watcher orchestre plusieurs briques spécialisées pour fournir un atelier d'IA local, sûr et traçable. Cette page
-présente les responsabilités de chaque composant et illustre les principaux échanges via des diagrammes Mermaid et
-PlantUML intégrés à la documentation.
+Cette page distingue explicitement :
 
-## Vue générale
+- **l'état actuel** : ce qui est observable dans le dépôt aujourd'hui ;
+- **la cible future** : ce que le projet vise, sans le présenter comme déjà livré.
 
-- **Interface utilisateur** : scripts CLI (`python -m app.ui.main`) et automatisations (`run.ps1`) qui déclenchent les
-  scénarios d'entraînement ou d'évaluation.
-- **Orchestrateur** : modules `app.core` responsables de la planification des tâches, de l'exécution des agents et du
-  pilotage du curriculum adaptatif.
-- **Agents et outils** : classes sous `app.agents` et `app.tools` chargées de la génération de code, de l'analyse et de la
-  rétroaction utilisateur.
-- **Mémoire vectorielle** : stockage persistant des connaissances et contextes dans `app.core.memory`.
-- **Qualité et sécurité** : bancs d'essai (`tests/`, `metrics/`, `QA.md`) et garde-fous (`bandit.yml`, `pyproject.toml`).
-- **Journalisation** : configuration centralisée via `app.core.logging_setup` pour tracer toutes les décisions et actions.
+## État actuel
 
-## Diagramme d'ensemble (Mermaid)
+Watcher est aujourd'hui un dépôt Python local-first centré sur une CLI, une politique runtime explicite et une chaîne d'ingestion locale.
 
-```mermaid
-flowchart LR
-    subgraph Client
-        User[Utilisateur]
-        CLI[CLI & scripts]
-    end
+### Arborescence réelle
 
-    subgraph Orchestration
-        Core[Orchestrateur]
-        Curriculum[Curriculum adaptatif]
-        Plugins[Gestion des plugins]
-    end
-
-    subgraph Execution
-        Agents[Agents spécialisés]
-        Tools[Outils & exécutants]
-    end
-
-    subgraph DataLayer[Persistance]
-        Memory[(Mémoire vectorielle)]
-        Datasets[(Datasets DVC)]
-        Logs[(Journal JSON)]
-    end
-
-    subgraph Assurance
-        QA[Benchmarks & QA]
-        Security[Garde-fous sécurité]
-    end
-
-    User --> CLI --> Core
-    Core --> Curriculum
-    Core --> Plugins
-    Core --> Agents
-    Agents --> Tools
-    Agents --> QA
-    QA --> Core
-    Agents --> Memory
-    Tools --> Memory
-    Memory --> Agents
-    Core --> Logs
-    Security --> Core
-    Security --> QA
-    Datasets --> Agents
-    Agents --> Datasets
+```text
+app/
+├── core/        # noyau applicatif, bootstrap, configuration, sandbox, mémoire SQLite, logging
+├── autopilot/   # scheduler, controller, discovery, reporting
+├── data/        # jeux de données, scraping/data helpers, préparation
+├── policy/      # schéma policy.yaml, manager, ledger de consentement
+├── scrapers/    # HTTP, sitemap, GitHub, règles robots.txt
+├── ingest/      # pipeline de validation et ingestion documentaire
+├── embeddings/  # stockage/vectorisation locale
+├── llm/         # clients et intégrations de modèles locaux
+├── tools/       # plugins, scaffolding, utilitaires
+└── ui/          # interface locale et point d'entrée graphique
 ```
 
-Le diagramme met en évidence la boucle de rétroaction : les agents consultent la mémoire vectorielle, exécutent des
-outils puis alimentent les bancs d'essai et les journaux. Les résultats réinjectés dans l'orchestrateur lui permettent
-d'affiner la stratégie d'entraînement.
+### Rôle des modules
 
-## Interactions détaillées (PlantUML)
+- **`app/core`** : cœur transverse du projet. On y trouve notamment le bootstrap, la configuration, le sandboxing, des composants runtime, du logging et une mémoire SQLite historique.
+- **`app/autopilot`** : applique la policy runtime pendant les cycles autonomes. Ce sous-système décide le passage online/offline, gère les budgets, la discovery et l'orchestration de collecte.
+- **`app/data`** : contient surtout des données, scripts et helpers de préparation/collecte. Ce n'est pas la couche métier principale.
+- **`app/policy`** : source de vérité pour `policy.yaml`, la validation du schéma, l'allowlist, le kill-switch et le ledger de consentement.
+- **`app/scrapers`** : couche réseau contrôlée, avec respect de `robots.txt`, throttling, cache et extraction.
+- **`app/ingest`** : transforme les documents collectés en entrées validées et ingérables.
+- **`app/ingest`** : transforme les documents collectés en entrées validées et ingérables. Cette couche porte désormais un registre de sources minimal et les états `raw`, `validated`, `promoted`.
+- **`app/embeddings`** : gère la partie vector store et l'indexation locale associée.
+- **`app/llm`** : encapsule les interactions avec les backends de modèles.
+- **`app/tools`** : expose des utilitaires de productivité et d'extension, notamment autour des plugins.
+- **`app/ui`** : interface locale actuelle.
 
-```plantuml
-@startuml
-skinparam componentStyle rectangle
-skinparam shadowing false
+### Flux actuel
 
-actor Utilisateur as User
+1. La CLI charge la configuration et la policy locale.
+2. `app/policy` valide les contraintes runtime.
+3. `app/autopilot/scheduler.py` décide si le réseau peut être activé.
+4. `app/autopilot/controller.py` orchestre `discover -> scrape -> verify -> ingest`.
+5. `app/scrapers` collecte sous contraintes.
+6. `app/ingest/source_registry.py` journalise la progression des sources et de la connaissance.
+7. `app/ingest` et `app/embeddings` valident puis indexent localement.
 
-package "Watcher" {
-  [Interface CLI] as CLI
-  [Orchestrateur] as Orchestrator
-  [Gestion des plugins] as Plugins
-  [Curriculum adaptatif] as Curriculum
-  [Mémoire vectorielle] as VectorStore
-  [Qualité & sécurité] as Quality
-  [Bus d'événements] as EventBus
-}
+### Slice Phase 1 déjà en place
 
-User --> CLI : Configure & lance les runs
-CLI --> Orchestrator : Commandes
-Orchestrator --> Plugins : Découverte & exécution
-Orchestrator --> Curriculum : Mise à jour des objectifs
-Orchestrator --> VectorStore : Lecture/écriture de contexte
-Orchestrator --> Quality : Benchmarks & garde-fous
-Quality --> Orchestrator : Rapports
-VectorStore --> Plugins : Fournit le contexte
-Quality --> EventBus : Alertes
-EventBus --> Orchestrator : Décisions automatisées
-@enduml
-```
+Le dépôt contient maintenant un premier slice réel de la boucle documentaire contrôlée :
 
-Cette vue composant détaille les principaux flux applicatifs et souligne l'importance de la modularité : chaque brique
-peut être remplacée ou étendue sans casser la chaîne de valeur si les interfaces documentées sont respectées.
+- **Source Registry** : registre JSON minimal explicite (`source-registry.json`) piloté par `app/ingest/source_registry.py`.
+- **États de connaissance** : `raw`, `validated`, `promoted`.
+- **Métadonnées minimales** : `source`, `source_type`, `confidence`, `freshness_at`, `licence`, `status`.
+- **Branchement incrémental** : la discovery et le contrôleur mettent à jour le registre sans remplacer `app/data`, `app/scrapers` ni `app/ingest`.
 
-## Chaîne d'observabilité
+### GitHub ciblé actuel
 
-```mermaid
-sequenceDiagram
-    autonumber
-    participant Agent
-    participant Logger
-    participant Sink as Stockage (JSON)
-    participant Monitor as Tableau de bord
+Le dépôt supporte désormais une collecte GitHub prudente et bornée pour la spécialisation programmation :
 
-    Agent->>Logger: événement(structuré)
-    Logger-->>Sink: append log
-    Sink-->>Monitor: export métriques
-    Monitor-->>Agent: feedback sur dérives
-```
+- **oui** : métadonnées de dépôt, dernière release, changelogs standards, documentation ciblée, fichiers de référence explicitement autorisés ;
+- **non** : scraping GitHub large, exploration récursive du dépôt, collecte d'issues/PR/commits ;
+- **promotion** : toute donnée GitHub reste soumise à la corroboration et au pipeline normal `raw -> validated -> promoted`.
 
-Cette séquence illustre comment les événements structurés alimentent la surveillance. La journalisation JSON autorise
-l'export vers des tableaux de bord tout en conservant la traçabilité locale.
+### Ce qui n'est plus affirmé comme état actuel
 
-## Points d'extension
+- Il n'existe pas de couche centrale `app.agents` dans l'arborescence réelle.
+- La mémoire vectorielle ne doit pas être décrite uniquement via `app.core.memory`.
+  L'état réel est mixte :
+  `app/core/memory.py` couvre une mémoire SQLite/historique, tandis que la chaîne d'ingestion et d'embeddings repose aujourd'hui surtout sur `app/ingest` et `app/embeddings`.
 
-- **Plugins** : `plugins.toml` et les entry points `watcher.plugins` permettent d'ajouter des capacités sans modifier le
-  noyau.
-- **Pipelines de qualité** : de nouveaux scénarios peuvent être ajoutés dans `tests/` ou `metrics/` pour renforcer les
-  contrôles.
-- **Sources de données** : les ensembles DVC sous `datasets/` peuvent être étendus avec de nouveaux corpus tout en
-  conservant la reproductibilité.
+## Cible future
+
+La cible raisonnable du projet est de clarifier et stabiliser les frontières entre sous-systèmes, sans gonfler la promesse publique.
+
+- **`app/core`** devrait rester la couche transverse commune, pas une zone fourre-tout.
+- **`app/data`** devrait rester orienté datasets/préparation, avec moins de logique applicative.
+- **`app/autopilot`** devrait devenir le point unique des cycles autonomes observables et auditables.
+- **`app/ingest` + `app/embeddings`** devraient porter de façon plus lisible toute la chaîne documentaire locale.
+- **`app/ui`** peut évoluer, mais la CLI reste aujourd'hui la surface la plus stable.
+- **Documentation publique et artefacts** : la cible est d'aligner automatiquement toute promesse publique avec des éléments réellement publiés et vérifiables.
+
+## Règle de vérité documentaire
+
+Une affirmation peut être décrite comme **état actuel** seulement si elle est :
+
+1. visible dans le code du dépôt ;
+2. cohérente avec l'arborescence réelle ;
+3. vérifiable localement ou par la CI.
+
+Sinon, elle doit être formulée comme **cible future** ou **travail en cours**.
+
+## Mini-checklist publique
+
+Avant de présenter une fonctionnalité comme publique ou disponible :
+
+- vérifier qu'elle existe bien dans `app/` ;
+- vérifier que le README ne la présente pas comme déjà publiée si ce n'est pas le cas ;
+- vérifier qu'un artefact, une page ou une commande locale permet réellement de la constater.

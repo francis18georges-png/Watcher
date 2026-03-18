@@ -68,5 +68,45 @@ def test_pipeline_skips_incompatible_licence_and_deduplicates() -> None:
     texts, metas = store.add_calls[0]
     assert len(texts) == 1
     assert len(metas) == 1
+    assert metas[0]["language"] == "unknown"
+    assert metas[0]["source_type"] == "web"
+    assert metas[0]["source"] in {"https://example.com/a", "https://example.com/c"}
+    assert metas[0]["corroborating_sources"] == 2
+    assert metas[0]["confidence_score"] >= 0.6
+    assert metas[0]["knowledge_state"] == "promoted"
+    assert metas[0]["status"] == "promoted"
+    assert metas[0]["confidence"] >= 0.6
+    assert "freshness_at" in metas[0]
+    assert metas[0]["domain"] in {"example.com"}
     assert metas[0]["licence"] == "CC-BY-4.0"
     assert metas[0]["url"] in {"https://example.com/a", "https://example.com/c"}
+
+
+def test_pipeline_uses_overlap_chunking() -> None:
+    store = DummyStore()
+    pipeline = IngestPipeline(store, chunk_size=4, chunk_overlap=1)
+    text = "alpha beta gamma delta epsilon zeta eta"
+    docs = [
+        RawDocument(
+            url="https://example.com/a",
+            title="Source A",
+            text=text,
+            licence="CC-BY-4.0",
+        ),
+        RawDocument(
+            url="https://example.com/b",
+            title="Source B",
+            text=text,
+            licence="CC-BY-4.0",
+        ),
+    ]
+
+    count = pipeline.ingest(docs)
+
+    assert count == 2
+    texts, metas = store.add_calls[0]
+    assert texts == [
+        "alpha beta gamma delta",
+        "delta epsilon zeta eta",
+    ]
+    assert all(meta["corroborating_sources"] == 2 for meta in metas)

@@ -14,13 +14,19 @@ class SitemapScraper:
     def __init__(self, http: HTTPScraper) -> None:
         self.http = http
 
-    def fetch(self, sitemap_url: str) -> List[str]:
+    def fetch(self, sitemap_url: str, *, respect_robots: bool = True) -> List[str]:
         """Download *sitemap_url* and return contained URLs."""
 
-        payload = self.http.fetch_raw(sitemap_url, respect_robots=False)
+        payload = self.http.fetch_raw(sitemap_url, respect_robots=respect_robots)
         if payload is None:
             return []
         raw, _ = payload
+        return self.parse(raw)
+
+    @staticmethod
+    def parse(raw: bytes) -> List[str]:
+        """Parse raw sitemap XML bytes into URL candidates."""
+
         try:
             root = ET.fromstring(raw)
         except ET.ParseError:

@@ -348,6 +348,12 @@ def main(argv: Sequence[str] | None = None) -> int:
         default="web",
         help="Portée (ex: web, git)",
     )
+<<<<<<< ours
+<<<<<<< ours
+=======
+
+>>>>>>> theirs
+=======
     approve_parser.add_argument(
         "--categories",
         nargs="*",
@@ -367,6 +373,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         help="Budget temps (minutes)",
     )
 
+>>>>>>> theirs
     revoke_parser = policy_sub.add_parser(
         "revoke",
         help="Révoquer un domaine préalablement approuvé",
@@ -552,17 +559,31 @@ def main(argv: Sequence[str] | None = None) -> int:
                 print(manager.show().rstrip())
                 return 0
             if args.policy_command == "approve":
+<<<<<<< ours
+<<<<<<< ours
+                domain = manager.approve(domain=args.domain, scope=args.scope)
+                print(f"Autorisation enregistrée pour {domain} ({args.scope})")
+=======
+                rule = manager.approve(
+                    domain=args.domain,
+                    scope=args.scope,
+=======
                 rule = manager.approve(
                     domain=args.domain,
                     scope=args.scope,
                     categories=args.categories,
                     bandwidth_mb=args.bandwidth,
                     time_budget_minutes=args.time_budget,
+>>>>>>> theirs
                 )
                 print(
                     "Autorisation enregistrée pour "
                     f"{rule.domain} ({rule.scope})"
                 )
+<<<<<<< ours
+>>>>>>> theirs
+=======
+>>>>>>> theirs
                 return 0
             if args.policy_command == "revoke":
                 manager.revoke(args.domain, scope=args.scope)
@@ -637,6 +658,8 @@ def main(argv: Sequence[str] | None = None) -> int:
                     text=text,
                     licence=args.licence,
                     published_at=published_at,
+                    source_type="file",
+                    fetched_at=published_at,
                 )
             )
         if len(documents) < args.min_sources:

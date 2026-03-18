@@ -1,9 +1,8 @@
 from __future__ import annotations
 
 import hashlib
+from dataclasses import dataclass
 from pathlib import Path
-from typing import Iterable
-
 import yaml
 
 from pydantic import ValidationError
@@ -14,6 +13,15 @@ from .schema import Policy
 
 class PolicyError(RuntimeError):
     """Raised when the policy file is missing or malformed."""
+
+
+@dataclass(frozen=True, slots=True)
+class PolicyApproval:
+    """Result of an approval operation recorded in the policy ledger."""
+
+    domain: str
+    scope: str
+    created: bool
 
 
 class PolicyManager:
@@ -69,21 +77,22 @@ class PolicyManager:
         *,
         domain: str,
         scope: str,
-        categories: Iterable[str] | None = None,
-        bandwidth_mb: int | None = None,
-        time_budget_minutes: int | None = None,
-    ) -> str:
-        del categories, bandwidth_mb, time_budget_minutes  # legacy compatibility
+    ) -> PolicyApproval:
         policy = self._read_policy()
         domain_norm = domain.strip().lower()
+        scope_norm = scope.strip().lower()
         if not domain_norm:
             raise PolicyError("domain must not be empty")
+        if not scope_norm:
+            raise PolicyError("scope must not be empty")
+        created = False
         if domain_norm not in policy.allowlist_domains:
             policy.allowlist_domains.append(domain_norm)
             policy.allowlist_domains = sorted(set(policy.allowlist_domains))
             self._write_policy(policy)
-        self._record("approve", domain=domain_norm, scope=scope)
-        return domain_norm
+            created = True
+        self._record("approve", domain=domain_norm, scope=scope_norm)
+        return PolicyApproval(domain=domain_norm, scope=scope_norm, created=created)
 
     def revoke(self, domain: str, scope: str | None = None) -> None:
         policy = self._read_policy()

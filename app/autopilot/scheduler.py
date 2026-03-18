@@ -5,7 +5,7 @@ from __future__ import annotations
 import json
 import logging
 from dataclasses import dataclass, field
-from datetime import datetime, time
+from datetime import datetime, time, timedelta
 from pathlib import Path
 from typing import Any, Callable, Mapping, Sequence
 
@@ -172,6 +172,8 @@ class AutopilotState:
     logs: list[AutopilotLogEntry] = field(default_factory=list)
     last_cpu_percent: float | None = None
     last_ram_mb: float | None = None
+    bandwidth_mb_today: float = 0.0
+    bandwidth_window_started_at: str | None = None
 
     def __post_init__(self) -> None:
         self.queue = self._coerce_queue(self.queue)
@@ -187,6 +189,8 @@ class AutopilotState:
             "logs": [entry.to_dict() for entry in self.logs],
             "last_cpu_percent": self.last_cpu_percent,
             "last_ram_mb": self.last_ram_mb,
+            "bandwidth_mb_today": self.bandwidth_mb_today,
+            "bandwidth_window_started_at": self.bandwidth_window_started_at,
         }
 
     @classmethod
@@ -205,6 +209,8 @@ class AutopilotState:
             logs=logs,
             last_cpu_percent=data.get("last_cpu_percent"),  # type: ignore[arg-type]
             last_ram_mb=data.get("last_ram_mb"),  # type: ignore[arg-type]
+            bandwidth_mb_today=float(data.get("bandwidth_mb_today", 0.0)),
+            bandwidth_window_started_at=data.get("bandwidth_window_started_at"),  # type: ignore[arg-type]
         )
 
     @staticmethod
@@ -378,6 +384,7 @@ class AutopilotScheduler:
             if engine is not None:
                 engine.set_offline(True)
             return self.state
+        self._refresh_bandwidth_window(now)
         usage = self._resource_probe.snapshot()
         self.state.last_cpu_percent = usage.cpu_percent
         self.state.last_ram_mb = usage.ram_mb
@@ -413,6 +420,48 @@ class AutopilotScheduler:
                 engine.set_offline(True)
         self._save_state()
         return self.state
+
+    def register_bandwidth_usage(
+        self,
+        payload_mb: float,
+        *,
+        now: datetime | None = None,
+    ) -> None:
+        """Record consumed network bandwidth for the current daily budget window."""
+
+        consumed = max(0.0, float(payload_mb))
+        current = now or self._clock()
+        self._refresh_bandwidth_window(current)
+        self.state.bandwidth_mb_today += consumed
+        self._save_state()
+
+    def remaining_bandwidth_mb(
+        self,
+        policy: Policy,
+        *,
+        now: datetime | None = None,
+    ) -> float:
+        """Return the remaining daily bandwidth budget for the current window."""
+
+        current = now or self._clock()
+        self._refresh_bandwidth_window(current)
+        remaining = float(policy.budgets.bandwidth_mb_per_day) - self.state.bandwidth_mb_today
+        return max(0.0, remaining)
+
+    def has_bandwidth_budget(
+        self,
+        policy: Policy,
+        *,
+        now: datetime | None = None,
+        expected_payload_mb: float = 0.0,
+    ) -> bool:
+        """Report whether the current window can still absorb ``expected_payload_mb``."""
+
+        remaining = self.remaining_bandwidth_mb(policy, now=now)
+        expected = max(0.0, float(expected_payload_mb))
+        if expected == 0.0:
+            return remaining > 0.0
+        return remaining >= expected
 
     # ------------------------------------------------------------------
     # Helpers
@@ -532,7 +581,29 @@ class AutopilotScheduler:
     def _within_budgets(self, policy: Policy, usage: ResourceUsage) -> bool:
         cpu_ok = usage.cpu_percent <= policy.budgets.cpu_percent_cap
         ram_ok = usage.ram_mb <= policy.budgets.ram_mb_cap
-        return cpu_ok and ram_ok
+        bandwidth_ok = self.state.bandwidth_mb_today <= float(policy.budgets.bandwidth_mb_per_day)
+        return cpu_ok and ram_ok and bandwidth_ok
+
+    def _refresh_bandwidth_window(self, now: datetime) -> None:
+        """Rotate daily bandwidth usage accounting every 24 hours."""
+
+        start = self._parse_timestamp(self.state.bandwidth_window_started_at)
+        if start is None:
+            self.state.bandwidth_window_started_at = self._timestamp(now)
+            self.state.bandwidth_mb_today = 0.0
+            return
+        if now - start >= timedelta(days=1):
+            self.state.bandwidth_window_started_at = self._timestamp(now)
+            self.state.bandwidth_mb_today = 0.0
+
+    @staticmethod
+    def _parse_timestamp(value: str | None) -> datetime | None:
+        if not value:
+            return None
+        try:
+            return datetime.fromisoformat(value)
+        except ValueError:
+            return None
 
 _DAY_ORDER: tuple[str, ...] = ("mon", "tue", "wed", "thu", "fri", "sat", "sun")
 

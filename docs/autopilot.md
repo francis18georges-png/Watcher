@@ -16,8 +16,8 @@ et une ingestion 100 % locales, gouvernées par la politique `policy.yaml`, sans
 2. **Boucle continue**
    - La commande `watcher autopilot run --noninteractive` déclenche le contrôleur (`app/autopilot/controller.py`) qui orchestre
      la boucle `discover → scrape → verify → ingest → reindex` jusqu'à la prochaine fenêtre programmée.
-   - La planification (`app/autopilot/scheduler.py`) applique les créneaux réseau (`02:00–04:00`, `network_windows`) et les
-     budgets (`bandwidth_mb_per_day`, `cpu_percent_cap`, `ram_mb_cap`). Hors plage, le réseau reste coupé.
+   - La planification (`app/autopilot/scheduler.py`) applique les créneaux réseau (`network_windows`) et les
+     budgets (`bandwidth_mb_per_day`, `cpu_percent_cap`, `ram_mb_cap`). Le quota bande passante est compté sur une fenêtre glissante de 24h. Hors plage, le réseau reste coupé.
 
 3. **Surveillance et rapports**
    - Chaque itération journalise un `trace_id` JSON structuré pour audit (`~/.watcher/logs/`).
@@ -41,7 +41,7 @@ système de fichiers limité au workspace (`~/.watcher/workspace`).
 
 - **Offline par défaut** : la politique impose `offline_default: true`. Le réseau n'est activé que durant les fenêtres
   autorisées. `pytest-socket` garantit ce comportement en tests.
-- **Budgets** : la scheduler réduit dynamiquement le nombre de tâches si les quotas CPU/RAM/bande passante approchent 100 %.
+- **Budgets** : la scheduler coupe le passage online dès qu'un quota CPU/RAM/bande passante est dépassé. Le contrôleur et la discovery débitent tous deux le budget journalier de bande passante, sur une fenêtre glissante de 24 h, puis arrêtent toute nouvelle requête dès qu'il est épuisé.
 - **Kill-switch** : la présence de `~/.watcher/disable` arrête la boucle en cours. Le fichier est surveillé à chaque itération.
 
 ## Journalisation et audit
@@ -59,3 +59,11 @@ système de fichiers limité au workspace (`~/.watcher/workspace`).
   interaction.
 
 Ces tests sont intégrés aux pipelines CI, assurant le mode plug-and-play et la conformité aux critères de confiance.
+
+
+## Exceptions réseau minimales
+
+- **HTTP non chiffré (`http://`)** : interdit par défaut en discovery.
+- **Exception locale uniquement** : `localhost`, `127.0.0.1`, `::1` peuvent conserver un fallback HTTP pour les environnements de test/offline locaux.
+- **Robots.txt** : discovery et scraping utilisent `respect_robots=True` partout, y compris pour les sitemaps et les flux RSS.
+- **GitHub scope (`scope=git`)** : unique exception runtime. Watcher interroge seulement `api.github.com/repos/<owner>/<repo>` avec `respect_robots=False`, car il s'agit d'un endpoint API machine explicite utilisé uniquement pour résoudre un dépôt déjà ciblé par la policy (allowlist/topic). Aucune autre voie `no-robots` n'est autorisée.

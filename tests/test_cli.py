@@ -5,6 +5,7 @@ import logging
 
 import pytest
 
+from app import cli as watcher_cli
 from app.tools.scaffold import create_python_cli
 
 
@@ -47,3 +48,56 @@ def test_create_python_cli_force_overwrite(tmp_path, caplog):
         sys.argv = argv
         sys.path.pop(0)
     assert "pong" in caplog.text
+
+
+@pytest.fixture(autouse=True)
+def _stub_watcher_settings(monkeypatch):
+    """Avoid full runtime config loading while testing watcher CLI routes."""
+
+    class _Settings:
+        class llm:
+            backend = "stub"
+            model = "stub-model"
+
+        class training:
+            seed = 42
+
+        class intelligence:
+            mode = "offline"
+
+    monkeypatch.setattr(watcher_cli, "get_settings", lambda: _Settings())
+
+
+def test_watcher_policy_cli_approve_revoke_flow(tmp_path, monkeypatch, capsys):
+    home = tmp_path / "home"
+    home.mkdir()
+    monkeypatch.setenv("HOME", str(home))
+
+    configurator = watcher_cli.FirstRunConfigurator(home=home)
+    configurator.run(auto=True, download_models=False)
+
+    approve_code = watcher_cli.main(
+        ["policy", "approve", "--domain", "example.com", "--scope", "web"]
+    )
+    assert approve_code == 0
+    assert "Autorisation enregistrée" in capsys.readouterr().out
+
+    revoke_code = watcher_cli.main(["policy", "revoke", "--domain", "example.com"])
+    assert revoke_code == 0
+    assert "Autorisation révoquée" in capsys.readouterr().out
+
+
+def test_watcher_policy_cli_rejects_invalid_scope(tmp_path, monkeypatch):
+    home = tmp_path / "home"
+    home.mkdir()
+    monkeypatch.setenv("HOME", str(home))
+
+    configurator = watcher_cli.FirstRunConfigurator(home=home)
+    configurator.run(auto=True, download_models=False)
+
+    with pytest.raises(SystemExit) as exc:
+        watcher_cli.main(
+            ["policy", "approve", "--domain", "example.com", "--scope", "   "]
+        )
+
+    assert exc.value.code == 2

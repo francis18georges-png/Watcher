@@ -215,3 +215,125 @@ def test_ingest_command_reads_files(monkeypatch, tmp_path, capsys):
     assert file_b.as_uri() in captured_urls
     captured = capsys.readouterr()
     assert "extrait(s) validé(s)" in captured.out
+<<<<<<< ours
+
+
+<<<<<<< ours
+def _prepare_policy_home(tmp_path: Path) -> Path:
+    """Create a minimal Watcher home with policy/ledger files."""
+
+    from app.core.first_run import FirstRunConfigurator
+
+    home = tmp_path / "home"
+    home.mkdir()
+    configurator = FirstRunConfigurator(home=home)
+    configurator.run(auto=True, download_models=False)
+    return home
+
+
+def test_policy_approve_and_revoke_roundtrip(monkeypatch, tmp_path, capsys):
+    home = _prepare_policy_home(tmp_path)
+    manager = cli.PolicyManager(home=home)
+    monkeypatch.setattr(cli, "PolicyManager", lambda: manager)
+
+    approve_exit = cli.main(
+        ["policy", "approve", "--domain", "Example.COM", "--scope", "web"]
+    )
+    assert approve_exit == 0
+    approve_output = capsys.readouterr().out
+    assert "Autorisation enregistrée pour example.com (web)" in approve_output
+
+    policy_text = (home / ".watcher" / "policy.yaml").read_text(encoding="utf-8")
+    assert "example.com" in policy_text
+
+    revoke_exit = cli.main(["policy", "revoke", "--domain", "example.com"])
+    assert revoke_exit == 0
+    revoke_output = capsys.readouterr().out
+    assert "Autorisation révoquée pour example.com" in revoke_output
+
+
+@pytest.mark.parametrize(
+    ("argv", "message_fragment"),
+    [
+        (["policy", "approve", "--domain", "   "], "domain must not be empty"),
+        (["policy", "revoke", "--domain", "unknown.test"], "aucune autorisation trouvée"),
+        (
+            ["policy", "approve", "--domain", "example.com", "--bandwidth", "10"],
+            "unrecognized arguments: --bandwidth 10",
+        ),
+    ],
+)
+def test_policy_commands_report_expected_errors(
+    monkeypatch, tmp_path, argv, message_fragment, capsys
+):
+    home = _prepare_policy_home(tmp_path)
+    manager = cli.PolicyManager(home=home)
+    monkeypatch.setattr(cli, "PolicyManager", lambda: manager)
+
+    with pytest.raises(SystemExit) as exc_info:
+        cli.main(argv)
+
+    assert exc_info.value.code == 2
+    captured = capsys.readouterr()
+    assert message_fragment in captured.err
+=======
+def test_policy_approve_and_revoke_cli(tmp_path, monkeypatch, capsys):
+    home = tmp_path / "home"
+    home.mkdir()
+    monkeypatch.setenv("HOME", str(home))
+
+    configurator = cli.FirstRunConfigurator(home=home)
+    configurator.run(auto=True, download_models=False)
+
+    approve_exit = cli.main(
+        ["policy", "approve", "--domain", "Example.COM", "--scope", "Web"]
+    )
+    assert approve_exit == 0
+    captured = capsys.readouterr()
+    assert "Autorisation enregistrée pour example.com (web)" in captured.out
+
+    manager = cli.PolicyManager(home=home)
+    policy = manager._read_policy()
+    assert "example.com" in policy.allowlist_domains
+
+    revoke_exit = cli.main(["policy", "revoke", "--domain", "example.com"])
+    assert revoke_exit == 0
+    captured = capsys.readouterr()
+    assert "Autorisation révoquée pour example.com" in captured.out
+
+    policy = manager._read_policy()
+    assert "example.com" not in policy.allowlist_domains
+
+
+def test_policy_cli_expected_errors(tmp_path, monkeypatch, capsys):
+    home = tmp_path / "home"
+    home.mkdir()
+    monkeypatch.setenv("HOME", str(home))
+
+    configurator = cli.FirstRunConfigurator(home=home)
+    configurator.run(auto=True, download_models=False)
+
+    with pytest.raises(SystemExit) as approve_error:
+        cli.main(
+            ["policy", "approve", "--domain", "example.com", "--scope", "   "]
+        )
+    assert approve_error.value.code == 2
+    approve_output = capsys.readouterr()
+    assert "scope must not be empty" in approve_output.err
+
+    with pytest.raises(SystemExit) as revoke_error:
+        cli.main(["policy", "revoke", "--domain", "unknown.test"])
+    assert revoke_error.value.code == 2
+    revoke_output = capsys.readouterr()
+    assert "aucune autorisation trouvée pour unknown.test" in revoke_output.err
+
+    with pytest.raises(SystemExit) as removed_option_error:
+        cli.main(
+            ["policy", "approve", "--domain", "example.com", "--categories", "news"]
+        )
+    assert removed_option_error.value.code == 2
+    removed_option_output = capsys.readouterr()
+    assert "unrecognized arguments: --categories news" in removed_option_output.err
+>>>>>>> theirs
+=======
+>>>>>>> theirs

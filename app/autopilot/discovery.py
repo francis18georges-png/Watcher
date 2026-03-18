@@ -6,6 +6,7 @@ from collections.abc import Iterable, Iterator, Sequence
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from email.utils import parsedate_to_datetime
+from typing import Callable
 from urllib.parse import urlparse
 import xml.etree.ElementTree as ET
 
@@ -35,13 +36,14 @@ class DefaultDiscoveryCrawler:
         http: HTTPScraper | None = None,
         sitemap: SitemapScraper | None = None,
         github: GitHubScraper | None = None,
+        can_fetch: Callable[[], bool] | None = None,
+        register_payload_bytes: Callable[[int], None] | None = None,
     ) -> None:
         self._http = http or HTTPScraper()
         self._sitemap = sitemap or SitemapScraper(self._http)
         self._github = github or GitHubScraper(self._http)
-
-    # ------------------------------------------------------------------
-    # Public API
+        self._can_fetch = can_fetch
+        self._register_payload_bytes = register_payload_bytes
 
     def discover(
         self,
@@ -49,15 +51,13 @@ class DefaultDiscoveryCrawler:
         rules: Sequence[DomainRule],
     ) -> Iterable[DiscoveryResult]:
         seen: set[str] = set()
-        lowered_topics = [item.lower() for item in topics if item]
+        filtered_topics = [item.strip() for item in topics if item and item.strip()]
         for rule in rules:
-            for result in self._discover_for_rule(rule, lowered_topics):
+            for result in self._discover_for_rule(rule, filtered_topics):
                 if result.url in seen:
                     continue
                 seen.add(result.url)
                 yield result
-
-    # ------------------------------------------------------------------
 
     def _discover_for_rule(
         self, rule: DomainRule, topics: Sequence[str]
@@ -72,17 +72,28 @@ class DefaultDiscoveryCrawler:
         self, rule: DomainRule, topics: Sequence[str]
     ) -> Iterator[DiscoveryResult]:
         for sitemap_url in self._candidate_sitemaps(rule.domain):
-            for url in self._sitemap.fetch(sitemap_url):
+            if not self._budget_available():
+                return
+            payload = self._http.fetch_raw(sitemap_url, respect_robots=True)
+            if payload is None:
+                continue
+            raw, _headers = payload
+            self._record_payload(raw)
+            for url in self._sitemap.parse(raw):
                 if not self._url_allowed(rule, url):
                     continue
                 if not self._matches_topics(topics, url):
                     continue
                 yield DiscoveryResult(url=url, title="", summary="")
+
         for feed_url in self._candidate_feeds(rule.domain):
-            payload = self._http.fetch_raw(feed_url, respect_robots=False)
+            if not self._budget_available():
+                return
+            payload = self._http.fetch_raw(feed_url, respect_robots=True)
             if payload is None:
                 continue
             raw, _headers = payload
+            self._record_payload(raw)
             for entry in self._parse_feed(raw):
                 if not self._url_allowed(rule, entry.url):
                     continue
@@ -98,73 +109,81 @@ class DefaultDiscoveryCrawler:
     def _discover_git(
         self, rule: DomainRule, topics: Sequence[str]
     ) -> Iterator[DiscoveryResult]:
-        repos = self._candidate_repositories(rule, topics)
-        for repo in repos:
-            info = self._github.fetch_repository(repo)
-            if info is None:
+        for repo in self._candidate_repositories(rule, topics):
+            if not self._budget_available():
+                return
+            bundle = self._github.fetch_programming_bundle(repo)
+            if bundle is None or not bundle.repository.url:
                 continue
-            if not info.url:
-                continue
-            if not self._url_allowed(rule, info.url):
-                continue
-            if topics and not self._matches_topics(topics, info.repository):
+            self._record_payload_bytes(bundle.payload_bytes)
+            if bundle.documents:
+                for document in bundle.documents:
+                    yield DiscoveryResult(
+                        url=document.url,
+                        title=document.title,
+                        summary=document.summary,
+                        licence=document.license,
+                        published_at=document.published_at,
+                        content=document.content,
+                        fetched_at=document.fetched_at,
+                        etag=document.etag,
+                        last_modified=document.last_modified,
+                        source_type=document.source_type,
+                    )
                 continue
             yield DiscoveryResult(
-                url=info.url,
-                title=info.repository,
-                summary="Dépôt GitHub découvert via allowlist",
-                licence=info.license,
+                url=bundle.repository.url,
+                title=bundle.repository.repository,
+                summary=(
+                    bundle.repository.description
+                    or "Dépôt GitHub ciblé sans artefact textuel collecté"
+                ),
+                licence=bundle.repository.license,
+                source_type="git-repository",
             )
-
-    # ------------------------------------------------------------------
-    # Helpers
 
     @staticmethod
     def _candidate_sitemaps(domain: str) -> list[str]:
         bases = DefaultDiscoveryCrawler._candidate_bases(domain)
-        return [f"{base}/sitemap.xml" for base in bases] + [
-            f"{base}/sitemap_index.xml" for base in bases
-        ]
+        return [f"{base}/sitemap.xml" for base in bases]
 
     @staticmethod
     def _candidate_feeds(domain: str) -> list[str]:
         bases = DefaultDiscoveryCrawler._candidate_bases(domain)
-        suffixes = ("/feed", "/rss.xml", "/rss", "/atom.xml")
-        return [f"{base}{suffix}" for base in bases for suffix in suffixes]
+        return [f"{base}/feed" for base in bases] + [f"{base}/rss.xml" for base in bases]
 
     @staticmethod
     def _candidate_bases(domain: str) -> list[str]:
-        parsed = urlparse(domain if "//" in domain else f"//{domain}", "https")
-        host = parsed.netloc or parsed.path
-        host = host.strip().strip("/")
+        parsed = urlparse(domain if "://" in domain else f"https://{domain}")
+        host = (parsed.netloc or parsed.path).strip().strip("/")
         if not host:
             return []
-        if parsed.scheme in {"http", "https"}:
-            bases = [f"{parsed.scheme}://{host}"]
-        else:
-            bases = [f"https://{host}"]
-        if not any(base.startswith("http://") for base in bases):
+        scheme = parsed.scheme if parsed.scheme in {"http", "https"} else "https"
+        bases = [f"{scheme}://{host}"]
+        if scheme == "https" and DefaultDiscoveryCrawler._allow_insecure_http(host):
             bases.append(f"http://{host}")
-        return list(dict.fromkeys(bases))
+        return bases
+
+    @staticmethod
+    def _allow_insecure_http(host: str) -> bool:
+        return host in {"localhost", "127.0.0.1", "::1"}
 
     @staticmethod
     def _url_allowed(rule: DomainRule, url: str) -> bool:
         parsed = urlparse(url)
-        host = parsed.netloc.lower()
+        host = (parsed.hostname or "").lower()
         domain = DefaultDiscoveryCrawler._normalise_domain(rule.domain)
         if not host:
             return False
-        if rule.allow_subdomains:
-            return host == domain or host.endswith(f".{domain}")
         return host == domain
 
     @staticmethod
     def _normalise_domain(domain: str) -> str:
         value = domain.strip().lower()
-        if "//" in value:
+        if "://" in value:
             parsed = urlparse(value)
-            if parsed.netloc:
-                value = parsed.netloc
+            if parsed.hostname:
+                return parsed.hostname.strip("/")
         return value.strip("/")
 
     @staticmethod
@@ -172,19 +191,18 @@ class DefaultDiscoveryCrawler:
         if not topics:
             return True
         haystack = " ".join(value.lower() for value in values if value)
-        return any(topic in haystack for topic in topics)
+        return any(topic.lower() in haystack for topic in topics)
 
     @staticmethod
     def _candidate_repositories(
         rule: DomainRule, topics: Sequence[str]
     ) -> list[str]:
         repos: list[str] = []
-        domain_candidate = rule.domain.strip()
+        domain_candidate = rule.domain.strip().strip("/")
         if "/" in domain_candidate:
             repos.append(domain_candidate)
-        repos.extend(item for item in rule.categories if "/" in item)
         repos.extend(topic for topic in topics if "/" in topic)
-        ordered = []
+        ordered: list[str] = []
         seen: set[str] = set()
         for repo in repos:
             normalised = repo.strip().strip("/")
@@ -267,3 +285,15 @@ class DefaultDiscoveryCrawler:
             return parsed.replace(tzinfo=timezone.utc)
         return parsed
 
+    def _budget_available(self) -> bool:
+        if self._can_fetch is None:
+            return True
+        return bool(self._can_fetch())
+
+    def _record_payload(self, raw: bytes) -> None:
+        self._record_payload_bytes(len(raw))
+
+    def _record_payload_bytes(self, payload_size: int) -> None:
+        if self._register_payload_bytes is None:
+            return
+        self._register_payload_bytes(max(0, int(payload_size)))

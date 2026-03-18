@@ -189,6 +189,13 @@ Phase 0.
 - le système sait rejeter ou marquer comme douteux une information insuffisamment corroborée,
 - le mode offline reste la norme hors fenêtres réseau.
 
+### Premier slice désormais en place
+- registre de sources minimal explicite,
+- états `raw / validated / promoted` présents dans le code,
+- métadonnées minimales branchées sur le flux existant `discover -> verify -> ingest`,
+- persistance locale simple, compatible avec l'approche offline-first,
+- support GitHub ciblé pour releases, changelogs, docs limitées et fichiers de référence explicitement autorisés.
+
 ### Risques
 - accumulation de texte non structuré,
 - confusion entre mémoire brute et mémoire fiable,

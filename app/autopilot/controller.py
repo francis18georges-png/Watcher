@@ -14,6 +14,7 @@ from typing import Iterable, Iterator, Mapping, MutableMapping, Protocol, Sequen
 from urllib.parse import urlparse
 
 from app.autopilot.scheduler import AutopilotError, AutopilotScheduler
+from app.ingest import KnowledgeStatus, SourceRegistry
 from app.ingest.pipeline import IngestPipeline, IngestValidationError, RawDocument
 from app.policy.manager import PolicyError
 from app.policy.schema import DomainRule, Policy
@@ -46,6 +47,11 @@ class DiscoveryResult:
     summary: str
     licence: str | None = None
     published_at: datetime | None = None
+    content: str | None = None
+    fetched_at: datetime | None = None
+    etag: str | None = None
+    last_modified: str | None = None
+    source_type: str = "web"
 
 
 class DiscoveryCrawler(Protocol):
@@ -405,18 +411,21 @@ class AutopilotController:
     ) -> None:
         self.scheduler = scheduler
         self.pipeline = pipeline
+        policy_manager = scheduler._policy_manager  # type: ignore[attr-defined]
+        self._policy_loader = scheduler._policy_loader  # type: ignore[attr-defined]
         if crawler is None:
             from app.autopilot.discovery import DefaultDiscoveryCrawler
 
-            crawler = DefaultDiscoveryCrawler()
+            crawler = DefaultDiscoveryCrawler(
+                can_fetch=self._can_fetch_more_bandwidth,
+                register_payload_bytes=self._register_bandwidth_bytes,
+            )
         self.crawler = crawler
         self.scraper = scraper or HTTPScraper()
         self._throttle = max(0.0, float(throttle_seconds))
         self._sleep = sleep_func or time.sleep
         self._clock = clock or datetime.utcnow
         self._logger = logger or LOGGER
-        policy_manager = scheduler._policy_manager  # type: ignore[attr-defined]
-        self._policy_loader = scheduler._policy_loader  # type: ignore[attr-defined]
         self._config_dir = (
             policy_manager.config_dir
             if policy_manager is not None
@@ -429,6 +438,7 @@ class AutopilotController:
         self._reporter = ReportGenerator(Path(reports_dir))
         self._ledger_view = LedgerView(self._ledger_path)
         self._gap_detector = KnowledgeGapDetector()
+        self._source_registry = SourceRegistry(self._config_dir / "source-registry.json")
         self._last_request: dict[str, float] = {}
 
     # ------------------------------------------------------------------
@@ -470,20 +480,50 @@ class AutopilotController:
 
         active_topics = topics or state.topics
         discovered = list(self.crawler.discover(active_topics, allowed.values()))
+        for item in discovered:
+            self._source_registry.record(
+                source=item.url,
+                source_type=item.source_type or _source_type_from_url(item.url),
+                status=KnowledgeStatus.RAW,
+                confidence=0.0,
+                freshness_at=item.published_at,
+                licence=item.licence,
+                observed_at=now,
+            )
         collected: list[tuple[RawDocument, str]] = []
         skipped: list[str] = []
 
-        bandwidth_limit = float(policy.budgets.bandwidth_mb_per_day)
-        total_bandwidth = 0.0
         per_domain_bandwidth: MutableMapping[str, float] = defaultdict(float)
         start_time = now
 
         for item in discovered:
+            if not self.scheduler.has_bandwidth_budget(policy, now=self._clock()):
+                self._logger.warning(
+                    "Budget global dépassé (%.2f MB).",
+                    float(policy.budgets.bandwidth_mb_per_day),
+                )
+                break
             if not gate.allow(item.url):
+                self._source_registry.reject(
+                    source=item.url,
+                    source_type=item.source_type or _source_type_from_url(item.url),
+                    reason="blocked by policy or consent",
+                    freshness_at=item.published_at,
+                    licence=item.licence,
+                    observed_at=self._clock(),
+                )
                 continue
             domain = _domain_from_url(item.url)
             if not domain:
                 skipped.append(item.url)
+                self._source_registry.reject(
+                    source=item.url,
+                    source_type=item.source_type or _source_type_from_url(item.url),
+                    reason="invalid domain",
+                    freshness_at=item.published_at,
+                    licence=item.licence,
+                    observed_at=self._clock(),
+                )
                 continue
             rule = allowed.get(domain)
             if rule is None:
@@ -495,45 +535,115 @@ class AutopilotController:
             if self._exceeded_time(policy, rule, start_time):
                 self._logger.warning("Budget temporel dépassé pour %s.", domain)
                 break
-            self._throttle_domain(domain)
-            result = self.scraper.fetch(item.url, respect_robots=True)
-            if result is None or not result.content:
-                skipped.append(item.url)
-                continue
-            licence = result.license or item.licence
+            source_type = item.source_type or _source_type_from_url(item.url)
+            if item.content is not None:
+                text = item.content.strip()
+                licence = item.licence
+                fetched_at = item.fetched_at or self._clock()
+                etag = item.etag
+                last_modified = item.last_modified
+            else:
+                self._throttle_domain(domain)
+                result = self.scraper.fetch(item.url, respect_robots=True)
+                if result is None:
+                    skipped.append(item.url)
+                    self._source_registry.reject(
+                        source=item.url,
+                        source_type=source_type,
+                        reason="fetch failed",
+                        freshness_at=item.published_at,
+                        licence=item.licence,
+                        observed_at=self._clock(),
+                    )
+                    continue
+                payload_mb = _bytes_to_mb(len(result.raw_content))
+                per_domain_bandwidth[domain] += payload_mb
+                self.scheduler.register_bandwidth_usage(payload_mb, now=self._clock())
+                if per_domain_bandwidth[domain] > float(rule.bandwidth_mb):
+                    self._logger.warning(
+                        "Budget de bande passante dépassé pour %s (%.2f MB).",
+                        domain,
+                        rule.bandwidth_mb,
+                    )
+                    break
+                if not result.content:
+                    skipped.append(item.url)
+                    self._source_registry.reject(
+                        source=item.url,
+                        source_type=source_type,
+                        reason="empty content",
+                        freshness_at=item.published_at,
+                        licence=result.license or item.licence,
+                        observed_at=self._clock(),
+                    )
+                    continue
+                text = result.content.strip()
+                licence = result.license or item.licence
+                fetched_at = self._clock()
+                etag = result.etag
+                last_modified = result.last_modified
             if licence is None or licence not in self.pipeline.allowed_licences:
                 skipped.append(item.url)
+                self._source_registry.reject(
+                    source=item.url,
+                    source_type=source_type,
+                    reason="incompatible licence",
+                    freshness_at=item.published_at,
+                    licence=licence,
+                    observed_at=self._clock(),
+                )
                 continue
-            text = result.content.strip()
             if not text:
                 skipped.append(item.url)
+                self._source_registry.reject(
+                    source=item.url,
+                    source_type=source_type,
+                    reason="blank content",
+                    freshness_at=item.published_at,
+                    licence=licence,
+                    observed_at=self._clock(),
+                )
                 continue
             title = item.title or self._guess_title(text)
+            fetched_at = self._clock()
             raw = RawDocument(
                 url=item.url,
                 title=title,
                 text=text,
                 licence=licence,
                 published_at=item.published_at,
+                source_type=source_type,
+                fetched_at=fetched_at,
+                etag=etag,
+                last_modified=last_modified,
             )
             digest = hashlib.sha256(text.encode("utf-8")).hexdigest()
             collected.append((raw, digest))
-            payload_mb = _bytes_to_mb(len(result.raw_content))
-            total_bandwidth += payload_mb
-            per_domain_bandwidth[domain] += payload_mb
-            if total_bandwidth > bandwidth_limit:
-                self._logger.warning("Budget global dépassé (%s MB).", bandwidth_limit)
-                break
-            if per_domain_bandwidth[domain] > float(rule.bandwidth_mb):
-                self._logger.warning(
-                    "Budget de bande passante dépassé pour %s (%.2f MB).",
-                    domain,
-                    rule.bandwidth_mb,
-                )
-                break
 
         verified = verifier.filter(collected)
         verified_documents = [item[0] for item in verified]
+        verified_sources = {item.url for item in verified_documents}
+        for document in verified_documents:
+            self._source_registry.record(
+                source=document.url,
+                source_type=document.source_type,
+                status=KnowledgeStatus.VALIDATED,
+                confidence=1.0,
+                freshness_at=document.published_at,
+                licence=document.licence,
+                observed_at=self._clock(),
+            )
+        for document, _digest in collected:
+            if document.url in verified_sources:
+                continue
+            self._source_registry.reject(
+                source=document.url,
+                source_type=document.source_type,
+                reason="insufficient corroboration",
+                freshness_at=document.published_at,
+                licence=document.licence,
+                observed_at=self._clock(),
+            )
         knowledge_gaps = self._gap_detector.detect(
             topics=active_topics,
             discovered=discovered,
@@ -563,6 +673,16 @@ class AutopilotController:
             )
 
         recent_revoked = self._ledger_view.revocations_since(now - timedelta(days=7))
+        for document in verified_documents:
+            self._source_registry.record(
+                source=document.url,
+                source_type=document.source_type,
+                status=KnowledgeStatus.PROMOTED,
+                confidence=1.0,
+                freshness_at=document.published_at,
+                licence=document.licence,
+                observed_at=self._clock(),
+            )
         self._reporter.record(
             ingested=[item.url for item in verified_documents],
             revoked=recent_revoked,
@@ -605,6 +725,21 @@ class AutopilotController:
         first_line = text.split("\n", 1)[0]
         return first_line[:120].strip() or "Document"
 
+    def _can_fetch_more_bandwidth(self) -> bool:
+        try:
+            policy = self._policy_loader()
+        except PolicyError:
+            return False
+        return self.scheduler.has_bandwidth_budget(policy, now=self._clock())
+
+    def _register_bandwidth_bytes(self, payload_bytes: int) -> None:
+        if payload_bytes <= 0:
+            return
+        self.scheduler.register_bandwidth_usage(
+            _bytes_to_mb(payload_bytes),
+            now=self._clock(),
+        )
+
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -634,3 +769,10 @@ def _normalise_datetime(value: datetime) -> datetime:
     if value.tzinfo is None:
         return value
     return value.astimezone(timezone.utc).replace(tzinfo=None)
+
+
+def _source_type_from_url(url: str) -> str:
+    domain = _domain_from_url(url) or ""
+    if domain == "github.com":
+        return "git"
+    return "web"
