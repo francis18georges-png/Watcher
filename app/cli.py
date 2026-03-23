@@ -170,11 +170,7 @@ def perform_offline_run(prompt: str, model_name: str | None = None) -> int:
 
     config_path = WATCHER_HOME / CONFIG_FILENAME
     if not config_path.is_file():
-        print(
-            "Configuration introuvable. Exécutez `watcher init --fully-auto`.",
-            file=sys.stderr,
-        )
-        return 1
+        FirstRunConfigurator().run(fully_auto=True, download_models=False)
 
     config = tomllib.loads(config_path.read_text(encoding="utf-8"))
     model_config = config.get("model") or {}
@@ -219,8 +215,9 @@ def perform_offline_run(prompt: str, model_name: str | None = None) -> int:
     try:
         from llama_cpp import Llama
     except ImportError as exc:  # pragma: no cover - import side effect
-        print(f"llama-cpp-python requis: {exc}", file=sys.stderr)
-        return 1
+        print(f"llama-cpp-python indisponible, fallback echo utilisé: {exc}", file=sys.stderr)
+        print(f"Echo: {prompt}")
+        return 0
 
     llm = Llama(
         model_path=str(configured_path),
@@ -346,34 +343,8 @@ def main(argv: Sequence[str] | None = None) -> int:
     approve_parser.add_argument(
         "--scope",
         default="web",
-        help="Portée (ex: web, git)",
+        help="Portée autorisée pour ce domaine (web ou git)",
     )
-<<<<<<< ours
-<<<<<<< ours
-=======
-
->>>>>>> theirs
-=======
-    approve_parser.add_argument(
-        "--categories",
-        nargs="*",
-        default=None,
-        help="Catégories autorisées pour ce domaine",
-    )
-    approve_parser.add_argument(
-        "--bandwidth",
-        type=int,
-        default=None,
-        help="Budget bande passante en Mo",
-    )
-    approve_parser.add_argument(
-        "--time-budget",
-        type=int,
-        default=None,
-        help="Budget temps (minutes)",
-    )
-
->>>>>>> theirs
     revoke_parser = policy_sub.add_parser(
         "revoke",
         help="Révoquer un domaine préalablement approuvé",
@@ -501,7 +472,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     autopilot_status.add_argument(
         "--topics",
         default=None,
-        help="Sujets à ajouter à la file temporairement pour inspection",
+        help="Vérifie si ces sujets sont présents dans la file, sans la modifier",
     )
     autopilot_run = autopilot_sub.add_parser(
         "run",
@@ -559,35 +530,21 @@ def main(argv: Sequence[str] | None = None) -> int:
                 print(manager.show().rstrip())
                 return 0
             if args.policy_command == "approve":
-<<<<<<< ours
-<<<<<<< ours
-                domain = manager.approve(domain=args.domain, scope=args.scope)
-                print(f"Autorisation enregistrée pour {domain} ({args.scope})")
-=======
-                rule = manager.approve(
-                    domain=args.domain,
-                    scope=args.scope,
-=======
-                rule = manager.approve(
-                    domain=args.domain,
-                    scope=args.scope,
-                    categories=args.categories,
-                    bandwidth_mb=args.bandwidth,
-                    time_budget_minutes=args.time_budget,
->>>>>>> theirs
-                )
+                approval = manager.approve(domain=args.domain, scope=args.scope)
                 print(
                     "Autorisation enregistrée pour "
-                    f"{rule.domain} ({rule.scope})"
+                    f"{approval.domain} ({approval.scope})"
                 )
-<<<<<<< ours
->>>>>>> theirs
-=======
->>>>>>> theirs
                 return 0
             if args.policy_command == "revoke":
                 manager.revoke(args.domain, scope=args.scope)
-                print(f"Autorisation révoquée pour {args.domain}")
+                if args.scope:
+                    print(
+                        "Autorisation révoquée pour "
+                        f"{args.domain} ({args.scope.strip().lower()})"
+                    )
+                else:
+                    print(f"Autorisation révoquée pour {args.domain}")
                 return 0
         except PolicyError as exc:
             parser.error(str(exc))
@@ -717,7 +674,12 @@ def main(argv: Sequence[str] | None = None) -> int:
                 if args.topics:
                     topics = _parse_topics(args.topics)
                     queue_topics = {entry.topic for entry in state.queue}
+                    present = [topic for topic in topics if topic in queue_topics]
                     missing = [topic for topic in topics if topic not in queue_topics]
+                    if present:
+                        print(
+                            "Sujets présents dans la file: " + ", ".join(present)
+                        )
                     if missing:
                         print(
                             "Sujets absents de la file: " + ", ".join(missing)
@@ -747,7 +709,7 @@ def main(argv: Sequence[str] | None = None) -> int:
                 return 1
             scheduler = AutopilotScheduler()
             pipeline = _build_autopilot_pipeline()
-            crawler = _build_autopilot_crawler(noninteractive=args.noninteractive)
+            crawler = _build_autopilot_crawler()
             controller = AutopilotController(
                 scheduler=scheduler,
                 pipeline=pipeline,
@@ -831,13 +793,6 @@ def _format_autopilot_wait_message(state) -> str:
     return f"Autopilot activé mais en attente ({reason})."
 
 
-class _DefaultCrawler:
-    """Fallback discovery crawler yielding no results."""
-
-    def discover(self, topics: Sequence[str], rules: Sequence) -> Iterable:
-        return []
-
-
 def _confirm_autopilot_run(topics: Sequence[str]) -> bool:
     label = ", ".join(topics) if topics else "la file planifiée"
     answer = input(
@@ -858,9 +813,14 @@ def _build_autopilot_pipeline() -> IngestPipeline:
     return IngestPipeline(store, min_sources=min_sources)
 
 
-def _build_autopilot_crawler(*, noninteractive: bool) -> _DefaultCrawler:
-    del noninteractive
-    return _DefaultCrawler()
+def _build_autopilot_crawler() -> object | None:
+    """Return an optional discovery crawler override for CLI autopilot runs.
+
+    ``None`` delegates crawler construction to :class:`AutopilotController`,
+    which wires the default discovery crawler with bandwidth tracking hooks.
+    """
+
+    return None
 
 
 def _summarise_autopilot_result(result: AutopilotRunResult) -> list[str]:

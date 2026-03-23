@@ -4,17 +4,17 @@
 
 Watcher devient une plateforme locale orchestrant quatre plans fonctionnels :
 
-1. **Initialisation automatique** – `watcher init --auto` détecte le matériel CPU/GPU, choisit la pile llama.cpp adaptée et provisionne les modèles par hachage dans `~/.watcher/models`. Un cache checksum permet la reprise en cas de coupure.
+1. **Initialisation automatique** – `watcher init --fully-auto` détecte le matériel CPU/GPU, choisit la pile llama.cpp adaptée et provisionne les modèles par hachage dans `~/.watcher/models`. Un cache checksum permet la reprise en cas de coupure.
 2. **Conformité & consentement** – Un moteur de politique lit `config/policy.yaml`, applique les budgets de ressources, et signe chaque accord utilisateur dans un grand livre JSONL immuable.
 3. **Pipeline de connaissance autonome** – Modules de scraping respectueux (`app/scrapers/`) collectent des sources approuvées, vérifiées puis ingérées dans un index vectoriel local (`app/ingest/`).
-4. **Autopilot supervisé** – `watcher autopilot` orchestre découverte → scraping → vérification → ingestion → réindexation tout en restant offline hors fenêtres autorisées.
+4. **Autopilot supervisé** – `watcher autopilot` orchestre découverte → scraping → vérification → ingestion → rapport HTML tout en restant offline hors fenêtres autorisées.
 
 Les journaux JSON (avec `trace_id`) et un rapport HTML hebdomadaire documentent chaque activité, garantissant auditabilité et sécurité.
 
 ## Diagramme de flux (texte)
 
 ```
-+-------------+       watcher init --auto        +-----------------+
++-------------+   watcher init --fully-auto     +-----------------+
 |  Hardware   | --detect--> PlatformProfiler --> | llama.cpp Setup |
 +-------------+                                  +-----------------+
         |                                               |
@@ -138,7 +138,7 @@ from app.cache.models import ModelCache
 
 def register(subparsers: argparse._SubParsersAction) -> None:
     parser = subparsers.add_parser("init", help="Initialise Watcher")
-    parser.add_argument("--auto", action="store_true", help="Mode totalement automatique")
+    parser.add_argument("--fully-auto", action="store_true", help="Mode totalement automatique")
     parser.set_defaults(func=handle)
 
 
@@ -325,16 +325,16 @@ source .venv/bin/activate
 pip install -e .[dev]
 
 # Initialisation sans interaction
-watcher init --auto
+watcher init --fully-auto
 
 # Exécution hors ligne
-watcher run --offline --model-path ~/.watcher/models/llama3-8b-q4.gguf
+watcher run --offline --prompt "Resumer ce depot en trois points."
 
 # Ingestion automatique
-watcher ingest --auto ./datasets/local_corpus
+watcher ingest ./datasets/local_corpus
 
 # Autopilot avec politique stricte
-watcher autopilot enable --topics "dev-docs,security" --profile dev-docs
+watcher autopilot enable --topics "dev-docs,security"
 ```
 
 ## 5. Plan de tests

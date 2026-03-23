@@ -25,12 +25,12 @@ L'installation plug-and-play génère automatiquement l'arborescence suivante da
     └── watcher-autopilot.{service,timer} # service utilisateur (Linux)
 ```
 
-Sous Windows, `watcher init --auto` crée également :
+Sous Windows, `watcher init --fully-auto` crée également :
 
 ```
-%APPDATA%\Microsoft\Windows\Start Menu\Programs\Startup\Watcher Autopilot.lnk
 HKCU\Software\Microsoft\Windows\CurrentVersion\RunOnce\WatcherInit
 SCHTASKS /Create /TN "Watcher Autopilot" /SC ONLOGON /TR "watcher autopilot run --noninteractive"
+~/.watcher/autostart/windows/{watcher-register-autostart.ps1,README.md}
 ```
 
 Cette arborescence garantit un environnement isolé, reproductible et sans dépendance à une infrastructure distante.

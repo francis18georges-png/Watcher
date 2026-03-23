@@ -65,6 +65,7 @@ def _stub_cli_settings(monkeypatch):
         training=SimpleNamespace(seed=42),
         intelligence=SimpleNamespace(mode="offline"),
     )
+    monkeypatch.setattr(cli, "auto_configure_if_needed", lambda *args, **kwargs: None)
     monkeypatch.setattr(cli, "get_settings", lambda: settings)
     return settings
 
@@ -93,13 +94,14 @@ def test_cli_autopilot_status_offline(monkeypatch, capsys):
     monkeypatch.setattr(cli, "AutopilotScheduler", lambda: scheduler)
     monkeypatch.setattr(cli, "Engine", lambda: engine)
 
-    exit_code = cli.main(["autopilot", "status", "--topics", "bar"])
+    exit_code = cli.main(["autopilot", "status", "--topics", "foo,bar"])
 
     assert exit_code == 0
     assert scheduler.evaluate_calls == 1
     assert engine.offline[-1] is True
     captured = capsys.readouterr()
     assert "Autopilot hors ligne (hors fenêtre réseau)" in captured.out
+    assert "Sujets présents dans la file: foo" in captured.out
     assert "Sujets absents de la file: bar" in captured.out
 
 
@@ -146,9 +148,7 @@ def test_cli_autopilot_run_success(monkeypatch, capsys):
 
     monkeypatch.setattr(cli, "AutopilotScheduler", lambda: scheduler_instance)
     monkeypatch.setattr(cli, "_build_autopilot_pipeline", lambda: pipeline_instance)
-    monkeypatch.setattr(
-        cli, "_build_autopilot_crawler", lambda *, noninteractive: crawler_instance
-    )
+    monkeypatch.setattr(cli, "_build_autopilot_crawler", lambda: crawler_instance)
     monkeypatch.setattr(cli, "AutopilotController", DummyController)
     monkeypatch.setattr("builtins.input", lambda _: "o")
 
@@ -185,9 +185,7 @@ def test_cli_autopilot_run_blocked(monkeypatch, capsys):
 
     monkeypatch.setattr(cli, "AutopilotScheduler", lambda: scheduler_instance)
     monkeypatch.setattr(cli, "_build_autopilot_pipeline", lambda: pipeline_instance)
-    monkeypatch.setattr(
-        cli, "_build_autopilot_crawler", lambda *, noninteractive: crawler_instance
-    )
+    monkeypatch.setattr(cli, "_build_autopilot_crawler", lambda: crawler_instance)
     monkeypatch.setattr(cli, "AutopilotController", DummyController)
     monkeypatch.setattr(
         "builtins.input",
@@ -218,3 +216,7 @@ def test_cli_autopilot_report(monkeypatch, capsys, tmp_path):
     assert exit_code == 0
     captured = capsys.readouterr()
     assert captured.out.strip() == str(report_path)
+
+
+def test_build_autopilot_crawler_delegates_to_controller_default() -> None:
+    assert cli._build_autopilot_crawler() is None

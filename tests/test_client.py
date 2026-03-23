@@ -38,7 +38,7 @@ def test_engine_set_offline_toggles_client(monkeypatch) -> None:
             self.offline = bool(offline)
 
     engine = object.__new__(Engine)
-    engine.client = Client()
+    engine.client = Client(model="llama3.2:3b")
     engine.mem = DummyMem()
     engine.settings = SimpleNamespace(intelligence=SimpleNamespace(mode="online"))
     engine._offline = False

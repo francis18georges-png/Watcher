@@ -44,6 +44,8 @@ def _run_cli_and_sample(args: list[str]) -> tuple[dict[str, str | None], list[fl
 
 def _run_cli_subprocess(
     args: list[str],
+    *,
+    home: Path | None = None,
 ) -> tuple[dict[str, str | None], list[str], list[float]]:
     template = Template(
         """
@@ -75,6 +77,9 @@ print(json.dumps(payload))
     env["PYTHONPATH"] = (
         repo_root if not pythonpath else f"{repo_root}{os.pathsep}{pythonpath}"
     )
+    if home is not None:
+        env["HOME"] = str(home)
+        env["USERPROFILE"] = str(home)
     completed = subprocess.run(
         [sys.executable, "-c", script],
         capture_output=True,
@@ -94,7 +99,10 @@ print(json.dumps(payload))
     return env_values, stdout_lines[:-1], sequence
 
 
-def test_cli_reproducibility_end_to_end(monkeypatch):
+def test_cli_reproducibility_end_to_end(monkeypatch, tmp_path):
+    home = tmp_path / "home"
+    monkeypatch.setenv("HOME", str(home))
+    monkeypatch.setenv("USERPROFILE", str(home))
     monkeypatch.setenv("PYTHONHASHSEED", "0")
     monkeypatch.setenv("WATCHER_TRAINING__SEED", "0")
 
@@ -129,25 +137,24 @@ def test_cli_reproducibility_end_to_end(monkeypatch):
     assert seq_custom1 == seq_custom2
 
 
-def test_cli_reproducibility_via_subprocess():
-    env_values, output_lines, seq1 = _run_cli_subprocess(["plugin", "list"])
+def test_cli_reproducibility_via_subprocess(tmp_path):
+    home = tmp_path / "home"
+    env_values, output_lines, seq1 = _run_cli_subprocess(["plugin", "list"], home=home)
     assert env_values == {
         "PYTHONHASHSEED": "42",
         "WATCHER_TRAINING__SEED": "42",
     }
     assert output_lines, "plugin listing should produce output"
 
-    env_repeat, output_repeat, seq2 = _run_cli_subprocess(["plugin", "list"])
+    env_repeat, output_repeat, seq2 = _run_cli_subprocess(["plugin", "list"], home=home)
     assert env_repeat == env_values
     assert output_repeat == output_lines
     assert seq2 == seq1
 
-    env_custom, output_custom, seq_custom1 = _run_cli_subprocess([
-        "--seed",
-        "123",
-        "plugin",
-        "list",
-    ])
+    env_custom, output_custom, seq_custom1 = _run_cli_subprocess(
+        ["--seed", "123", "plugin", "list"],
+        home=home,
+    )
     assert env_custom == {
         "PYTHONHASHSEED": "123",
         "WATCHER_TRAINING__SEED": "123",
@@ -155,12 +162,10 @@ def test_cli_reproducibility_via_subprocess():
     assert output_custom == output_lines
     assert seq_custom1 != seq1
 
-    env_custom_repeat, output_custom_repeat, seq_custom2 = _run_cli_subprocess([
-        "--seed",
-        "123",
-        "plugin",
-        "list",
-    ])
+    env_custom_repeat, output_custom_repeat, seq_custom2 = _run_cli_subprocess(
+        ["--seed", "123", "plugin", "list"],
+        home=home,
+    )
     assert env_custom_repeat == env_custom
     assert output_custom_repeat == output_custom
     assert seq_custom2 == seq_custom1

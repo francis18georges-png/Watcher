@@ -16,7 +16,7 @@ The requested feature set exceeds the capacity of a single iteration in this env
 10. Autonomy reporting module producing weekly HTML summaries.
 
 ## Workstreams
-- **Initialization**: implement `watcher init --auto`, download manager, config writer, scripts generation.
+- **Initialization**: implement `watcher init --fully-auto`, download manager, config writer, scripts generation.
 - **Policy**: enforce schema, consent ledger, CLI actions, kill-switch integration.
 - **Scraping**: modular scrapers, throttling, dedupe, licence detection, multi-source verification.
 - **Ingestion**: chunking, embeddings, index (SQLite-VSS/FAISS), metadata tracking.

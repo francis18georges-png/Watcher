@@ -74,6 +74,18 @@ def test_pipeline_skips_incompatible_licence_and_deduplicates() -> None:
     assert metas[0]["corroborating_sources"] == 2
     assert metas[0]["confidence_score"] >= 0.6
     assert metas[0]["knowledge_state"] == "promoted"
+    assert metas[0]["evaluation_basis"] == "multi_source_corroboration"
+    assert metas[0]["evaluation_status"] == "promoted"
+    assert metas[0]["evaluation_score"] >= 0.6
+    assert (
+        metas[0]["evaluation_reason"]
+        == "promoted after ingesting corroborated content from 2 distinct sources"
+    )
+    assert metas[0]["validation_reason"] == "corroborated by 2 distinct sources"
+    assert (
+        metas[0]["promotion_reason"]
+        == "promoted after ingesting corroborated content from 2 distinct sources"
+    )
     assert metas[0]["status"] == "promoted"
     assert metas[0]["confidence"] >= 0.6
     assert "freshness_at" in metas[0]
@@ -110,3 +122,32 @@ def test_pipeline_uses_overlap_chunking() -> None:
         "delta epsilon zeta eta",
     ]
     assert all(meta["corroborating_sources"] == 2 for meta in metas)
+
+
+def test_pipeline_handles_mixed_timezone_metadata_when_selecting_source() -> None:
+    store = DummyStore()
+    pipeline = IngestPipeline(store, allowed_licences={"CC-BY-4.0", "MIT"})
+    docs = [
+        RawDocument(
+            url="https://example.com/a",
+            title="Aware source",
+            text="Shared corroborated content",
+            licence="MIT",
+            published_at=datetime(2024, 1, 1, 9, 0, tzinfo=timezone.utc),
+        ),
+        RawDocument(
+            url="https://example.com/b",
+            title="Naive source",
+            text="Shared corroborated content",
+            licence="CC-BY-4.0",
+            published_at=datetime(2024, 1, 2, 9, 0, 0),
+        ),
+    ]
+
+    count = pipeline.ingest(docs)
+
+    assert count == 1
+    texts, metas = store.add_calls[0]
+    assert texts == ["Shared corroborated content"]
+    assert metas[0]["source"] == "https://example.com/a"
+    assert metas[0]["freshness_at"] == "2024-01-01T09:00:00+00:00"

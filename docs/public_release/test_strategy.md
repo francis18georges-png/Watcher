@@ -11,7 +11,7 @@ Garantir une expérience hors ligne fiable, sécurisée et cohérente sur Window
 ## Suites de tests
 
 ### 1. Tests unitaires (pytest)
-- `tests/core/test_policy.py` : génération policy, validation allowlists, kill-switch.
+- `tests/core/test_policy.py` : génération policy, validation `domain_rules`/compatibilité allowlist, kill-switch.
 - `tests/core/test_ingestion.py` : normalisation, chunking, déduplication hash, validation licence.
 - `tests/core/test_rag.py` : index SQLite-VSS/FAISS, recherche par similarité, métadonnées.
 - `tests/services/test_config.py` : création `~/.watcher` (config, consents) et reprise.
@@ -19,7 +19,7 @@ Garantir une expérience hors ligne fiable, sécurisée et cohérente sur Window
 
 ### 2. Tests d'intégration
 - `tests/integration/test_first_run.py` : exécution `watcher init --fully-auto` crée ressources, télécharge modèles mockés par hash.
-- `tests/integration/test_autopilot_cycle.py` : simulateur orchestrant `discover→scrape→verify→ingest→reindex` avec fixtures.
+- `tests/integration/test_autopilot_cycle.py` : simulateur orchestrant `discover→scrape→verify→ingest→report` avec fixtures.
 - `tests/integration/test_diagnostics.py` : génération logs JSON, export ZIP.
 
 ### 3. Tests E2E CLI

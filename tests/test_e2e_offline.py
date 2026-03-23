@@ -16,6 +16,8 @@ def test_cli_run_offline(tmp_path):
 
     repo_root = Path(__file__).resolve().parents[1]
     env = os.environ.copy()
+    env["HOME"] = str(tmp_path)
+    env["USERPROFILE"] = str(tmp_path)
     env["WATCHER_PATHS__BASE_DIR"] = str(tmp_path)
     env["WATCHER_MEMORY__DB_PATH"] = "memory/e2e.db"
     env["WATCHER_INTELLIGENCE__MODE"] = "offline"

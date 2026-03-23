@@ -10,8 +10,8 @@ from config import clear_settings_cache, get_settings
 def test_load_existing_config():
     clear_settings_cache()
     settings = get_settings()
-    assert settings.llm.model == "llama3.2:3b"
-    assert settings.llm.backend == "ollama"
+    assert settings.llm.model == "smollm-135m-instruct-Q4_0"
+    assert settings.llm.backend == "llama.cpp"
     assert settings.logging.fallback_level == "INFO"
 
 

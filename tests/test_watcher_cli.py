@@ -1,4 +1,5 @@
 import importlib
+import config as config_module
 from contextlib import contextmanager
 from importlib import resources
 from pathlib import Path
@@ -7,6 +8,7 @@ from typing import Sequence
 
 import pytest
 
+from app import bootstrap
 from app import cli
 
 
@@ -25,6 +27,9 @@ def _stub_cli_settings(monkeypatch):
         training=SimpleNamespace(seed=42),
         intelligence=SimpleNamespace(mode="offline"),
     )
+    monkeypatch.setattr(bootstrap, "auto_configure_if_needed", lambda *args, **kwargs: None)
+    monkeypatch.setattr(cli, "auto_configure_if_needed", lambda *args, **kwargs: None)
+    monkeypatch.setattr(config_module, "get_settings", lambda: settings)
     monkeypatch.setattr(cli, "get_settings", lambda: settings)
     return settings
 
@@ -80,7 +85,7 @@ def test_plugin_list_imported_without_root_manifest(tmp_path, capsys):
         importlib.reload(module)
 
 
-def test_run_command_sets_offline_and_uses_engine(monkeypatch, capsys):
+def test_run_command_uses_engine_when_not_forced_offline(monkeypatch, capsys):
     class DummyClient:
         backend = "llama.cpp"
 
@@ -103,7 +108,7 @@ def test_run_command_sets_offline_and_uses_engine(monkeypatch, capsys):
     engine = DummyEngine()
     monkeypatch.setattr(cli, "Engine", lambda: engine)
 
-    exit_code = cli.main(["run", "--prompt", "Salut", "--offline"])
+    exit_code = cli.main(["run", "--prompt", "Salut"])
 
     assert exit_code == 0
     assert engine.offline is True
@@ -215,10 +220,8 @@ def test_ingest_command_reads_files(monkeypatch, tmp_path, capsys):
     assert file_b.as_uri() in captured_urls
     captured = capsys.readouterr()
     assert "extrait(s) validé(s)" in captured.out
-<<<<<<< ours
 
 
-<<<<<<< ours
 def _prepare_policy_home(tmp_path: Path) -> Path:
     """Create a minimal Watcher home with policy/ledger files."""
 
@@ -237,19 +240,22 @@ def test_policy_approve_and_revoke_roundtrip(monkeypatch, tmp_path, capsys):
     monkeypatch.setattr(cli, "PolicyManager", lambda: manager)
 
     approve_exit = cli.main(
-        ["policy", "approve", "--domain", "Example.COM", "--scope", "web"]
+        ["policy", "approve", "--domain", "Example.COM", "--scope", "git"]
     )
     assert approve_exit == 0
     approve_output = capsys.readouterr().out
-    assert "Autorisation enregistrée pour example.com (web)" in approve_output
+    assert "Autorisation enregistrée pour example.com (git)" in approve_output
 
     policy_text = (home / ".watcher" / "policy.yaml").read_text(encoding="utf-8")
     assert "example.com" in policy_text
+    assert "scope: git" in policy_text
 
-    revoke_exit = cli.main(["policy", "revoke", "--domain", "example.com"])
+    revoke_exit = cli.main(
+        ["policy", "revoke", "--domain", "example.com", "--scope", "git"]
+    )
     assert revoke_exit == 0
     revoke_output = capsys.readouterr().out
-    assert "Autorisation révoquée pour example.com" in revoke_output
+    assert "Autorisation révoquée pour example.com (git)" in revoke_output
 
 
 @pytest.mark.parametrize(
@@ -257,6 +263,10 @@ def test_policy_approve_and_revoke_roundtrip(monkeypatch, tmp_path, capsys):
     [
         (["policy", "approve", "--domain", "   "], "domain must not be empty"),
         (["policy", "revoke", "--domain", "unknown.test"], "aucune autorisation trouvée"),
+        (
+            ["policy", "approve", "--domain", "example.com", "--scope", "api"],
+            "scope must be one of: web, git",
+        ),
         (
             ["policy", "approve", "--domain", "example.com", "--bandwidth", "10"],
             "unrecognized arguments: --bandwidth 10",
@@ -276,64 +286,3 @@ def test_policy_commands_report_expected_errors(
     assert exc_info.value.code == 2
     captured = capsys.readouterr()
     assert message_fragment in captured.err
-=======
-def test_policy_approve_and_revoke_cli(tmp_path, monkeypatch, capsys):
-    home = tmp_path / "home"
-    home.mkdir()
-    monkeypatch.setenv("HOME", str(home))
-
-    configurator = cli.FirstRunConfigurator(home=home)
-    configurator.run(auto=True, download_models=False)
-
-    approve_exit = cli.main(
-        ["policy", "approve", "--domain", "Example.COM", "--scope", "Web"]
-    )
-    assert approve_exit == 0
-    captured = capsys.readouterr()
-    assert "Autorisation enregistrée pour example.com (web)" in captured.out
-
-    manager = cli.PolicyManager(home=home)
-    policy = manager._read_policy()
-    assert "example.com" in policy.allowlist_domains
-
-    revoke_exit = cli.main(["policy", "revoke", "--domain", "example.com"])
-    assert revoke_exit == 0
-    captured = capsys.readouterr()
-    assert "Autorisation révoquée pour example.com" in captured.out
-
-    policy = manager._read_policy()
-    assert "example.com" not in policy.allowlist_domains
-
-
-def test_policy_cli_expected_errors(tmp_path, monkeypatch, capsys):
-    home = tmp_path / "home"
-    home.mkdir()
-    monkeypatch.setenv("HOME", str(home))
-
-    configurator = cli.FirstRunConfigurator(home=home)
-    configurator.run(auto=True, download_models=False)
-
-    with pytest.raises(SystemExit) as approve_error:
-        cli.main(
-            ["policy", "approve", "--domain", "example.com", "--scope", "   "]
-        )
-    assert approve_error.value.code == 2
-    approve_output = capsys.readouterr()
-    assert "scope must not be empty" in approve_output.err
-
-    with pytest.raises(SystemExit) as revoke_error:
-        cli.main(["policy", "revoke", "--domain", "unknown.test"])
-    assert revoke_error.value.code == 2
-    revoke_output = capsys.readouterr()
-    assert "aucune autorisation trouvée pour unknown.test" in revoke_output.err
-
-    with pytest.raises(SystemExit) as removed_option_error:
-        cli.main(
-            ["policy", "approve", "--domain", "example.com", "--categories", "news"]
-        )
-    assert removed_option_error.value.code == 2
-    removed_option_output = capsys.readouterr()
-    assert "unrecognized arguments: --categories news" in removed_option_output.err
->>>>>>> theirs
-=======
->>>>>>> theirs

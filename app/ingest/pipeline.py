@@ -6,7 +6,7 @@ import hashlib
 import re
 from collections import defaultdict
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Iterable, Sequence
 from urllib.parse import urlparse
 
@@ -42,6 +42,9 @@ class RawDocument:
     fetched_at: datetime | None = None
     etag: str | None = None
     last_modified: str | None = None
+    evaluation_status: str | None = None
+    evaluation_score: float | None = None
+    evaluation_reason: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -88,6 +91,9 @@ class _ChunkCandidate:
     fetched_at: datetime | None
     etag: str | None
     last_modified: str | None
+    evaluation_status: str | None
+    evaluation_score: float | None
+    evaluation_reason: str | None
 
 
 class IngestPipeline:
@@ -197,6 +203,9 @@ class IngestPipeline:
                         fetched_at=document.fetched_at,
                         etag=document.etag,
                         last_modified=document.last_modified,
+                        evaluation_status=document.evaluation_status,
+                        evaluation_score=document.evaluation_score,
+                        evaluation_reason=document.evaluation_reason,
                     )
                 )
         return candidates
@@ -206,7 +215,7 @@ class IngestPipeline:
         return min(
             items,
             key=lambda item: (
-                item.published_at or datetime.max,
+                _normalise_datetime(item.published_at),
                 item.url,
             ),
         )
@@ -236,6 +245,17 @@ class IngestPipeline:
             "corroborating_sources": corroborating_sources,
             "confidence_score": confidence_score,
             "knowledge_state": KnowledgeStatus.PROMOTED.value,
+            "evaluation_basis": "multi_source_corroboration",
+            "evaluation_status": representative.evaluation_status
+            or KnowledgeStatus.PROMOTED.value,
+            "evaluation_score": representative.evaluation_score
+            if representative.evaluation_score is not None
+            else confidence_score,
+            "evaluation_reason": representative.evaluation_reason
+            or _promotion_reason(corroborating_sources),
+            "validation_reason": _validation_reason(corroborating_sources),
+            "promotion_reason": representative.evaluation_reason
+            or _promotion_reason(corroborating_sources),
             # Compatibility aliases kept for existing callers/consumers.
             "confidence": confidence_score,
             "score": confidence_score,
@@ -299,3 +319,24 @@ def _domain_from_url(url: str) -> str | None:
     parsed = urlparse(url)
     hostname = (parsed.hostname or "").strip().lower()
     return hostname or None
+
+
+def _validation_reason(corroborating_sources: int) -> str:
+    return (
+        f"corroborated by {max(0, int(corroborating_sources))} distinct sources"
+    )
+
+
+def _promotion_reason(corroborating_sources: int) -> str:
+    return (
+        "promoted after ingesting corroborated content from "
+        f"{max(0, int(corroborating_sources))} distinct sources"
+    )
+
+
+def _normalise_datetime(value: datetime | None) -> datetime:
+    if value is None:
+        return datetime.max
+    if value.tzinfo is None:
+        return value
+    return value.astimezone(timezone.utc).replace(tzinfo=None)

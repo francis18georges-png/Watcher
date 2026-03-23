@@ -1,4 +1,4 @@
 [[plugins]]
 path = "app.tools.plugins.hello:HelloPlugin"
 api_version = "1.0"
-signature = "d6d873ad0d7585b890b67786d0c3b4f366a9642b724cbfdbc6752a5c9aee46e5"
+signature = "fc4fd32d0a64264cecf372d1aac70677f5cd8745ff15aec5bb8a36b6a6b6d832"

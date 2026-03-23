@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timezone
 from importlib import resources
 from pathlib import Path
 from secrets import token_bytes
@@ -25,6 +25,16 @@ import yaml
 from app.core.autostart import render_systemd_scripts, render_windows_scripts
 from app.core.model_registry import ensure_models, select_models
 from app.policy.ledger import ConsentLedger, LedgerError
+
+
+def _utc_timestamp() -> str:
+    """Return a UTC timestamp using the legacy ``...Z`` wire format."""
+
+    return datetime.now(timezone.utc).isoformat(timespec="seconds").replace(
+        "+00:00",
+        "Z",
+    )
+
 
 @dataclass(slots=True)
 class HardwareProfile:
@@ -216,7 +226,7 @@ class FirstRunConfigurator:
             return
 
         hostname = platform.node() or "localhost"
-        now = datetime.utcnow().isoformat(timespec="seconds") + "Z"
+        now = _utc_timestamp()
         policy = self._load_baseline_policy()
 
         subject = policy.setdefault("subject", {})
@@ -246,7 +256,7 @@ class FirstRunConfigurator:
         metadata = {
             "type": "metadata",
             "version": 1,
-            "created_at": datetime.utcnow().isoformat(timespec="seconds") + "Z",
+            "created_at": _utc_timestamp(),
             "secret_hex": token_bytes(32).hex(),
         }
         self.consent_ledger.write_text(
@@ -386,7 +396,9 @@ class FirstRunConfigurator:
         ]
 
     def _configure_windows_autostart(self) -> None:
-        run_once_command = subprocess.list2cmdline(["watcher", "init", "--auto"])
+        run_once_command = subprocess.list2cmdline(
+            ["watcher", "init", "--fully-auto"]
+        )
         autopilot_command = subprocess.list2cmdline(
             ["watcher", "autopilot", "run", "--noninteractive"]
         )
@@ -414,6 +426,8 @@ class FirstRunConfigurator:
                     powershell_script,
                 ],
                 check=True,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
             )
         except (OSError, subprocess.CalledProcessError):
             pass
@@ -432,6 +446,8 @@ class FirstRunConfigurator:
                     "/F",
                 ],
                 check=True,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
             )
         except (OSError, subprocess.CalledProcessError):
             pass
@@ -462,6 +478,8 @@ class FirstRunConfigurator:
             subprocess.run(
                 ["systemctl", "--user", "daemon-reload"],
                 check=True,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
             )
         except (OSError, subprocess.CalledProcessError):
             pass
@@ -476,6 +494,8 @@ class FirstRunConfigurator:
                     "watcher-autopilot.timer",
                 ],
                 check=True,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
             )
         except (OSError, subprocess.CalledProcessError):
             pass

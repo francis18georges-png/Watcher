@@ -19,46 +19,41 @@ Le dépôt contient des workflows et des scripts de packaging, mais il ne faut p
 
 ## Démarrage hors ligne en 3 étapes
 
-1. **Installer les dépendances Python** (environnement virtuel recommandé) :
+1. **Préparer un environnement Python local** (environnement virtuel recommandé) :
 
    ```bash
+   python -m venv .venv
+   source .venv/bin/activate  # Linux/macOS
+   .venv\Scripts\activate     # Windows
    pip install -r requirements.txt
+   pip install -e .
    ```
 
-2. **Préparer les modèles locaux** (LLM + embeddings) grâce au script dédié :
-
-   ```bash
-   scripts/setup-local-models.sh
-   # Les fichiers sont placés dans models/llm/ et models/embeddings/
-   ```
-
-   Le script télécharge par défaut le modèle `SmolLM-135M-Instruct` au format GGUF et le
-   modèle d'embedding `all-MiniLM-L6-v2`. Utilisez `--help` pour personnaliser les chemins
-   ou forcer un re-téléchargement.
-
-3. **Initialiser votre espace utilisateur (~/.watcher)** :
+2. **Initialiser votre espace utilisateur (`~/.watcher`)** :
 
    ```bash
    watcher init --fully-auto
    ```
 
    La commande détecte le matériel disponible (CPU/GPU), prépare un `config.toml`
-   et une `policy.yaml` dans `~/.watcher/` puis active le mode offline par défaut.
+   et une `policy.yaml` dans `~/.watcher/`, télécharge ou copie les modèles locaux
+   requis dans `~/.watcher/models/`, puis active le mode offline par défaut.
    Les valeurs par défaut documentées sont publiées dans [`config/policy.yaml`](config/policy.yaml)
    afin que les installeurs et kits hors-ligne puissent embarquer le même référentiel
    sans exécuter la CLI.
-   Les modèles restent gérés par `scripts/setup-local-models.sh` : les chemins
-   générés pointent vers `~/.watcher/models/` afin de séparer les données
-   utilisateur du dépôt Git.
+   Les chemins générés pointent vers `~/.watcher/models/` afin de séparer les données
+   utilisateur du dépôt Git. Le script `scripts/setup-local-models.sh` reste utile
+   pour pré-provisionner les artefacts sur Linux/macOS, mais il n'est plus requis
+   pour le bootstrap standard.
 
-4. **Lancer l'agent entièrement offline** :
+3. **Lancer l'agent entièrement offline** :
 
    ```bash
    watcher run --offline --prompt "Analyse ce dépôt et résume les modules principaux."
    ```
 
    La commande appelle le backend `llama.cpp` local, la mémoire vectorielle SQLite et les
-   outils sandboxés (`app/core/sandbox.py`). Les traces sont visibles dans `logs/`.
+   outils sandboxés (`app/core/sandbox.py`). Les traces sont visibles dans `~/.watcher/logs/`.
 
    Pour vérifier ce parcours dans un environnement vierge, la recette `make demo-offline`
    prépare automatiquement un espace isolé dans `.artifacts/demo-offline/` avant de lancer
@@ -67,13 +62,18 @@ Le dépôt contient des workflows et des scripts de packaging, mais il ne faut p
 ### Commandes CLI stables
 
 - `watcher init --fully-auto` : crée `~/.watcher/config.toml`, une politique par
-  défaut et un journal de consentement sans interaction.
+  défaut, un journal de consentement et les modèles locaux de référence sans interaction.
 - `watcher run` : exécute un scénario minimaliste (prompt libre) en respectant le mode
   offline. Le drapeau `--model` permet de basculer dynamiquement vers un autre fichier GGUF.
 - `watcher ask "question"` : interroge l'index vectoriel local (namespace configurable) et
   renvoie une réponse déterministe, y compris sans réseau grâce au fallback `Echo`.
 - `watcher ingest chemin/` : ajoute un ou plusieurs fichiers Markdown/TXT dans la mémoire
   vectorielle persistée (`memory/vector-store.db`) en lots contrôlés via `--batch-size`.
+- `watcher policy approve --domain <domaine> --scope web|git` : persiste une règle de policy
+  dans `~/.watcher/policy.yaml` sous `domain_rules`. `allowlist_domains` reste synchronisé
+  pour compatibilité avec les garde-fous runtime existants.
+- `watcher autopilot run --noninteractive` : exécute un cycle supervisé `discover → scrape → verify → ingest`
+  sous contrôle de la policy runtime.
 
 ## Citer Watcher
 
@@ -117,11 +117,12 @@ redescend sous `7`, empêchant ainsi le reste du pipeline et la fusion tant que 
 pratiques identifiées par Scorecard ne sont pas rétablies.
 
 La matrice Python du même workflow est résolue par le job `determine-python`. En l'absence
-de variable `WATCHER_NOX_PYTHON`, il publie explicitement les versions supportées (`3.10`,
-`3.11`, `3.12`) afin que les jobs `quality` puissent s'exécuter sur Linux, macOS et Windows
-pour chaque interpréteur. Pour cibler un sous-ensemble lors d'un debug ou d'un backport,
-exportez `WATCHER_NOX_PYTHON="3.11"` (ou plusieurs valeurs séparées par des virgules) avant
-de lancer `nox` ou de déclencher le workflow manuellement ; la même logique s'applique aux
+de variable `WATCHER_NOX_PYTHON`, il publie explicitement la version de référence (`3.12`)
+afin que les jobs `quality` puissent s'exécuter sur Linux, macOS et Windows avec le même
+interpréteur que les workflows de release. Pour cibler un autre interpréteur ou étendre
+temporairement la matrice (par exemple `3.13`), exportez
+`WATCHER_NOX_PYTHON="3.13"` (ou plusieurs valeurs séparées par des virgules) avant
+de lancer `nox` ou de déclencher le workflow manuellement ; la même logique s'applique aux
 exécutions locales via `noxfile.py`.
 
 ## Releases, SBOM et provenance
@@ -331,7 +332,7 @@ et mettez à jour la configuration d'authentification associée.
 ## Installation
 
 1. Cloner ce dépôt.
-2. Créer et activer un environnement Python 3.10 ou supérieur :
+2. Créer et activer un environnement Python 3.12 ou supérieur :
 
    ```bash
    python -m venv .venv
@@ -360,7 +361,10 @@ et mettez à jour la configuration d'authentification associée.
 
     Ce fichier fixe des versions précises afin d'assurer une installation reproductible.
 
-    Sur Windows, le script `installer.ps1` installe automatiquement toutes ces dépendances.
+    Sur Windows, le script [`installer.ps1`](installer.ps1) crée `.venv`, installe
+    `requirements.txt`, `requirements-dev.txt` puis le package `watcher` en mode editable.
+    Utilisez `-SkipDevDependencies` pour une installation plus légère et `-Initialize`
+    pour enchaîner immédiatement avec `watcher init --fully-auto`.
 
 Les fichiers d'environnement (`*.env`), les journaux (`*.log`) et les environnements virtuels (`.venv/`) sont ignorés par Git afin d'éviter la mise en version de données sensibles ou temporaires.
 
@@ -475,8 +479,8 @@ Les volumes présentés ci-dessus fonctionnent également avec l'image locale (`
 ## Environnement de développement
 
 Un dossier `.devcontainer/` est fourni pour disposer d'un environnement prêt à l'emploi
-dans VS Code ou GitHub Codespaces. Il utilise l'image Python 3.12 officielle
-(le projet restant compatible à partir de Python 3.10), préconfigure les caches
+dans VS Code ou GitHub Codespaces. Il utilise l'image Python 3.12 officielle
+(alignée sur la version minimale supportée par le projet), préconfigure les caches
 `pip` et `DVC` sur des volumes persistants et installe automatiquement les
 dépendances du projet ainsi que les hooks `pre-commit`.
 
@@ -527,9 +531,10 @@ dans les journaux pour faciliter le diagnostic.
 
 Sous Windows :
 
-1. `./installer.ps1 -SkipOllama` pour installer l'environnement local sans télécharger les modèles Ollama.
-   Omettez l'option `-SkipOllama` pour déclencher l'installation complète lorsque vous avez besoin des modèles.
-2. `./run.ps1`
+1. `./installer.ps1` pour créer l'environnement local et installer la CLI.
+   Ajoutez `-Initialize` si vous voulez lancer `watcher init --fully-auto` dans la foulée.
+2. Si vous n'avez pas utilisé `-Initialize`, exécutez `.\.venv\Scripts\watcher.exe init --fully-auto`.
+3. `./run.ps1`
 
 Dans un environnement sans serveur d'affichage (CI, sessions distantes), forcez le mode headless en vidant `DISPLAY`
 avant d'exécuter le lanceur :
@@ -542,7 +547,9 @@ $env:DISPLAY = ""
 ### Ligne de commande
 
 ```bash
-python -m app.ui.main
+watcher --help
+# ou, sans installation editable :
+python -m app.cli --help
 ```
 
 ### Générer une CLI Python
@@ -753,9 +760,9 @@ Le dépôt inclut maintenant une base minimale pour la Phase 1 de la roadmap doc
 
 - un **Source Registry** explicite, stocké localement en JSON ;
 - trois états de connaissance réels dans le code : `raw`, `validated`, `promoted` ;
-- des métadonnées minimales de traçabilité : source, type, langue, confiance, fraîcheur/date, licence, statut, ainsi que des traceurs HTTP quand ils existent (`etag`, `last_modified`, `fetched_at`).
+- des métadonnées minimales de traçabilité : source, type, langue, confiance, fraîcheur/date, licence, statut, motifs de validation/promotion, résultat d’évaluation (`promoted` ou `rejected`), score d’évaluation, comptage de corroboration, ainsi que des traceurs HTTP quand ils existent (`etag`, `last_modified`, `fetched_at`).
 
-Cette base reste volontairement incrémentale : elle s'appuie sur la chaîne existante `autopilot -> scrapers -> ingest -> embeddings`, sans introduire de collecte web générale ni de boucle d'auto-amélioration.
+Cette base reste volontairement incrémentale : elle s'appuie sur la chaîne existante `autopilot -> scrapers -> evaluate -> ingest -> embeddings`, sans introduire de collecte web générale ni de boucle d'auto-amélioration.
 
 ## GitHub ciblé
 
@@ -787,7 +794,7 @@ Les signalements doivent respecter la politique d'embargo décrite dans ce docum
 Watcher fonctionne hors ligne par défaut et n'envoie aucune donnée vers l'extérieur.
 Les journaux comme les contenus mémorisés restent sur l'environnement local et peuvent être effacés par l'utilisateur.
 
-La policy runtime (`config/policy.yaml` puis `~/.watcher/policy.yaml`) est appliquée par `app/autopilot/scheduler.py` et `app/autopilot/controller.py` : kill-switch, fenêtres réseau, caps CPU/RAM et budget `bandwidth_mb_per_day`. Ce budget est débité pendant la discovery (sitemaps, flux RSS, résolution GitHub ciblée) et pendant le scraping des pages, sur une fenêtre glissante de 24 h. Les accès `respect_robots=False` sont limités à l'API GitHub `api.github.com/repos/<owner>/<repo>` pour `scope=git`.
+La policy runtime (`config/policy.yaml` puis `~/.watcher/policy.yaml`) est appliquée par `app/autopilot/scheduler.py` et `app/autopilot/controller.py` : kill-switch, fenêtres réseau, caps CPU/RAM et budget `bandwidth_mb_per_day`. Les autorisations de domaine y sont persistées dans `domain_rules` (`domain` + `scope`), tandis que `allowlist_domains` reste synchronisé pour compatibilité. Le budget réseau est débité pendant la discovery (sitemaps, flux RSS, résolution GitHub ciblée) et pendant le scraping des pages, sur une fenêtre glissante de 24 h. Les accès `respect_robots=False` sont limités à l'API GitHub `api.github.com/repos/<owner>/<repo>` pour `scope=git`.
 
 ## Configuration des logs
 

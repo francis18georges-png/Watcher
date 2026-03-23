@@ -50,14 +50,11 @@ markdown_extensions:
       custom_fences:
         - name: mermaid
           class: mermaid
-        - name: plantuml
-          class: plantuml
-          format: !!python/name:pymdownx.superfences.fence_code_format
   - pymdownx.tabbed:
       alternate_style: true
   - pymdownx.emoji:
       emoji_generator: !!python/name:pymdownx.emoji.to_svg
-  - pymdownx.plantuml:
+  - plantuml_markdown:
       server: https://www.plantuml.com/plantuml
 
 plugins:

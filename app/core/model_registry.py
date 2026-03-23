@@ -180,9 +180,9 @@ MODEL_REGISTRY: dict[str, list[ModelSpec]] = {
         ModelSpec(
             name="demo-all-MiniLM-L6-v2.tar.gz",
             sha256=_decode_embedded_hash(
-                "YTVhNTFiNTMzNjgxYTY5NDQ2MjgzZTNjNmNlN2MzNWJjMDk4ZTBiZDU0MGM5ZmY1NjkzMWEwMmM0MTRkYzA1NA=="  # noqa: E501
+                "MzVkMmRjMWI1YjQ1NDY5NDZlYzdlNTRjOTRkNWMxNWI3NTQ0ZTZlZDY0NGE3MWIyNDk2NjkzMWYwYTQ5ZWQwNg=="  # noqa: E501
             ),
-            size_bytes=262144,
+            size_bytes=273541,
             urls=(
                 "https://huggingface.co/datasets/francisgg/demo-watch-llm/resolve/main/"
                 "demo-all-MiniLM-L6-v2.tar.gz"

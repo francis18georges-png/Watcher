@@ -138,7 +138,7 @@ Side channels:
 
 ## Flux critiques
 1. **Initialisation** : CLI/GUI détecte `~/.watcher/first_run`, déclenche onboarding, génère fichiers de politique, télécharge modèles vérifiés.
-2. **Autopilot** : planification `systemd-user`/`LaunchAgent`/`Task Scheduler` appelle le service CLI, qui orchestre `discover → scrape → verify → ingest → reindex` avec contrôle offline.
+2. **Autopilot** : planification `systemd-user`/`LaunchAgent`/`Task Scheduler` appelle le service CLI, qui orchestre `discover → scrape → verify → ingest → report` avec contrôle offline.
 3. **Recherche** : GUI/CLI appelle API locale `search`, qui utilise embeddings FAISS/SQLite-VSS et renvoie résultats avec métadonnées/score.
 4. **Mises à jour** : Workflows GitHub signent et publient packages ; GUI propose l'update via Tauri Updater opt-in.
 5. **Sécurité** : Cosign + SLSA garantissent provenance ; sandbox limite les sous-processus ; logs et diagnostics restent locaux.

@@ -79,3 +79,15 @@ def test_artifact_matches_spec_checks_size(tmp_path: Path) -> None:
 
     assert registry._artifact_matches_spec(path, spec_mismatch) is False
 
+
+def test_embedded_registry_artifacts_match_specs() -> None:
+    for family_specs in registry.MODEL_REGISTRY.values():
+        for spec in family_specs:
+            if spec.embedded_resource is None:
+                continue
+            package_root = Path(registry.__file__).resolve().parent.parent
+            path = package_root / spec.embedded_resource
+            assert path.is_file(), spec.embedded_resource
+            assert path.stat().st_size == spec.size_bytes
+            assert registry._hash_file(path) == spec.sha256
+

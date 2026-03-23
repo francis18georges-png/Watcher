@@ -30,6 +30,7 @@ __all__ = [
     "KnowledgeGapDetector",
     "LedgerView",
     "MultiSourceVerifier",
+    "PromotionEvaluator",
     "ReportGenerator",
 ]
 
@@ -81,6 +82,76 @@ class AutopilotRunResult:
     blocked: list[str] = field(default_factory=list)
     knowledge_gaps: list[str] = field(default_factory=list)
     reason: str | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class PromotionDecision:
+    """Outcome of the lightweight promotion gate."""
+
+    promote: bool
+    evaluation_status: str
+    evaluation_score: float
+    evaluation_reason: str
+
+
+class PromotionEvaluator:
+    """Minimal deterministic gate applied before promotion."""
+
+    def __init__(self, *, max_age_days: int | None = 365) -> None:
+        self.max_age_days = max_age_days
+
+    def evaluate(
+        self,
+        *,
+        document: RawDocument,
+        corroborating_domains: int,
+        now: datetime,
+        min_corroborating_domains: int,
+    ) -> PromotionDecision:
+        domains = max(0, int(corroborating_domains))
+        minimum = max(2, int(min_corroborating_domains))
+        if domains < minimum:
+            score = round(min(0.49, 0.25 + (domains * 0.1)), 2)
+            return PromotionDecision(
+                promote=False,
+                evaluation_status="rejected",
+                evaluation_score=score,
+                evaluation_reason=(
+                    f"rejected by evaluator: only {domains} corroborating domains"
+                ),
+            )
+
+        age_days = _document_age_days(document.published_at, now)
+        if age_days is not None and self.max_age_days is not None and age_days > self.max_age_days:
+            score = round(min(0.69, 0.45 + max(0, domains - minimum) * 0.05), 2)
+            return PromotionDecision(
+                promote=False,
+                evaluation_status="rejected",
+                evaluation_score=score,
+                evaluation_reason=(
+                    f"rejected by evaluator: content is {age_days} days old "
+                    f"(max {self.max_age_days})"
+                ),
+            )
+
+        freshness_bonus = 0.05
+        freshness_label = "freshness unknown"
+        if age_days is not None:
+            freshness_bonus = 0.2 if age_days <= 30 else 0.1
+            freshness_label = f"age {age_days} days"
+        score = round(
+            min(1.0, 0.6 + max(0, domains - minimum) * 0.1 + freshness_bonus),
+            2,
+        )
+        return PromotionDecision(
+            promote=True,
+            evaluation_status="promoted",
+            evaluation_score=score,
+            evaluation_reason=(
+                "promoted after evaluation: "
+                f"{domains} corroborating domains and {freshness_label}"
+            ),
+        )
 
 
 class KnowledgeGapDetector:
@@ -167,14 +238,31 @@ class MultiSourceVerifier:
     def __init__(self, *, min_sources: int) -> None:
         self._min_sources = max(2, min_sources)
 
+    def corroboration_counts(
+        self,
+        documents: Sequence[tuple[RawDocument, str]],
+    ) -> dict[str, int]:
+        grouped: MutableMapping[str, list[tuple[RawDocument, str]]] = defaultdict(list)
+        for document, digest in documents:
+            grouped[digest].append((document, digest))
+        counts: dict[str, int] = {}
+        for digest, items in grouped.items():
+            domains = {
+                domain
+                for document, _ in items
+                if (domain := _domain_from_url(document.url)) is not None
+            }
+            counts[digest] = len(domains)
+        return counts
+
     def filter(self, documents: Sequence[tuple[RawDocument, str]]) -> list[tuple[RawDocument, str]]:
         grouped: MutableMapping[str, list[tuple[RawDocument, str]]] = defaultdict(list)
         for document, digest in documents:
             grouped[digest].append((document, digest))
+        counts = self.corroboration_counts(documents)
         validated: list[tuple[RawDocument, str]] = []
         for digest, items in grouped.items():
-            domains = {_domain_from_url(item[0].url) for item in items}
-            if len(domains) < self._min_sources:
+            if counts.get(digest, 0) < self._min_sources:
                 continue
             validated.extend(items)
         return validated
@@ -294,7 +382,7 @@ class LedgerView:
 
 
 class ReportGenerator:
-    """Persist weekly HTML report about ingested and revoked sources."""
+    """Persist weekly HTML report about promotion and rollback outcomes."""
 
     def __init__(self, output_path: Path) -> None:
         self.output_path = output_path
@@ -305,7 +393,9 @@ class ReportGenerator:
         self,
         *,
         ingested: Sequence[str],
-        revoked: Sequence[str],
+        rejected: Sequence[str],
+        revoked_domains: Sequence[str],
+        revoked_sources: Sequence[str],
         knowledge_gaps: Sequence[str],
         timestamp: datetime,
     ) -> None:
@@ -313,8 +403,18 @@ class ReportGenerator:
         now_iso = timestamp.isoformat()
         for url in ingested:
             history.append({"type": "ingested", "value": url, "timestamp": now_iso})
-        for domain in revoked:
-            history.append({"type": "revoked", "value": domain, "timestamp": now_iso})
+        for item in rejected:
+            history.append(
+                {"type": "rejected_promotion", "value": item, "timestamp": now_iso}
+            )
+        for domain in revoked_domains:
+            history.append(
+                {"type": "revoked_domain", "value": domain, "timestamp": now_iso}
+            )
+        for url in revoked_sources:
+            history.append(
+                {"type": "revoked_source", "value": url, "timestamp": now_iso}
+            )
         for gap in knowledge_gaps:
             history.append({"type": "knowledge_gap", "value": gap, "timestamp": now_iso})
         self._save_history(history)
@@ -341,7 +441,9 @@ class ReportGenerator:
         window_start = now - timedelta(days=7)
         since_norm = _normalise_datetime(window_start)
         ingested: list[str] = []
-        revoked: list[str] = []
+        rejected: list[str] = []
+        revoked_domains: list[str] = []
+        revoked_sources: list[str] = []
         knowledge_gaps: list[str] = []
         for entry in history:
             timestamp = LedgerView._parse_timestamp(entry.get("timestamp"))
@@ -351,8 +453,12 @@ class ReportGenerator:
                 continue
             if entry.get("type") == "ingested":
                 ingested.append(str(entry.get("value", "")))
-            elif entry.get("type") == "revoked":
-                revoked.append(str(entry.get("value", "")))
+            elif entry.get("type") == "rejected_promotion":
+                rejected.append(str(entry.get("value", "")))
+            elif entry.get("type") in {"revoked", "revoked_domain"}:
+                revoked_domains.append(str(entry.get("value", "")))
+            elif entry.get("type") == "revoked_source":
+                revoked_sources.append(str(entry.get("value", "")))
             elif entry.get("type") == "knowledge_gap":
                 knowledge_gaps.append(str(entry.get("value", "")))
         html = [
@@ -371,13 +477,27 @@ class ReportGenerator:
             html.append("    </ul>")
         else:
             html.append("    <p>Aucune nouvelle source.</p>")
-        html.append("    <h2>Sources révoquées</h2>")
-        if revoked:
+        html.append("    <h2>Promotions rejetées</h2>")
+        if rejected:
             html.append("    <ul>")
-            html.extend(f"      <li>{item}</li>" for item in sorted(set(revoked)))
+            html.extend(f"      <li>{item}</li>" for item in sorted(set(rejected)))
             html.append("    </ul>")
         else:
-            html.append("    <p>Aucune révocation enregistrée.</p>")
+            html.append("    <p>Aucune promotion rejetée.</p>")
+        html.append("    <h2>Sources révoquées</h2>")
+        if revoked_sources:
+            html.append("    <ul>")
+            html.extend(f"      <li>{item}</li>" for item in sorted(set(revoked_sources)))
+            html.append("    </ul>")
+        else:
+            html.append("    <p>Aucune source révoquée.</p>")
+        html.append("    <h2>Domaines révoqués</h2>")
+        if revoked_domains:
+            html.append("    <ul>")
+            html.extend(f"      <li>{item}</li>" for item in sorted(set(revoked_domains)))
+            html.append("    </ul>")
+        else:
+            html.append("    <p>Aucun domaine révoqué.</p>")
         html.append("    <h2>Knowledge gaps détectés</h2>")
         if knowledge_gaps:
             html.append("    <ul>")
@@ -408,6 +528,7 @@ class AutopilotController:
         logger: logging.Logger | None = None,
         sleep_func: callable | None = None,
         clock: callable | None = None,
+        promotion_evaluator: PromotionEvaluator | None = None,
     ) -> None:
         self.scheduler = scheduler
         self.pipeline = pipeline
@@ -440,6 +561,7 @@ class AutopilotController:
         self._gap_detector = KnowledgeGapDetector()
         self._source_registry = SourceRegistry(self._config_dir / "source-registry.json")
         self._last_request: dict[str, float] = {}
+        self._promotion_evaluator = promotion_evaluator or PromotionEvaluator()
 
     # ------------------------------------------------------------------
 
@@ -477,6 +599,8 @@ class AutopilotController:
         if policy.require_corroboration > self.pipeline.min_sources:
             self.pipeline.min_sources = policy.require_corroboration
         verifier = MultiSourceVerifier(min_sources=self.pipeline.min_sources)
+        recent_revoked = self._ledger_view.revocations_since(now - timedelta(days=7))
+        revoked_sources = self._apply_recent_revocations(recent_revoked, observed_at=now)
 
         active_topics = topics or state.topics
         discovered = list(self.crawler.discover(active_topics, allowed.values()))
@@ -488,6 +612,7 @@ class AutopilotController:
                 confidence=0.0,
                 freshness_at=item.published_at,
                 licence=item.licence,
+                status_reason="discovered",
                 observed_at=now,
             )
         collected: list[tuple[RawDocument, str]] = []
@@ -620,10 +745,13 @@ class AutopilotController:
             digest = hashlib.sha256(text.encode("utf-8")).hexdigest()
             collected.append((raw, digest))
 
+        corroboration_counts = verifier.corroboration_counts(collected)
         verified = verifier.filter(collected)
         verified_documents = [item[0] for item in verified]
         verified_sources = {item.url for item in verified_documents}
-        for document in verified_documents:
+        rejected_promotions: list[str] = []
+        for document, digest in verified:
+            corroborating_domains = corroboration_counts.get(digest, 0)
             self._source_registry.record(
                 source=document.url,
                 source_type=document.source_type,
@@ -631,9 +759,46 @@ class AutopilotController:
                 confidence=1.0,
                 freshness_at=document.published_at,
                 licence=document.licence,
+                corroborating_sources=corroborating_domains,
+                status_reason=_validated_reason(corroborating_domains),
                 observed_at=self._clock(),
             )
-        for document, _digest in collected:
+        promotable: list[tuple[RawDocument, str, PromotionDecision]] = []
+        promotable_documents: list[RawDocument] = []
+        for document, digest in verified:
+            corroborating_domains = corroboration_counts.get(digest, 0)
+            decision = self._promotion_evaluator.evaluate(
+                document=document,
+                corroborating_domains=corroborating_domains,
+                now=self._clock(),
+                min_corroborating_domains=self.pipeline.min_sources,
+            )
+            if decision.promote:
+                document.evaluation_status = decision.evaluation_status
+                document.evaluation_score = decision.evaluation_score
+                document.evaluation_reason = decision.evaluation_reason
+                promotable.append((document, digest, decision))
+                promotable_documents.append(document)
+                continue
+            skipped.append(document.url)
+            self._source_registry.record(
+                source=document.url,
+                source_type=document.source_type,
+                status=KnowledgeStatus.VALIDATED,
+                confidence=decision.evaluation_score,
+                freshness_at=document.published_at,
+                licence=document.licence,
+                corroborating_sources=corroborating_domains,
+                status_reason=decision.evaluation_reason,
+                evaluation_status=decision.evaluation_status,
+                evaluation_score=decision.evaluation_score,
+                evaluation_reason=decision.evaluation_reason,
+                observed_at=self._clock(),
+            )
+            rejected_promotions.append(
+                f"{document.url} | {decision.evaluation_reason}"
+            )
+        for document, digest in collected:
             if document.url in verified_sources:
                 continue
             self._source_registry.reject(
@@ -642,55 +807,79 @@ class AutopilotController:
                 reason="insufficient corroboration",
                 freshness_at=document.published_at,
                 licence=document.licence,
+                corroborating_sources=corroboration_counts.get(digest),
                 observed_at=self._clock(),
             )
         knowledge_gaps = self._gap_detector.detect(
             topics=active_topics,
             discovered=discovered,
-            ingested=verified_documents,
+            ingested=promotable_documents,
         )
         if not verified:
             self._logger.info("Aucun contenu corroboré à ingérer.")
-            return AutopilotRunResult(
+            return self._finalize_run(
                 ingested=0,
+                ingested_urls=[],
+                rejected=rejected_promotions,
+                revoked_domains=recent_revoked,
+                revoked_sources=revoked_sources,
                 skipped=skipped,
                 blocked=gate.blocked,
                 knowledge_gaps=knowledge_gaps,
             )
+        if not promotable:
+            self._logger.info("Aucun contenu n'a franchi la porte de promotion.")
+            return self._finalize_run(
+                ingested=0,
+                ingested_urls=[],
+                rejected=rejected_promotions,
+                revoked_domains=recent_revoked,
+                revoked_sources=revoked_sources,
+                skipped=skipped,
+                blocked=gate.blocked,
+                knowledge_gaps=knowledge_gaps,
+                reason="évaluation défavorable",
+            )
 
         try:
             with VectorStoreTransaction(self.pipeline.store) as transaction:
-                ingested = self.pipeline.ingest(verified_documents)
+                ingested = self.pipeline.ingest(promotable_documents)
                 transaction.commit()
         except IngestValidationError as exc:
             self._logger.error("Ingestion interrompue: %s", exc)
-            return AutopilotRunResult(
+            return self._finalize_run(
                 ingested=0,
+                ingested_urls=[],
+                rejected=rejected_promotions,
+                revoked_domains=recent_revoked,
+                revoked_sources=revoked_sources,
                 skipped=skipped,
                 blocked=gate.blocked,
                 knowledge_gaps=knowledge_gaps,
                 reason="ingestion invalide",
             )
-
-        recent_revoked = self._ledger_view.revocations_since(now - timedelta(days=7))
-        for document in verified_documents:
+        for document, digest, decision in promotable:
+            corroborating_domains = corroboration_counts.get(digest, 0)
             self._source_registry.record(
                 source=document.url,
                 source_type=document.source_type,
                 status=KnowledgeStatus.PROMOTED,
-                confidence=1.0,
+                confidence=decision.evaluation_score,
                 freshness_at=document.published_at,
                 licence=document.licence,
+                corroborating_sources=corroborating_domains,
+                status_reason=decision.evaluation_reason,
+                evaluation_status=decision.evaluation_status,
+                evaluation_score=decision.evaluation_score,
+                evaluation_reason=decision.evaluation_reason,
                 observed_at=self._clock(),
             )
-        self._reporter.record(
-            ingested=[item.url for item in verified_documents],
-            revoked=recent_revoked,
-            knowledge_gaps=knowledge_gaps,
-            timestamp=now,
-        )
-        return AutopilotRunResult(
+        return self._finalize_run(
             ingested=ingested,
+            ingested_urls=[item.url for item in promotable_documents],
+            rejected=rejected_promotions,
+            revoked_domains=recent_revoked,
+            revoked_sources=revoked_sources,
             skipped=skipped,
             blocked=gate.blocked,
             knowledge_gaps=knowledge_gaps,
@@ -740,6 +929,66 @@ class AutopilotController:
             now=self._clock(),
         )
 
+    def _apply_recent_revocations(
+        self,
+        revoked_domains: Sequence[str],
+        *,
+        observed_at: datetime,
+    ) -> list[str]:
+        domains = sorted(
+            {
+                domain.strip().lower()
+                for domain in revoked_domains
+                if isinstance(domain, str) and domain.strip()
+            }
+        )
+        if not domains:
+            return []
+        reason = "revoked by consent ledger"
+        revoked_entries = self._source_registry.revoke_domains(
+            domains=domains,
+            reason=reason,
+            observed_at=observed_at,
+        )
+        delete_by_domains = getattr(self.pipeline.store, "delete_by_domains", None)
+        if callable(delete_by_domains):
+            removed = int(delete_by_domains(domains))
+            if removed:
+                self._logger.info(
+                    "%s documents supprimés du vector store après révocation.",
+                    removed,
+                )
+        return [entry.source for entry in revoked_entries]
+
+    def _finalize_run(
+        self,
+        *,
+        ingested: int,
+        ingested_urls: Sequence[str],
+        rejected: Sequence[str],
+        revoked_domains: Sequence[str],
+        revoked_sources: Sequence[str],
+        skipped: Sequence[str],
+        blocked: Sequence[str],
+        knowledge_gaps: Sequence[str],
+        reason: str | None = None,
+    ) -> AutopilotRunResult:
+        self._reporter.record(
+            ingested=ingested_urls,
+            rejected=rejected,
+            revoked_domains=revoked_domains,
+            revoked_sources=revoked_sources,
+            knowledge_gaps=knowledge_gaps,
+            timestamp=self._clock(),
+        )
+        return AutopilotRunResult(
+            ingested=ingested,
+            skipped=list(skipped),
+            blocked=list(blocked),
+            knowledge_gaps=list(knowledge_gaps),
+            reason=reason,
+        )
+
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -758,6 +1007,22 @@ def _bytes_to_mb(size: int) -> float:
     if size <= 0:
         return 0.0
     return round(size / (1024 * 1024), 4)
+
+
+def _validated_reason(corroborating_domains: int) -> str:
+    return (
+        f"corroborated by {max(0, int(corroborating_domains))} distinct domains"
+    )
+
+
+def _document_age_days(
+    published_at: datetime | None,
+    now: datetime,
+) -> int | None:
+    if published_at is None:
+        return None
+    delta = _normalise_datetime(now) - _normalise_datetime(published_at)
+    return max(0, int(delta.total_seconds() // 86400))
 
 
 def _topic_matches(topic: str, *values: str) -> bool:

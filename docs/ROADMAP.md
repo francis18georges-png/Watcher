@@ -192,7 +192,9 @@ Phase 0.
 ### Premier slice désormais en place
 - registre de sources minimal explicite,
 - états `raw / validated / promoted` présents dans le code,
-- métadonnées minimales branchées sur le flux existant `discover -> verify -> ingest`,
+- motifs explicites de validation / promotion et comptage de corroboration persistés,
+- premier gate d'évaluation `promote/reject` branché avant ingestion,
+- métadonnées minimales branchées sur le flux existant `discover -> verify -> evaluate -> ingest`,
 - persistance locale simple, compatible avec l'approche offline-first,
 - support GitHub ciblé pour releases, changelogs, docs limitées et fichiers de référence explicitement autorisés.
 

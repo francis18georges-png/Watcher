@@ -26,6 +26,22 @@ def _normalize_policy(data: dict) -> dict:
         )
     normalized["network_windows"] = sorted(windows, key=lambda item: (item["start"], item["end"]))
     normalized["allowlist_domains"] = sorted(normalized.get("allowlist_domains", []))
+    domain_rules = normalized.get("domain_rules")
+    if domain_rules is None:
+        domain_rules = [
+            {"domain": domain, "scope": "web"}
+            for domain in normalized.get("allowlist_domains", [])
+        ]
+    normalized["domain_rules"] = sorted(
+        (
+            {
+                "domain": item.get("domain"),
+                "scope": item.get("scope", "web"),
+            }
+            for item in domain_rules
+        ),
+        key=lambda item: (item["domain"], item["scope"]),
+    )
 
     models = normalized.setdefault("models", {})
     for key in ("llm", "embedding"):

@@ -7,9 +7,9 @@ _Date du rapport : 2025-10-14_
 ### Architecture actuelle
 - **Bootstrap & premier lancement** : `FirstRunConfigurator` détecte le matériel (threads CPU, présence GPU), télécharge les modèles déclarés et génère `config.toml`, `policy.yaml`, `.env` ainsi que le journal de consentement dans `~/.watcher/`, en supprimant la sentinelle `first_run` une fois l’initialisation terminée.【F:app/core/first_run.py†L27-L155】【F:app/core/first_run.py†L216-L296】
 - **Gestion des modèles** : le registre fournit des artefacts GGUF et embeddings signés (hash SHA256 + taille), avec fallback embarqué et reprise de téléchargement. Les spécifications incluent licence, backend et taille de contexte.【F:app/core/model_registry.py†L19-L118】
-- **Politique & consentement** : `PolicyManager` charge/valide `policy.yaml`, gère allowlist, kill-switch et enregistrements signés HMAC dans `consents.jsonl` via `ConsentLedger`. La CLI expose `policy show|approve|revoke` et migre l’ancien ledger si présent.【F:app/policy/manager.py†L8-L108】【F:app/policy/ledger.py†L8-L53】
-- **Autostart multiplateforme** : génération de scripts systemd (--user) et tâches Windows RunOnce/Task Scheduler, déclenchées automatiquement pendant `watcher init --auto`. Les artefacts sont écrits sous `~/.watcher/autostart/` et testés par `test_autostart_*`.【F:app/core/autostart.py†L1-L83】【F:app/core/first_run.py†L300-L362】【F:tests/test_autostart_config.py†L12-L116】
-- **Autopilot** : `AutopilotScheduler` applique fenêtres réseau, budgets CPU/RAM et kill-switch, persiste son état (`state.json`) et maintient la file de sujets. `AutopilotController` orchestre discover → scrape → verify → ingest, applique le `ConsentGate`, la corroboration multi-source et publie un rapport HTML hebdomadaire.【F:app/autopilot/scheduler.py†L1-L247】【F:app/autopilot/controller.py†L1-L340】
+- **Politique & consentement** : `PolicyManager` charge/valide `policy.yaml`, gère `domain_rules` (`domain` + `scope`), maintient `allowlist_domains` en compatibilité, applique le kill-switch et enregistre des entrées signées HMAC dans `consents.jsonl` via `ConsentLedger`. La CLI expose `policy show|approve|revoke` avec `--scope web|git` et migre l’ancien ledger si présent.【F:app/policy/manager.py†L8-L145】【F:app/policy/schema.py†L185-L365】【F:app/policy/ledger.py†L8-L53】
+- **Autostart multiplateforme** : génération de scripts systemd (--user) et tâches Windows RunOnce/Task Scheduler, déclenchées automatiquement pendant `watcher init --fully-auto`. Les artefacts sont écrits sous `~/.watcher/autostart/` et testés par `test_autostart_*`.【F:app/core/autostart.py†L1-L83】【F:app/core/first_run.py†L300-L362】【F:tests/test_autostart_config.py†L12-L116】
+- **Autopilot** : `AutopilotScheduler` applique fenêtres réseau, budgets CPU/RAM et kill-switch, persiste son état (`autopilot-state.json`) et maintient la file de sujets. `AutopilotController` orchestre discover → scrape → verify → ingest, applique le `ConsentGate`, la corroboration multi-source et publie un rapport HTML hebdomadaire. Les tests couvrent désormais aussi le chemin policy `domain_rules` seule et le runtime `scope=git`.【F:app/autopilot/scheduler.py†L1-L247】【F:app/autopilot/controller.py†L1-L340】【F:tests/test_autopilot_controller.py†L724-L879】
 - **Scraping vérifié** : implémentations HTTP, sitemap et GitHub honorent robots.txt, ETag/If-Modified-Since, throttling, user-agent dédié et déduplication des URLs/hachés avant ingestion.【F:app/scrapers/http.py†L1-L241】【F:tests/test_http_scraper.py†L9-L148】
 - **Pipeline RAG** : `IngestPipeline` normalise, détecte la langue, segmente, exige ≥2 sources et licences compatibles avant de pousser dans `SimpleVectorStore` (SQLite + embeddings locaux) avec métadonnées `{url,titre,licence,date,hash,score}`. Rollback vectoriel assuré via `VectorStoreTransaction`.【F:app/ingest/pipeline.py†L1-L138】【F:app/autopilot/controller.py†L139-L208】
 - **LLM local** : backends `llama.cpp` et fallback `Echo` encapsulés par `app/llm` et `watcher run --offline`, garantissant une réponse déterministe lorsque le réseau est bloqué.【F:app/llm/engine.py†L1-L189】【F:tests/test_e2e_offline.py†L1-L34】
@@ -18,7 +18,7 @@ _Date du rapport : 2025-10-14_
 - Le binaire `watcher` défini dans `pyproject.toml` route vers `app.cli:main`, exposant `init`, `run`, `ask`, `ingest`, `autopilot`, `policy`, `cache`, `eval`. Chaque sous-commande respecte les codes de sortie stables testés par `tests/test_cli*.py`.【F:pyproject.toml†L6-L40】【F:app/cli.py†L1-L320】
 
 ### Dépendances & environnement
-- Dépendances runtime : HTTPX, llama-cpp-python, sentence-transformers, SQLAlchemy, Alembic, Rich, PyYAML. Les versions sont figées pour reproductibilité ≥3.10 (tests 3.10-3.12 dans CI).【F:pyproject.toml†L14-L38】【F:.github/workflows/ci.yml†L67-L145】
+- Dépendances runtime : HTTPX, llama-cpp-python, sentence-transformers, SQLAlchemy, Alembic, Rich, PyYAML. Les versions sont figées pour reproductibilité ≥3.12 (CI par défaut sur Python 3.12, matrice extensible via `WATCHER_NOX_PYTHON`).【F:pyproject.toml†L14-L37】【F:.github/workflows/ci.yml†L67-L145】
 - Dépendances dev/test : `requirements-dev.txt` couvre pytest, pytest-socket, coverage, mypy, nox, trafilatura, etc. Les tests bloquent le réseau par défaut (pytest-socket) pour rester offline-first.【F:requirements-dev.txt†L1-L93】【F:tests/conftest.py†L1-L60】
 
 ### Configuration & scripts
@@ -33,7 +33,7 @@ _Date du rapport : 2025-10-14_
 - Suite pytest couvre autopilot, scrapers, ingestion, sandbox, CLI, first-run et offline E2E (`pytest -m e2e_offline`). Diff-coverage 100 % via nox/coverage gate. Scorecard, CodeQL, pip-audit, gitleaks intégrés dans CI.【F:noxfile.py†L48-L214】【F:tests/test_autopilot.py†L1-L120】【F:.github/workflows/ci.yml†L1-L234】
 
 ### CI/CD, packaging & distribution
-- **CI multi-OS** : matrice Linux/macOS/Windows avec Python 3.10-3.12, enforcement Scorecard ≥7, pip-audit, pytest-socket.【F:.github/workflows/ci.yml†L38-L213】
+- **CI multi-OS** : matrice Linux/macOS/Windows avec Python 3.12 par défaut, extensible via `WATCHER_NOX_PYTHON`, enforcement Scorecard ≥7, pip-audit, pytest-socket.【F:.github/workflows/ci.yml†L38-L213】
 - **Release signée** : workflow `release.yml` produit wheels + sdist + PyInstaller (Win/Linux/macOS), SBOM CycloneDX, provenance SLSA, signatures Sigstore.【F:.github/workflows/release.yml†L1-L270】
 - **Docker multi-arch** : buildx `linux/amd64, linux/arm64`, scan Trivy, SBOM CycloneDX & SPDX, signature cosign, provenance SLSA niveau 3.【F:.github/workflows/docker.yml†L1-L151】
 - **Docs** : MkDocs Material (`mkdocs.yml`) avec déploiement GitHub Pages automatisé (`deploy-docs.yml`). Contenus couvrant Quickstart offline, politique, autopilot, troubleshooting.【F:mkdocs.yml†L1-L104】【F:.github/workflows/deploy-docs.yml†L1-L87】
@@ -45,7 +45,7 @@ _Date du rapport : 2025-10-14_
 
 ### P1 — Critique qualité/UX
 1. **Sélection modèle GPU incomplète** : `select_models` ignore `has_gpu` et renvoie toujours la variante CPU. Recommandation : étendre `MODEL_REGISTRY` avec un profil GPU (ex. `smollm-360m` quantisé CUDA) et choisir dynamiquement selon `has_gpu` pour exploiter la détection existante.【F:app/core/model_registry.py†L200-L213】
-2. **Scraper RSS absent** : la politique exige sitemaps, RSS et GitHub. Les modules couvrent HTTP/Sitemap/GitHub mais pas RSS/Atom. Recommandation : ajouter `app/scrapers/rss.py` avec parsing feedparser, respect ETag/If-Modified-Since et tests (`test_rss_scraper.py`).【F:app/scrapers/__init__.py†L1-L37】
+2. **Collecte RSS/Atom encore concentrée dans la discovery** : la politique exige sitemaps, RSS et GitHub, et le support RSS/Atom existe aujourd’hui dans `app/autopilot/discovery.py`, mais pas encore sous forme de module dédié. Recommandation : extraire un composant `rss.py` si l’on veut isoler davantage le parsing, le cache et l’observabilité réseau.【F:app/autopilot/discovery.py†L1-L260】
 3. **Plan de profils prédéfinis** : `watcher init` n’expose pas encore `--profile` pour charger différents bundles de policy/allowlist documentés dans README. Recommandation : enrichir `FirstRunConfigurator` pour appliquer des profils YAML pré-packagés et tests correspondants.【F:app/cli.py†L60-L140】
 
 ### P2 — Optimisation / Documentation
@@ -263,14 +263,14 @@ diff --git a/app/scrapers/rss.py b/app/scrapers/rss.py
 - `pytest tests/test_policy_*.py` : garantit la conformité policy/consent ledger et CLI `policy` (approval/revoke).【F:tests/test_policy_manager.py†L1-L116】【F:tests/test_policy_baseline.py†L1-L82】
 
 ## H) Notes de migration & rollback
-- **Migration v2** : `FirstRunConfigurator.migrate_legacy_state()` migre le ledger `consent-ledger.jsonl` vers `consents.jsonl` et conserve le secret HMAC. Lors d’une mise à niveau, lancer `watcher init --auto` pour déclencher la migration sans toucher aux modèles.【F:app/core/first_run.py†L262-L296】
+- **Migration v2** : `FirstRunConfigurator.migrate_legacy_state()` migre le ledger `consent-ledger.jsonl` vers `consents.jsonl` et conserve le secret HMAC. Lors d’une mise à niveau, lancer `watcher init --fully-auto` pour déclencher la migration sans toucher au contrat utilisateur de la policy.【F:app/core/first_run.py†L262-L296】
 - **Index rollback** : `VectorStoreTransaction` sauvegarde le snapshot du vector store avant ingestion ; en cas d’échec, il restaure automatiquement le fichier `.bak`. Pour rollback manuel : arrêter autopilot, restaurer le dernier snapshot depuis `~/.watcher/memory/snapshots/` puis relancer `watcher run --offline` pour vérifier la cohérence.【F:app/autopilot/controller.py†L139-L208】
 - **Kill-switch** : créer `~/.watcher/disable` désactive autopilot et laisse l’utilisateur réinitialiser la politique/consents avant relance.【F:config/policy.yaml†L1-L12】【F:app/core/first_run.py†L320-L354】
 
 ## I) Procédure d’installation & autostart
-1. Installer dépendances Python : `pip install -r requirements.txt` (ou package wheel signé).【F:README.md†L20-L33】
+1. Installer dépendances Python et la CLI locale : `pip install -r requirements.txt` puis `pip install -e .` (ou package wheel signé).【F:README.md†L20-L33】
 2. Lancer `watcher init --fully-auto` (aucune interaction) : modèles vérifiés, config/policy/consents générés, autostart planifié, consentement initial journalisé.【F:README.md†L34-L60】【F:app/core/first_run.py†L69-L155】
-3. Vérifier policy/consents : `watcher policy show`, `watcher policy approve --domain docs.python.org --scope autopilot`.【F:app/cli.py†L209-L270】
+3. Vérifier policy/consents : `watcher policy show`, `watcher policy approve --domain docs.python.org --scope web`, puis au besoin `watcher policy approve --domain github.com --scope git`.【F:app/cli.py†L209-L320】
 4. Exécuter `watcher run --offline --prompt "Ping"` pour confirmer la réponse locale déterministe.【F:tests/test_e2e_offline.py†L1-L34】
 5. Autostart :
    - **Linux** : `systemctl --user daemon-reload && systemctl --user enable --now watcher-autopilot.timer` (généré automatiquement).【F:app/core/autostart.py†L46-L79】

@@ -55,6 +55,18 @@ def test_metadata_contains_required_fields_with_score() -> None:
     assert metadata["language"] == "unknown"
     assert metadata["domain"] == "example.net"
     assert metadata["knowledge_state"] == "promoted"
+    assert metadata["evaluation_basis"] == "multi_source_corroboration"
+    assert metadata["evaluation_status"] == "promoted"
+    assert metadata["evaluation_score"] == 0.6
+    assert (
+        metadata["evaluation_reason"]
+        == "promoted after ingesting corroborated content from 2 distinct sources"
+    )
+    assert metadata["validation_reason"] == "corroborated by 2 distinct sources"
+    assert (
+        metadata["promotion_reason"]
+        == "promoted after ingesting corroborated content from 2 distinct sources"
+    )
     assert metadata["status"] == "promoted"
     assert metadata["source_type"] == "web"
     assert metadata["date"] == datetime(2024, 1, 2, tzinfo=timezone.utc).isoformat()
@@ -96,3 +108,43 @@ def test_metadata_includes_http_trace_fields_when_available() -> None:
         "Wed, 03 Jan 2024 10:00:00 GMT",
         "Thu, 04 Jan 2024 10:00:00 GMT",
     }
+
+
+def test_metadata_keeps_explicit_evaluation_fields_from_documents() -> None:
+    store = DummyStore()
+    pipeline = IngestPipeline(store)
+
+    docs = [
+        RawDocument(
+            url="https://example.org/a",
+            title="Titre A",
+            text="Corroboration multi source",
+            licence="CC-BY-4.0",
+            evaluation_status="promoted",
+            evaluation_score=0.85,
+            evaluation_reason="promoted after evaluation: 2 corroborating domains and age 1 days",
+        ),
+        RawDocument(
+            url="https://example.net/b",
+            title="Titre B",
+            text="Corroboration multi source",
+            licence="CC-BY-4.0",
+            evaluation_status="promoted",
+            evaluation_score=0.85,
+            evaluation_reason="promoted after evaluation: 2 corroborating domains and age 1 days",
+        ),
+    ]
+
+    pipeline.ingest(docs)
+
+    metadata = store.add_calls[0][1][0]
+    assert metadata["evaluation_status"] == "promoted"
+    assert metadata["evaluation_score"] == 0.85
+    assert (
+        metadata["evaluation_reason"]
+        == "promoted after evaluation: 2 corroborating domains and age 1 days"
+    )
+    assert (
+        metadata["promotion_reason"]
+        == "promoted after evaluation: 2 corroborating domains and age 1 days"
+    )

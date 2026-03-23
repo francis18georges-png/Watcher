@@ -195,6 +195,10 @@ class MemorySettings(SectionSettings):
         default="sentence-transformers/all-MiniLM-L6-v2",
         description="Identifiant du modèle d'embedding SentenceTransformer.",
     )
+    embed_host: str = Field(
+        default="127.0.0.1:11434",
+        description="Hôte Ollama utilisé lorsque les embeddings distants sont activés.",
+    )
     embed_model_path: Path = Field(
         default=Path("models/embeddings/all-MiniLM-L6-v2"),
         description="Chemin local vers le modèle d'embedding.",

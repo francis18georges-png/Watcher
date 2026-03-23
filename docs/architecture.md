@@ -32,8 +32,7 @@ app/
 - **`app/data`** : contient surtout des données, scripts et helpers de préparation/collecte. Ce n'est pas la couche métier principale.
 - **`app/policy`** : source de vérité pour `policy.yaml`, la validation du schéma, l'allowlist, le kill-switch et le ledger de consentement.
 - **`app/scrapers`** : couche réseau contrôlée, avec respect de `robots.txt`, throttling, cache et extraction.
-- **`app/ingest`** : transforme les documents collectés en entrées validées et ingérables.
-- **`app/ingest`** : transforme les documents collectés en entrées validées et ingérables. Cette couche porte désormais un registre de sources minimal et les états `raw`, `validated`, `promoted`.
+- **`app/ingest`** : transforme les documents collectés en entrées validées et ingérables. Cette couche porte désormais un registre de sources minimal, les états `raw`, `validated`, `promoted`, ainsi que les motifs de validation/promotion et le comptage de corroboration.
 - **`app/embeddings`** : gère la partie vector store et l'indexation locale associée.
 - **`app/llm`** : encapsule les interactions avec les backends de modèles.
 - **`app/tools`** : expose des utilitaires de productivité et d'extension, notamment autour des plugins.
@@ -44,7 +43,7 @@ app/
 1. La CLI charge la configuration et la policy locale.
 2. `app/policy` valide les contraintes runtime.
 3. `app/autopilot/scheduler.py` décide si le réseau peut être activé.
-4. `app/autopilot/controller.py` orchestre `discover -> scrape -> verify -> ingest`.
+4. `app/autopilot/controller.py` orchestre `discover -> scrape -> verify -> evaluate -> promote/reject -> ingest`.
 5. `app/scrapers` collecte sous contraintes.
 6. `app/ingest/source_registry.py` journalise la progression des sources et de la connaissance.
 7. `app/ingest` et `app/embeddings` valident puis indexent localement.
@@ -55,7 +54,7 @@ Le dépôt contient maintenant un premier slice réel de la boucle documentaire 
 
 - **Source Registry** : registre JSON minimal explicite (`source-registry.json`) piloté par `app/ingest/source_registry.py`.
 - **États de connaissance** : `raw`, `validated`, `promoted`.
-- **Métadonnées minimales** : `source`, `source_type`, `confidence`, `freshness_at`, `licence`, `status`.
+- **Traçabilité minimale explicite** : `source`, `source_type`, `confidence`, `freshness_at`, `licence`, `status`, `status_reason`, `corroborating_sources`, `evaluation_status`, `evaluation_score`, `evaluation_reason`.
 - **Branchement incrémental** : la discovery et le contrôleur mettent à jour le registre sans remplacer `app/data`, `app/scrapers` ni `app/ingest`.
 
 ### GitHub ciblé actuel

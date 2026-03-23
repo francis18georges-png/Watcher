@@ -28,7 +28,7 @@ Les variables d'environnement correspondantes (`WATCHER_LLM__*`, `WATCHER_MEMORY
 
 ## Qualité et automatisation
 
-Les sessions Nox et la matrice Python du pipeline CI respectent la variable d'environnement `WATCHER_NOX_PYTHON`. Elle accepte une liste de versions séparées par des virgules et/ou des espaces (par exemple `"3.10, 3.11 3.12"`). Lorsque la variable est absente ou ne contient aucune version, la valeur par défaut couvre explicitement les interpréteurs pris en charge (`3.10`, `3.11` et `3.12`).
+Les sessions Nox et la matrice Python du pipeline CI respectent la variable d'environnement `WATCHER_NOX_PYTHON`. Elle accepte une liste de versions séparées par des virgules et/ou des espaces (par exemple `"3.12 3.13"`). Lorsque la variable est absente ou ne contient aucune version, la valeur par défaut cible explicitement l'interpréteur de référence du projet (`3.12`).
 
 Les pull requests provenant d'un fork n'ont pas accès aux identifiants AWS nécessaires au `dvc pull`. La CI journalise un
 avertissement et saute les étapes de récupération et de vérification des artefacts dans ce cas. Les branches internes

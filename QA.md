@@ -28,7 +28,7 @@
 
 ## Manual Verification
 
-1. Launch the GUI with `python -m app.ui.main`.
+1. Launch the GUI with `./run.ps1` on Windows or `python -m app.ui.main` from the repository root on other platforms.
 2. Enter a prompt and press **Envoyer**.
 3. The button disables while the response is generated.
 4. The interface remains responsive and the button re-enables once the reply appears.
@@ -54,8 +54,8 @@
   `diff-cover` détecte une baisse (seuil configuré avec `DIFF_COVER_FAIL_UNDER=100`).
 * Exécutez `nox -s policy` pour valider hors-ligne les exigences de diffusion : cohérence de version,
   documentation offline, configuration multi-arch Docker et permissions de token pour la release.
-* The Windows job invokes `./installer.ps1 -SkipOllama` to validate that the PowerShell installer succeeds
-  without the Ollama models.
+* The Windows job invokes `./installer.ps1` to validate that the PowerShell installer succeeds with the
+  current offline-first bootstrap flow.
 * Immediately afterwards the workflow launches `./run.ps1` with an empty `DISPLAY` variable to emulate
   headless mode. Any startup failure or premature exit fails the build.
 * Forked pull requests skip the DVC artifact pull and verification steps because the AWS credentials are not

@@ -1,12 +1,12 @@
 # Autopilote sans intervention
 
-Ce document décrit l'exécution autonome de Watcher après la phase `watcher init --auto`. L'objectif est de garantir une collecte
+Ce document décrit l'exécution autonome de Watcher après la phase `watcher init --fully-auto`. L'objectif est de garantir une collecte
 et une ingestion 100 % locales, gouvernées par la politique `policy.yaml`, sans action manuelle.
 
 ## Vue d'ensemble
 
 1. **Démarrage automatique**
-   - Windows : `watcher init --auto` enregistre une entrée `RunOnce` puis crée la tâche planifiée « Watcher Autopilot » (ONLOGON)
+   - Windows : `watcher init --fully-auto` prépare `~/.watcher/` puis crée la tâche planifiée « Watcher Autopilot » (ONLOGON)
      qui lance `watcher autopilot run --noninteractive`.
    - Linux : la séquence d'initialisation installe `~/.config/systemd/user/watcher-autopilot.service` et
      `watcher-autopilot.timer` (OnBootSec=30s, OnUnitActiveSec=1h, Persistent=true).
@@ -15,27 +15,31 @@ et une ingestion 100 % locales, gouvernées par la politique `policy.yaml`, sans
 
 2. **Boucle continue**
    - La commande `watcher autopilot run --noninteractive` déclenche le contrôleur (`app/autopilot/controller.py`) qui orchestre
-     la boucle `discover → scrape → verify → ingest → reindex` jusqu'à la prochaine fenêtre programmée.
+     la boucle `discover → scrape → verify → ingest → report` jusqu'à la prochaine fenêtre programmée.
    - La planification (`app/autopilot/scheduler.py`) applique les créneaux réseau (`network_windows`) et les
      budgets (`bandwidth_mb_per_day`, `cpu_percent_cap`, `ram_mb_cap`). Le quota bande passante est compté sur une fenêtre glissante de 24h. Hors plage, le réseau reste coupé.
+   - Les autorisations de domaine sont lues depuis `policy.yaml` via `domain_rules` (`domain` + `scope`). `allowlist_domains`
+     reste synchronisé pour compatibilité avec les garde-fous runtime existants.
 
 3. **Surveillance et rapports**
    - Chaque itération journalise un `trace_id` JSON structuré pour audit (`~/.watcher/logs/`).
-   - Les métriques hebdomadaires sont résumées dans `~/.watcher/reports/autopilot-YYYY-WW.html` : sources contactées, éléments
+   - Les métriques hebdomadaires sont résumées dans `~/.watcher/reports/weekly.html` : sources contactées, éléments
      ingérés, rejets (licence ou corroboration insuffisante) et consommation budgétaire.
 
 ## Phases de la boucle Autopilot
 
-| Phase      | Description                                                                                          | Modules clés                                      |
-|------------|------------------------------------------------------------------------------------------------------|---------------------------------------------------|
-| Discover   | Exploration via sitemaps, RSS, GitHub Topics et résolution des *knowledge gaps*.                      | `app/autopilot/discovery.py`                      |
-| Scrape     | Téléchargement contrôlé : robots.txt, ETag/If-Modified-Since, throttling, timeouts, UA dédié.        | `app/scrapers/http.py`, `app/scrapers/rss.py`, … |
-| Verify     | Consolidation multi-sources (≥ 2 indépendantes), scoring de confiance, rejet des licences interdites. | `app/scrapers/verify.py`, `app/policy/rules.py`   |
-| Ingest     | Normalisation, détection de langue, chunking, embeddings locaux, indexation SQLite-VSS/FAISS.        | `app/ingest/pipeline.py`                          |
-| Reindex    | Rafraîchissement des statistiques (`index.stats`) et génération du rapport hebdomadaire.             | `app/ingest/index.py`                             |
+| Phase      | Description                                                                                             | Modules clés                                                     |
+|------------|---------------------------------------------------------------------------------------------------------|------------------------------------------------------------------|
+| Discover   | Exploration via sitemaps, flux RSS/Atom et résolution GitHub ciblée à partir des `domain_rules`.      | `app/autopilot/discovery.py`, `app/scrapers/sitemap.py`, `app/scrapers/github.py` |
+| Scrape     | Téléchargement HTTP contrôlé pour les pages web découvertes (`respect_robots=True`, throttling, etc.). | `app/scrapers/http.py`, `app/autopilot/controller.py`            |
+| Verify     | Filtrage par policy/consentement, corroboration multi-source (≥ 2 domaines) et contrôle de licence.    | `app/autopilot/controller.py`                                    |
+| Evaluate   | Gate déterministe avant promotion (corroboration minimale, fraîcheur max optionnelle, score et motif). | `app/autopilot/controller.py`, `app/ingest/source_registry.py`   |
+| Ingest     | Normalisation, détection de langue, chunking, embeddings locaux et indexation vectorielle.              | `app/ingest/pipeline.py`                                         |
+| Report     | Mise à jour du source registry, révocation locale et génération du rapport hebdomadaire HTML.           | `app/autopilot/controller.py`                                    |
 
-Chaque phase tourne dans un sous-processus enfermé (Job Objects sous Windows, cgroups sous Linux) avec quotas CPU/RAM et
-système de fichiers limité au workspace (`~/.watcher/workspace`).
+Le runtime reste borné par la policy (`network_windows`, budgets, kill-switch), le `ConsentGate` et la corroboration
+multi-source avant toute promotion dans l'index local. Une source validée peut désormais être rejetée par le gate
+d'évaluation avant ingestion, avec persistance de `evaluation_status`, `evaluation_score` et `evaluation_reason`.
 
 ## Gestion des budgets et du réseau
 
@@ -46,16 +50,17 @@ système de fichiers limité au workspace (`~/.watcher/workspace`).
 
 ## Journalisation et audit
 
-- Toutes les actions autopilot sont tracées dans `~/.watcher/logs/autopilot.jsonl` avec `trace_id`, phase, source et résultat.
+- Toutes les actions autopilot passent par la journalisation configurée (`LOGGING_CONFIG_PATH` ou `config/logging.yml`) et sont écrites par défaut sous `~/.watcher/logs/`, avec `trace_id` lorsque le formatter structuré est activé.
 - Le ledger `~/.watcher/consents.jsonl` n'enregistre qu'un nouvel item lorsqu'une source (domaine/scope/version) change.
+- Le rapport hebdomadaire inclut désormais les sources ingérées, les promotions rejetées, les sources révoquées localement et les domaines révoqués observés dans le ledger récent.
 - Les scripts d'autostart générés (`~/.watcher/autostart/windows/*`, `~/.watcher/autostart/linux/*`) peuvent être ré-exécutés
   pour audit ou réparation.
 
 ## Tests recommandés
 
-- `pytest -m autopilot --maxfail=1` : valide la planification réseau, les budgets et le kill-switch.
-- `pytest -m scraping` : couvre la conformité robots/ETag et la déduplication.
-- Simulation d'un logon Windows ou `systemd --user` : vérifier que `watcher autopilot run --noninteractive` démarre sans
+- `pytest tests/test_autopilot.py tests/test_autopilot_controller.py tests/test_autopilot_discovery.py -q` : valide la planification réseau, les budgets, le kill-switch, `domain_rules` et le chemin `scope=git`.
+- `pytest tests/test_cli_autopilot.py -q` : couvre la surface CLI `watcher autopilot ...`.
+- Simulation d'un logon Windows ou `systemd --user` : vérifier que `watcher autopilot run --noninteractive` démarre sans
   interaction.
 
 Ces tests sont intégrés aux pipelines CI, assurant le mode plug-and-play et la conformité aux critères de confiance.
@@ -66,4 +71,4 @@ Ces tests sont intégrés aux pipelines CI, assurant le mode plug-and-play et la
 - **HTTP non chiffré (`http://`)** : interdit par défaut en discovery.
 - **Exception locale uniquement** : `localhost`, `127.0.0.1`, `::1` peuvent conserver un fallback HTTP pour les environnements de test/offline locaux.
 - **Robots.txt** : discovery et scraping utilisent `respect_robots=True` partout, y compris pour les sitemaps et les flux RSS.
-- **GitHub scope (`scope=git`)** : unique exception runtime. Watcher interroge seulement `api.github.com/repos/<owner>/<repo>` avec `respect_robots=False`, car il s'agit d'un endpoint API machine explicite utilisé uniquement pour résoudre un dépôt déjà ciblé par la policy (allowlist/topic). Aucune autre voie `no-robots` n'est autorisée.
+- **GitHub scope (`scope=git`)** : unique exception runtime. Watcher interroge seulement `api.github.com/repos/<owner>/<repo>` avec `respect_robots=False`, car il s'agit d'un endpoint API machine explicite utilisé uniquement pour résoudre un dépôt déjà ciblé par la policy (`domain_rules`, avec `allowlist_domains` maintenu en compatibilité). Aucune autre voie `no-robots` n'est autorisée.

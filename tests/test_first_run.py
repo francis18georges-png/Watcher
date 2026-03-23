@@ -40,7 +40,7 @@ def test_first_run_creates_expected_files(tmp_path: Path, monkeypatch: pytest.Mo
     policy_path = home / ".watcher" / "policy.yaml"
     assert policy_path.exists()
     content = policy_path.read_text(encoding="utf-8")
-    assert "version: 1" in content
+    assert "version: 2" in content
 
     ledger_path = home / ".watcher" / "consents.jsonl"
     assert ledger_path.exists()

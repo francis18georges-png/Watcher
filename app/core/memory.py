@@ -2,6 +2,7 @@ import math
 import os
 import sqlite3
 import time
+from contextlib import contextmanager
 from pathlib import Path
 from typing import TYPE_CHECKING, Iterator
 
@@ -213,10 +214,18 @@ class Memory:
         value = os.getenv("WATCHER_MEMORY_ENABLE_SQLCIPHER", "")
         return value.lower() in {"1", "true", "yes", "on"}
 
-    def _connect(self) -> sqlite3.Connection:
+    @contextmanager
+    def _connect(self) -> Iterator[sqlite3.Connection]:
         con = sqlite3.connect(self.db_path)
         self._apply_connection_settings(con)
-        return con
+        try:
+            yield con
+            con.commit()
+        except Exception:
+            con.rollback()
+            raise
+        finally:
+            con.close()
 
     def _apply_connection_settings(self, con: sqlite3.Connection) -> None:
         self._configure_sqlcipher(con)

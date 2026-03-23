@@ -8,6 +8,7 @@ import threading
 import time
 from pathlib import Path
 from typing import Any, Sequence
+from urllib.parse import urlparse
 
 import numpy as np
 
@@ -148,6 +149,33 @@ class SimpleVectorStore:
         paired.sort(key=lambda item: item[1], reverse=True)
         return paired[:k]
 
+    def delete_by_domains(self, domains: Sequence[str]) -> int:
+        domain_set = {
+            str(domain).strip().lower()
+            for domain in domains
+            if str(domain).strip()
+        }
+        if not domain_set:
+            return 0
+
+        with self._connect() as con:
+            rows = con.execute(
+                "SELECT id, metadata FROM documents WHERE namespace = ?",
+                (self.namespace,),
+            ).fetchall()
+            to_delete = [
+                (doc_id,)
+                for doc_id, raw_meta in rows
+                if self._domain_from_raw_meta(raw_meta) in domain_set
+            ]
+            if not to_delete:
+                return 0
+            con.executemany(
+                "DELETE FROM documents WHERE id = ?",
+                to_delete,
+            )
+        return len(to_delete)
+
     # ------------------------------------------------------------------
     # Internal helpers
 
@@ -182,6 +210,27 @@ class SimpleVectorStore:
         if "text" not in meta:
             meta["text"] = text
         return meta
+
+    @staticmethod
+    def _domain_from_raw_meta(raw: str) -> str | None:
+        try:
+            meta = json.loads(raw) if raw else {}
+        except json.JSONDecodeError:
+            meta = {}
+        if not isinstance(meta, dict):
+            return None
+        domain = meta.get("domain")
+        if isinstance(domain, str) and domain.strip():
+            return domain.strip().lower()
+        for key in ("source", "url"):
+            value = meta.get(key)
+            if not isinstance(value, str):
+                continue
+            parsed = urlparse(value)
+            hostname = (parsed.hostname or "").strip().lower()
+            if hostname:
+                return hostname
+        return None
 
     def _prune(self) -> None:
         if self._retention < 1:

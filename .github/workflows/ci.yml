@@ -61,7 +61,7 @@ jobs:
               if fragment and fragment.strip()
           ]
           if not versions:
-              versions = ["3.10", "3.11", "3.12"]
+              versions = ["3.12"]
 
           output = Path(os.environ["GITHUB_OUTPUT"])
           with output.open("a", encoding="utf-8") as file:
@@ -213,7 +213,7 @@ jobs:
       - name: Validate Windows installer
         if: runner.os == 'Windows'
         shell: pwsh
-        run: ./installer.ps1 -SkipOllama
+        run: ./installer.ps1
 
       - name: Run micro benchmarks
         if: runner.os == 'Linux'

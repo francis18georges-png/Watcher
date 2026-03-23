@@ -8,6 +8,7 @@ from .controller import (
     KnowledgeGapDetector,
     LedgerView,
     MultiSourceVerifier,
+    PromotionEvaluator,
     ReportGenerator,
 )
 from .discovery import DefaultDiscoveryCrawler
@@ -37,6 +38,7 @@ __all__ = [
     "KnowledgeGapDetector",
     "LedgerView",
     "MultiSourceVerifier",
+    "PromotionEvaluator",
     "ReportGenerator",
     "ResourceProbe",
     "ResourceUsage",

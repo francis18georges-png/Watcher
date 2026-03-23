@@ -6,6 +6,7 @@ from dataclasses import dataclass
 from datetime import datetime, time
 from pathlib import Path
 from typing import Any, Iterable
+from urllib.parse import urlparse
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
@@ -55,6 +56,15 @@ def _expand_range(start: str, end: str) -> list[str]:
 
 def _format_time(value: time) -> str:
     return value.strftime("%H:%M")
+
+
+def _normalise_domain(value: str) -> str:
+    text = value.strip().lower()
+    if "://" in text:
+        parsed = urlparse(text)
+        if parsed.hostname:
+            text = parsed.hostname.lower()
+    return text.strip().strip("/")
 
 
 class NetworkWindow(BaseModel):
@@ -172,6 +182,36 @@ class ModelsSection(BaseModel):
         }
 
 
+class DomainPolicyRule(BaseModel):
+    """Persisted policy entry describing an approved domain and its scope."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    domain: str
+    scope: str = "web"
+
+    @field_validator("domain", mode="before")
+    @classmethod
+    def _parse_domain(cls, value: Any) -> str:
+        text = _normalise_domain(str(value))
+        if not text:
+            raise ValueError("domain must not be empty")
+        return text
+
+    @field_validator("scope", mode="before")
+    @classmethod
+    def _parse_scope(cls, value: Any) -> str:
+        text = str(value).strip().lower()
+        if not text:
+            raise ValueError("scope must not be empty")
+        if text not in {"web", "git"}:
+            raise ValueError("scope must be one of: web, git")
+        return text
+
+    def to_dict(self) -> dict[str, str]:
+        return {"domain": self.domain, "scope": self.scope}
+
+
 @dataclass(slots=True)
 class DomainRule:
     """Policy entry describing a domain that is allowed for scraping."""
@@ -185,7 +225,7 @@ class DomainRule:
 class Policy(BaseModel):
     """Top level schema for ``policy.yaml``."""
 
-    model_config = ConfigDict(extra="forbid")
+    model_config = ConfigDict(extra="forbid", populate_by_name=True)
 
     version: int = Field(ge=1, default=1)
     autostart: bool = True
@@ -195,6 +235,10 @@ class Policy(BaseModel):
     network_windows: list[NetworkWindow]
     budgets: Budgets
     allowlist_domains: list[str] = Field(default_factory=list)
+    domain_rule_entries: list[DomainPolicyRule] = Field(
+        default_factory=list,
+        alias="domain_rules",
+    )
     subject: Subject | None = None
     models: ModelsSection
 
@@ -203,15 +247,31 @@ class Policy(BaseModel):
     def _coerce_domains(cls, value: Iterable[str]) -> list[str]:
         domains = []
         for item in value or []:
-            text = str(item).strip().lower()
+            text = _normalise_domain(str(item))
             if text:
                 domains.append(text)
         return sorted(set(domains))
+
+    @field_validator("domain_rule_entries", mode="before")
+    @classmethod
+    def _coerce_domain_rules(cls, value: Any) -> list[DomainPolicyRule]:
+        if not value:
+            return []
+        if not isinstance(value, Iterable) or isinstance(value, (str, bytes)):
+            raise ValueError("domain_rules must be a list")
+        entries: list[DomainPolicyRule] = []
+        for item in value:
+            if isinstance(item, DomainPolicyRule):
+                entries.append(item)
+            else:
+                entries.append(DomainPolicyRule.model_validate(item))
+        return entries
 
     @model_validator(mode="after")
     def _validate_windows(self) -> "Policy":
         if not self.network_windows:
             raise ValueError("at least one network window must be defined")
+        self._sync_domain_rules(include_allowlist=True)
         return self
 
     def to_dict(self) -> dict[str, Any]:
@@ -224,6 +284,7 @@ class Policy(BaseModel):
             "network_windows": [window.to_dict() for window in self.network_windows],
             "budgets": self.budgets.to_dict(),
             "allowlist_domains": list(self.allowlist_domains),
+            "domain_rules": [rule.to_dict() for rule in self.domain_rule_entries],
             "models": self.models.to_dict(),
         }
         if self.subject is not None:
@@ -244,9 +305,41 @@ class Policy(BaseModel):
         default_bandwidth = self.budgets.bandwidth_mb_per_day
         time_budget = self.window_duration_minutes()
         return [
-            DomainRule(domain=domain, bandwidth_mb=default_bandwidth, time_budget_minutes=time_budget)
-            for domain in self.allowlist_domains
+            DomainRule(
+                domain=rule.domain,
+                bandwidth_mb=default_bandwidth,
+                time_budget_minutes=time_budget,
+                scope=rule.scope,
+            )
+            for rule in self.domain_rule_entries
         ]
+
+    def add_domain_rule(self, *, domain: str, scope: str) -> bool:
+        candidate = DomainPolicyRule(domain=domain, scope=scope)
+        key = (candidate.domain, candidate.scope)
+        existing = {(rule.domain, rule.scope) for rule in self.domain_rule_entries}
+        if key in existing:
+            return False
+        self.domain_rule_entries.append(candidate)
+        self._sync_domain_rules()
+        return True
+
+    def remove_domain_rule(self, *, domain: str, scope: str | None = None) -> bool:
+        domain_norm = _normalise_domain(domain)
+        scope_norm = str(scope).strip().lower() if scope is not None else None
+        kept: list[DomainPolicyRule] = []
+        removed = False
+        for rule in self.domain_rule_entries:
+            matches_domain = rule.domain == domain_norm
+            matches_scope = scope_norm is None or rule.scope == scope_norm
+            if matches_domain and matches_scope:
+                removed = True
+                continue
+            kept.append(rule)
+        if removed:
+            self.domain_rule_entries = kept
+            self._sync_domain_rules()
+        return removed
 
     def kill_switch_engaged(self, *, home: Path | None = None) -> bool:
         return self.kill_switch_path(home=home).exists()
@@ -254,9 +347,22 @@ class Policy(BaseModel):
     def to_persistable(self) -> dict[str, Any]:
         return self.to_dict()
 
+    def _sync_domain_rules(self, *, include_allowlist: bool = False) -> None:
+        merged: dict[tuple[str, str], DomainPolicyRule] = {}
+        if include_allowlist:
+            for domain in self.allowlist_domains:
+                rule = DomainPolicyRule(domain=domain, scope="web")
+                merged[(rule.domain, rule.scope)] = rule
+        for rule in self.domain_rule_entries:
+            merged[(rule.domain, rule.scope)] = rule
+        keys = sorted(merged)
+        self.domain_rule_entries = [merged[key] for key in keys]
+        self.allowlist_domains = sorted({rule.domain for rule in self.domain_rule_entries})
+
 
 __all__ = [
     "Budgets",
+    "DomainPolicyRule",
     "DomainRule",
     "ModelEntry",
     "ModelsSection",

@@ -5,12 +5,21 @@ from __future__ import annotations
 import hashlib
 import hmac
 import json
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 
 
 class LedgerError(RuntimeError):
     """Raised when the consent ledger cannot be parsed."""
+
+
+def _utc_timestamp() -> str:
+    """Return a UTC timestamp using the persisted ``...Z`` format."""
+
+    return datetime.now(timezone.utc).isoformat(timespec="seconds").replace(
+        "+00:00",
+        "Z",
+    )
 
 
 class ConsentLedger:
@@ -44,7 +53,7 @@ class ConsentLedger:
     def record(self, *, action: str, domain: str, scope: str, policy_hash: str) -> None:
         payload = {
             "type": "entry",
-            "timestamp": datetime.utcnow().isoformat(timespec="seconds") + "Z",
+            "timestamp": _utc_timestamp(),
             "action": action,
             "domain": domain,
             "scope": scope,

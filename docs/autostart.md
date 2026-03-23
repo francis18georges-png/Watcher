@@ -7,15 +7,15 @@ Watcher automatise l'exécution de l'autopilote sans commandes en configurant de
 Les artefacts générés sont archivés dans `~/.watcher/autostart/windows/` pour audit :
 
 - `watcher-register-autostart.ps1` peut être relancé pour recréer le RunOnce et la tâche planifiée.
-- `README.md` résume les étapes appliquées durant `watcher init --auto`.
-- **RunOnce** exécute `watcher init --auto` si la sentinelle `~/.watcher/first_run` est présente.
+- `README.md` résume les étapes appliquées durant `watcher init --fully-auto`.
+- **RunOnce** exécute `watcher init --fully-auto` si la sentinelle `~/.watcher/first_run` est présente.
 - La tâche planifiée `Watcher Autopilot` lance `watcher autopilot run --noninteractive` à chaque ouverture de session.
 - `WATCHER_DISABLE=1` ou `~/.watcher/disable` désactivent le démarrage automatique, sauf si `WATCHER_AUTOSTART=1` force explicitement l'activation.
 - Le planificateur peut importer `scripts/autostart/windows/watcher-task.xml` pour obtenir une tâche reproductible pilotant `run-offline.ps1` (voir dépôt).
 
 ```powershell
 # Contenu de ~/.watcher/autostart/windows/watcher-register-autostart.ps1
-$runOnce = "watcher init --auto"
+$runOnce = "watcher init --fully-auto"
 $autopilot = "watcher autopilot run --noninteractive"
 
 New-Item -Path 'HKCU:\Software\Microsoft\Windows\CurrentVersion\RunOnce' -Force | Out-Null

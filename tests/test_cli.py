@@ -65,39 +65,44 @@ def _stub_watcher_settings(monkeypatch):
         class intelligence:
             mode = "offline"
 
+    monkeypatch.setattr(watcher_cli, "auto_configure_if_needed", lambda *args, **kwargs: None)
     monkeypatch.setattr(watcher_cli, "get_settings", lambda: _Settings())
 
 
 def test_watcher_policy_cli_approve_revoke_flow(tmp_path, monkeypatch, capsys):
     home = tmp_path / "home"
     home.mkdir()
-    monkeypatch.setenv("HOME", str(home))
 
     configurator = watcher_cli.FirstRunConfigurator(home=home)
     configurator.run(auto=True, download_models=False)
+    manager = watcher_cli.PolicyManager(home=home)
+    monkeypatch.setattr(watcher_cli, "PolicyManager", lambda: manager)
 
     approve_code = watcher_cli.main(
-        ["policy", "approve", "--domain", "example.com", "--scope", "web"]
+        ["policy", "approve", "--domain", "example.com", "--scope", "git"]
     )
     assert approve_code == 0
-    assert "Autorisation enregistrée" in capsys.readouterr().out
+    assert "Autorisation enregistrée pour example.com (git)" in capsys.readouterr().out
 
-    revoke_code = watcher_cli.main(["policy", "revoke", "--domain", "example.com"])
+    revoke_code = watcher_cli.main(
+        ["policy", "revoke", "--domain", "example.com", "--scope", "git"]
+    )
     assert revoke_code == 0
-    assert "Autorisation révoquée" in capsys.readouterr().out
+    assert "Autorisation révoquée pour example.com (git)" in capsys.readouterr().out
 
 
 def test_watcher_policy_cli_rejects_invalid_scope(tmp_path, monkeypatch):
     home = tmp_path / "home"
     home.mkdir()
-    monkeypatch.setenv("HOME", str(home))
 
     configurator = watcher_cli.FirstRunConfigurator(home=home)
     configurator.run(auto=True, download_models=False)
+    manager = watcher_cli.PolicyManager(home=home)
+    monkeypatch.setattr(watcher_cli, "PolicyManager", lambda: manager)
 
     with pytest.raises(SystemExit) as exc:
         watcher_cli.main(
-            ["policy", "approve", "--domain", "example.com", "--scope", "   "]
+            ["policy", "approve", "--domain", "example.com", "--scope", "api"]
         )
 
     assert exc.value.code == 2

@@ -65,12 +65,19 @@ class _LocalEncoder:
 _ENCODER = _LocalEncoder()
 
 
+def _zero_vectors(texts: list[str]) -> list[np.ndarray]:
+    return [np.zeros(1, dtype=np.float32) for _ in texts]
+
+
 def embed_local(texts: list[str]) -> list[np.ndarray]:
     """Embed ``texts`` using the local SentenceTransformer model."""
 
     if not texts:
         return []
-    return _ENCODER.encode(texts)
+    try:
+        return _ENCODER.encode(texts)
+    except RuntimeError:
+        return _zero_vectors(texts)
 
 
 def embed_ollama(
@@ -104,7 +111,7 @@ def embed_ollama(
     memory_cfg = settings.memory
 
     model = model or memory_cfg.embed_model
-    host = host or memory_cfg.embed_host
+    host = host or getattr(memory_cfg, "embed_host", "127.0.0.1:11434")
 
     parsed = urlparse(host if "://" in host else f"http://{host}")
     scheme = (parsed.scheme or "http").lower()

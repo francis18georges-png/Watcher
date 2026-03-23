@@ -8,7 +8,7 @@ import yaml
 from pydantic import ValidationError
 
 from .ledger import ConsentLedger, LedgerError
-from .schema import Policy
+from .schema import DomainPolicyRule, Policy
 
 
 class PolicyError(RuntimeError):
@@ -43,7 +43,9 @@ class PolicyManager:
 
     def _read_policy(self) -> Policy:
         if not self.policy_path.exists():
-            raise PolicyError("policy.yaml is missing – run 'watcher init --auto'")
+            raise PolicyError(
+                "policy.yaml is missing – run 'watcher init --fully-auto'"
+            )
         text = self.policy_path.read_text(encoding="utf-8")
         try:
             data = yaml.safe_load(text) or {}
@@ -79,34 +81,26 @@ class PolicyManager:
         scope: str,
     ) -> PolicyApproval:
         policy = self._read_policy()
-        domain_norm = domain.strip().lower()
-        scope_norm = scope.strip().lower()
-        if not domain_norm:
-            raise PolicyError("domain must not be empty")
-        if not scope_norm:
-            raise PolicyError("scope must not be empty")
-        created = False
-        if domain_norm not in policy.allowlist_domains:
-            policy.allowlist_domains.append(domain_norm)
-            policy.allowlist_domains = sorted(set(policy.allowlist_domains))
+        rule = self._coerce_rule(domain=domain, scope=scope)
+        created = policy.add_domain_rule(domain=rule.domain, scope=rule.scope)
+        if created:
             self._write_policy(policy)
-            created = True
-        self._record("approve", domain=domain_norm, scope=scope_norm)
-        return PolicyApproval(domain=domain_norm, scope=scope_norm, created=created)
+            self._record("approve", domain=rule.domain, scope=rule.scope)
+        return PolicyApproval(domain=rule.domain, scope=rule.scope, created=created)
 
     def revoke(self, domain: str, scope: str | None = None) -> None:
         policy = self._read_policy()
-        domain_norm = domain.strip().lower()
-        if not domain_norm:
-            raise PolicyError("domain must not be empty")
-        before = set(policy.allowlist_domains)
-        policy.allowlist_domains = sorted(
-            {item for item in policy.allowlist_domains if item != domain_norm}
-        )
-        if set(policy.allowlist_domains) == before:
-            raise PolicyError(f"aucune autorisation trouvée pour {domain}")
+        domain_norm = self._coerce_domain(domain)
+        scope_norm = self._coerce_scope(scope) if scope is not None else None
+        removed = policy.remove_domain_rule(domain=domain_norm, scope=scope_norm)
+        if not removed:
+            if scope_norm is None:
+                raise PolicyError(f"aucune autorisation trouvée pour {domain_norm}")
+            raise PolicyError(
+                f"aucune autorisation trouvée pour {domain_norm} ({scope_norm})"
+            )
         self._write_policy(policy)
-        self._record("revoke", domain=domain_norm, scope=scope or "*")
+        self._record("revoke", domain=domain_norm, scope=scope_norm or "*")
 
     def _record(self, action: str, *, domain: str, scope: str) -> None:
         try:
@@ -119,3 +113,35 @@ class PolicyManager:
             scope=scope,
             policy_hash=self._policy_hash(),
         )
+
+    @staticmethod
+    def _coerce_rule(*, domain: str, scope: str) -> DomainPolicyRule:
+        try:
+            return DomainPolicyRule(domain=domain, scope=scope)
+        except ValidationError as exc:
+            raise PolicyError(_first_validation_message(exc)) from exc
+
+    @classmethod
+    def _coerce_domain(cls, domain: str) -> str:
+        return cls._coerce_rule(domain=domain, scope="web").domain
+
+    @staticmethod
+    def _coerce_scope(scope: str) -> str:
+        text = str(scope).strip().lower()
+        if not text:
+            raise PolicyError("scope must not be empty")
+        if text not in {"web", "git"}:
+            raise PolicyError("scope must be one of: web, git")
+        return text
+
+
+def _first_validation_message(exc: ValidationError) -> str:
+    errors = exc.errors()
+    if errors:
+        message = errors[0].get("msg")
+        if isinstance(message, str):
+            prefix = "Value error, "
+            if message.startswith(prefix):
+                return message[len(prefix) :]
+            return message
+    return str(exc)

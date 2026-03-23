@@ -30,6 +30,7 @@ default_license = "MIT"
 db_path = "memory/mem.db"
 cache_size = 128
 embed_model = "sentence-transformers/all-MiniLM-L6-v2"
+embed_host = "127.0.0.1:11434"
 embed_model_path = "models/embeddings/all-MiniLM-L6-v2"
 summary_max_tokens = 512
 retention_limit = 4096

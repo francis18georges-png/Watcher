@@ -15,6 +15,13 @@ allowlist_domains:
   - docs.python.org
   - pytorch.org
   - w3.org
+domain_rules:
+  - domain: docs.python.org
+    scope: web
+  - domain: pytorch.org
+    scope: web
+  - domain: w3.org
+    scope: web
 subject:
   hostname: "{{ hostname }}"
   generated_at: "{{ generated_at }}"
@@ -25,5 +32,5 @@ models:
     license: Apache-2.0
   embedding:
     name: demo-all-MiniLM-L6-v2.tar.gz
-    sha256: a5a51b533681a69446283e3c6ce7c35bc098e0bd540c9ff56931a02c414dc054
+    sha256: 35d2dc1b5b4546946ec7e54c94d5c15b7544e6ed644a71b24966931f0a49ed06
     license: Apache-2.0

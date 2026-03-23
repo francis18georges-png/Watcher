@@ -130,7 +130,7 @@ recommandées pour les releases officielles :
 
 ### SBOM SPDX pour l'image Docker
 
-Chaque exécution du workflow [`docker.yml`](../.github/workflows/docker.yml) publie également
+Chaque exécution du workflow [`docker.yml`](https://github.com/francis18georges-png/Watcher/blob/main/.github/workflows/docker.yml) publie également
 `watcher-image-sbom-spdx/sbom.spdx.json`. Le fichier est généré par `syft` et peut être importé
 dans des solutions nécessitant un SBOM au format SPDX 2.3. Après avoir téléchargé l'artefact :
 

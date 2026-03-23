@@ -5,7 +5,7 @@ from __future__ import annotations
 import json
 import logging
 from dataclasses import dataclass, field
-from datetime import datetime, time, timedelta
+from datetime import datetime, time, timedelta, timezone
 from pathlib import Path
 from typing import Any, Callable, Mapping, Sequence
 
@@ -19,6 +19,10 @@ except ImportError:  # pragma: no cover - fallback
 
 
 LOGGER = logging.getLogger(__name__)
+
+
+def _utc_now() -> datetime:
+    return datetime.now(timezone.utc)
 
 
 def _coerce_score(value: Any) -> float | None:
@@ -271,7 +275,7 @@ class AutopilotScheduler:
         self.state_path = state_path
         self.state_path.parent.mkdir(parents=True, exist_ok=True)
         self._resource_probe = resource_probe or ResourceProbe()
-        self._clock = clock or datetime.utcnow
+        self._clock = clock or _utc_now
         self._logger = logger or LOGGER
         self.state = self._load_state()
 

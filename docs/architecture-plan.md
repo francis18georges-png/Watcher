@@ -12,7 +12,7 @@
 - **Bootstrap (`app/bootstrap.py`)** : détection du premier démarrage, création des dossiers `~/.watcher` et du kill-switch `disable`.
 - **Crawler (`app/crawl/*`)** : pipeline structuré autour de `AllowlistManager`, `RobotsCache`, `FetchWorker`, `Parser`, `QualityScorer`.
 - **Vector Store (`app/embeddings/store.py`)** : surcouche SQLite/FAISS (`sqlite-vss`) et conversions embeddings `sentence-transformers`.
-- **Scheduler (`app/autopilot/scheduler.py`)** : tâches périodiques (crawl, reindex, rapport hebdo) suivant la politique.
+- **Scheduler (`app/autopilot/scheduler.py`)** : tâches périodiques (crawl, ingestion, rapport hebdo) suivant la politique.
 - **Consent Ledger (`app/policy/consent.py`)** : append-only JSONL signé (clé Ed25519 générée lors du `init`).
 - **Sandbox (`app/security/sandbox.py`)** : wrapper cgroups/Job Objects + coupe-circuit réseau (iptables/Windows Firewall) + `pytest-socket`.
 

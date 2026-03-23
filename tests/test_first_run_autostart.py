@@ -92,7 +92,7 @@ def test_autostart_creates_windows_definitions(
     configurator.run(auto=True, download_models=False)
 
     powershell_call = next(call for call in calls if call and call[0] == "powershell")
-    assert "watcher init --auto" in powershell_call[-1]
+    assert "watcher init --fully-auto" in powershell_call[-1]
     assert "WatcherInit" in powershell_call[-1]
 
     schtasks_call = next(call for call in calls if call and call[0] == "schtasks")
@@ -109,8 +109,9 @@ def test_autostart_creates_windows_definitions(
     assert script_path.is_file()
     assert readme_path.is_file()
     content = script_path.read_text(encoding="utf-8")
-    assert "watcher init --auto" in content
+    assert "watcher init --fully-auto" in content
     assert "watcher autopilot run --noninteractive" in content
+    assert "watcher init --fully-auto" in readme_path.read_text(encoding="utf-8")
 
 
 def test_autostart_respects_disable_environment(

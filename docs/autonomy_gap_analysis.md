@@ -4,18 +4,18 @@ This document captures the blocking items identified to make Watcher "functionne
 
 ## Constat actuel
 - Pas encore plug-and-play : absence de release publiée, workflows Release/Docker en échec, image GHCR non multi-arch, documentation publique 404.
-- Les commandes cibles (`watcher init --auto`, `watcher autopilot enable --topics "…"`, `watcher ingest --auto`, `watcher run --offline --prompt "…"`) ne disposent pas encore d'un chemin entièrement automatisé et vérifié.
+- Les commandes cibles (`watcher init --fully-auto`, `watcher autopilot enable --topics "…"`, `watcher ingest chemin/`, `watcher run --offline --prompt "…"`) ne disposent pas encore d'un chemin entièrement automatisé et vérifié.
 
 ## P0 — Indispensables
 1. **First-run automatique**
-   - Commande `watcher init --auto` qui détecte CPU/GPU, sélectionne un modèle local, télécharge par hash, initialise `~/.watcher/config.toml` et peuple `models/`.
+   - Commande `watcher init --fully-auto` qui détecte CPU/GPU, sélectionne un modèle local, télécharge par hash, initialise `~/.watcher/config.toml` et peuple `models/`.
    - Script first-run unique avec garde-fous et vérification d'intégrité des modèles.
    - Test CI dédié qui échoue si un téléchargement ou hash ne correspond pas ; exécution `pytest -m first_run` en mode offline.
 2. **Policy & consentement explicites**
-   - Ajouter `config/policy.yaml` définissant allowlist de domaines, budgets (temps/bande passante), quotas CPU/RAM, fréquences et catégories de contenu autorisées.
+   - Ajouter `config/policy.yaml` définissant des `domain_rules` par domaine/scope, des budgets (temps/bande passante), des quotas CPU/RAM, des fréquences et des catégories de contenu autorisées.
    - Mettre en place un "consent ledger" JSON signé pour journaliser chaque nouvelle autorisation utilisateur ou source.
 3. **Autopilot planifié & sandbox réseau**
-   - Implémenter `watcher autopilot enable --topics "X,Y"` : planification des étapes discover → scrape → dedupe → verify → ingest → reindex.
+   - Implémenter `watcher autopilot enable --topics "X,Y"` : planification des étapes discover → scrape → dedupe → verify → ingest → report.
    - Forcer le respect des `robots.txt`, des en-têtes `ETag`/`Last-Modified`, du throttling et des licences ; réseau désactivé hors fenêtres "autopilot".
 4. **Vérification multi-sources**
    - Requérir corroboration ≥ 2 sources indépendantes avant ingestion.
@@ -33,7 +33,7 @@ This document captures the blocking items identified to make Watcher "functionne
 8. **Logs & métriques structurés**
    - Sortie logs JSON avec `trace_id` ; compteurs `pages_scrapees`, `taux_rejet`, `latence`, `tokens`.
 9. **Profils prêts à l'emploi**
-   - Options `--profile dev-docs`, `--profile research` chargeant des allowlists, budgets et parseurs spécialisés.
+   - Options `--profile dev-docs`, `--profile research` chargeant des `domain_rules`, budgets et parseurs spécialisés.
 
 ## CI/CD — Actions immédiates
 - Publier la release `v0.4.0` après correction du workflow Release (92 échecs en cours).

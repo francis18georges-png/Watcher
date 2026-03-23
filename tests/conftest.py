@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import importlib
 import importlib.util
 import logging
@@ -44,7 +45,10 @@ except ImportError:  # pragma: no cover - fallback when dependency missing local
 
 pytest_plugins = ("pytest_socket",)
 
-socket.disable_socket()
+if sys.platform == "win32" and hasattr(asyncio, "WindowsSelectorEventLoopPolicy"):
+    asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
+
+socket.disable_socket(allow_hosts=["127.0.0.1", "localhost"])
 
 
 @pytest.fixture(autouse=True)

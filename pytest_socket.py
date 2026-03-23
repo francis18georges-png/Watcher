@@ -10,6 +10,8 @@ from __future__ import annotations
 import socket
 from typing import Iterable
 
+_DEFAULT_ALLOWED_HOSTS = {"127.0.0.1", "localhost"}
+
 
 class SocketBlockedError(RuntimeError):
     """Raised when a test unexpectedly performs a network operation."""
@@ -27,7 +29,10 @@ class _SocketGuard:
     @classmethod
     def configure(cls, allow_unix: bool, hosts: Iterable[str]) -> None:
         cls.allow_unix = allow_unix
-        cls.allowed_hosts = {host.strip() for host in hosts if host.strip()}
+        cls.allowed_hosts = {
+            host.strip() for host in hosts if isinstance(host, str) and host.strip()
+        }
+        cls.allowed_hosts.update(_DEFAULT_ALLOWED_HOSTS)
 
     @classmethod
     def enable(cls) -> None:
